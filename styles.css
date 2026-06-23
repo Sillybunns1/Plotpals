@@ -509,3 +509,299 @@ body.light-mode .workspace-sidebar .nav-grandchild:hover {
 .app-shell.collapsed .menu-heading {
   justify-content: center;
 }
+
+
+/* PlotPals V15 additions */
+.big-cover {
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+}
+.banner-preview {
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+}
+.empty-art, .empty-banner {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  color: var(--muted);
+}
+.empty-banner {
+  min-height: 160px;
+}
+.scene-card {
+  border-left: 4px solid var(--accent-2);
+}
+.visual-timeline {
+  position: relative;
+  display: grid;
+  gap: 18px;
+  margin-left: 18px;
+}
+.visual-timeline:before {
+  content:"";
+  position:absolute;
+  left: 9px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(var(--accent), var(--accent-2));
+}
+.timeline-row {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 14px;
+  position: relative;
+}
+.timeline-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--gold);
+  box-shadow: 0 0 18px rgba(244,201,93,.35);
+  margin-top: 18px;
+  z-index: 1;
+}
+.timeline-card {
+  background: rgba(31,16,33,.82);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 16px;
+}
+.research-thumb, .map-preview {
+  width: 100%;
+  max-height: 260px;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.map-preview {
+  max-height: 360px;
+}
+
+/* PlotPals V15.1 hotfix */
+.open-existing-panel {
+  margin-top: 18px;
+}
+.open-existing-panel h3 {
+  margin-top: 0;
+}
+
+/* PlotPals V15.2 restored overview sidebar from V14 */
+.workspace-sidebar {
+  padding: 18px;
+}
+.workspace-sidebar .story-nav-group {
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+.workspace-sidebar .story-nav-group h4 {
+  margin: 0 0 10px;
+  color: #c68cff;
+  text-transform: uppercase;
+  font-size: .78rem;
+  letter-spacing: .08em;
+}
+.workspace-sidebar .story-nav,
+.workspace-sidebar .nav-parent,
+.workspace-sidebar .nav-child,
+.workspace-sidebar .nav-grandchild {
+  width: 100%;
+  text-align: left;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  background: transparent;
+  border-color: transparent;
+}
+.workspace-sidebar .story-nav:hover,
+.workspace-sidebar .nav-parent:hover,
+.workspace-sidebar .nav-child:hover,
+.workspace-sidebar .nav-grandchild:hover {
+  background: linear-gradient(90deg, rgba(103,43,173,.55), rgba(61,28,98,.2));
+  border-color: rgba(166,97,255,.35);
+}
+.workspace-sidebar .nav-child {
+  padding-left: 22px;
+}
+.workspace-sidebar .nav-grandchild {
+  padding-left: 42px;
+  font-size: .9rem;
+  color: var(--muted);
+}
+.overview-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+/* PlotPals V15.2 app shell safety */
+#appShell.app-shell:not(.hidden) {
+  display: grid;
+}
+#appShell.app-shell:not(.hidden) #sidebar {
+  display: block;
+}
+
+
+/* PlotPals V15.3 sidebar restoration */
+#nestedNav {
+  display: block;
+}
+.workspace-sidebar .story-nav-group {
+  display: block;
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+.workspace-sidebar .story-nav-group h4 {
+  margin: 0 0 10px;
+  color: #c68cff;
+  text-transform: uppercase;
+  font-size: .78rem;
+  letter-spacing: .08em;
+}
+.workspace-sidebar .story-nav,
+.workspace-sidebar .nav-parent,
+.workspace-sidebar .nav-child,
+.workspace-sidebar .nav-grandchild {
+  width: 100%;
+  text-align: left;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  background: transparent;
+  border-color: transparent;
+}
+.workspace-sidebar .story-nav:hover,
+.workspace-sidebar .nav-parent:hover,
+.workspace-sidebar .nav-child:hover,
+.workspace-sidebar .nav-grandchild:hover {
+  background: linear-gradient(90deg, rgba(103,43,173,.55), rgba(61,28,98,.2));
+  border-color: rgba(166,97,255,.35);
+}
+.workspace-sidebar .nav-child {
+  padding-left: 22px;
+}
+.workspace-sidebar .nav-grandchild {
+  padding-left: 42px;
+  font-size: .9rem;
+  color: var(--muted);
+}
+.overview-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+#appShell.app-shell:not(.hidden) {
+  display: grid;
+}
+#appShell.app-shell:not(.hidden) #sidebar {
+  display: block;
+}
+
+
+/* PlotPals V15.4 hard sidebar visibility */
+#nestedNav {
+  display: block !important;
+  min-height: 240px;
+}
+#nestedNav .story-nav-group {
+  display: block;
+}
+.static-sidebar-fallback {
+  display: block !important;
+}
+#sidebar {
+  display: block;
+}
+#appShell:not(.hidden) {
+  display: grid !important;
+}
+#appShell:not(.hidden) #sidebar {
+  display: block !important;
+}
+.workspace-sidebar .story-nav-group {
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+.workspace-sidebar .story-nav-group h4,
+#nestedNav .story-nav-group h4 {
+  margin: 0 0 10px;
+  color: #c68cff;
+  text-transform: uppercase;
+  font-size: .78rem;
+  letter-spacing: .08em;
+}
+.workspace-sidebar .story-nav,
+#nestedNav .story-nav {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 7px;
+  background: transparent;
+  border-color: transparent;
+}
+.workspace-sidebar .story-nav:hover,
+#nestedNav .story-nav:hover {
+  background: linear-gradient(90deg, rgba(103,43,173,.55), rgba(61,28,98,.2));
+  border-color: rgba(166,97,255,.35);
+}
+#nestedNav .nav-child {
+  padding-left: 22px;
+}
+#nestedNav .nav-grandchild {
+  padding-left: 42px;
+  font-size: .9rem;
+  color: var(--muted);
+}
+
+
+/* PlotPals V15.5 collapsible overview sidebar */
+.collapsible-menu-heading {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+  color: #c68cff;
+  text-transform: uppercase;
+  font-size: .78rem;
+  letter-spacing: .08em;
+  padding: 10px 8px;
+  margin-bottom: 8px;
+}
+.collapsible-menu-heading:hover {
+  background: linear-gradient(90deg, rgba(103,43,173,.55), rgba(61,28,98,.2));
+  border-color: rgba(166,97,255,.35);
+}
+.collapsible-menu-content {
+  display: block;
+}
+.story-nav-group.collapsed-menu .collapsible-menu-content {
+  display: none;
+}
+.collapse-arrow {
+  font-size: 1rem;
+  color: var(--muted);
+}
+.workspace-sidebar .story-nav-group.collapsible-ready h4 {
+  display: none;
+}
+.app-shell.collapsed .collapsible-menu-content,
+.app-shell.collapsed .collapsible-menu-heading span:first-child {
+  display: none;
+}
+.app-shell.collapsed .collapsible-menu-heading {
+  justify-content: center;
+}

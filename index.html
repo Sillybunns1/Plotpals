@@ -103,6 +103,10 @@
               </select>
               <label>Series / Project Title</label>
               <input id="newSeriesTitle" placeholder="Series or standalone project title" />
+              <label>Theme Color</label>
+              <input id="newProjectColor" type="color" value="#9d4edd" />
+              <label class="file-label inline-file">Cover Image <input id="newProjectCover" type="file" accept="image/*" /></label>
+              <label class="file-label inline-file">Banner Image <input id="newProjectBanner" type="file" accept="image/*" /></label>
               <button onclick="createSeriesFromProject()">Create Project</button>
             </div>
             <div>
@@ -113,6 +117,25 @@
               <button onclick="createBookFromProject()">Create Book</button>
               <button class="danger" onclick="deleteSelectedProject()">Delete Selected Project</button>
             </div>
+          </div>
+          <p id="createProjectMessage"></p>
+        </section>
+
+        <section class="dashboard-panel open-existing-panel">
+          <h3>Open Existing Story</h3>
+          <div class="project-grid compact">
+            <div>
+              <label>Project / Series</label>
+              <select id="projectSeriesSelect" onchange="projectSeriesChanged()"></select>
+            </div>
+            <div>
+              <label>Book</label>
+              <select id="projectBookSelect"></select>
+            </div>
+          </div>
+          <div class="backup-row">
+            <button class="glow" onclick="openWorkspace()">Open Overview</button>
+            <button class="danger" onclick="deleteSelectedProject()">Delete Selected Project</button>
           </div>
           <p id="projectMessage"></p>
         </section>
@@ -193,7 +216,76 @@
 
       <button class="wide glow" onclick="backToProjects()">← Main Page</button>
 
-      <div id="nestedNav" class="nested-nav"></div>
+      <div id="nestedNav" class="nested-nav">
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Library</h4>
+          <button class="story-nav" onclick="backToProjects()">📖 My Stories</button>
+          <button class="story-nav" onclick="setView('overview')">🏠 Project Overview</button>
+          <button class="story-nav" onclick="setView('stats')">📈 Writing Stats</button>
+          <button class="story-nav" onclick="setView('music')">♫ Project Playlist</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Manuscript</h4>
+          <button class="story-nav nav-parent" onclick="setView('write')">📘 Manuscript Editor</button>
+          <button class="story-nav nav-child" onclick="setView('write')">Chapters</button>
+          <button class="story-nav nav-child" onclick="setView('sceneCards')">Scene Cards</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Plot</h4>
+          <button class="story-nav nav-parent" onclick="setView('storyBoard')">🧭 Story Structure</button>
+          <button class="story-nav nav-parent" onclick="setView('chapters')">📄 Chapter Planner</button>
+          <button class="story-nav nav-parent" onclick="setView('threads')">🧵 Plot Threads</button>
+          <button class="story-nav nav-parent" onclick="setView('mysteries')">🔎 Mystery Tracker</button>
+          <button class="story-nav nav-parent" onclick="setView('foreshadowing')">🕯️ Foreshadowing</button>
+          <button class="story-nav nav-parent" onclick="setView('plotBoard')">🗂️ Plot Board</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Characters</h4>
+          <button class="story-nav nav-parent" onclick="setView('characters')">👥 All Characters</button>
+          <button class="story-nav nav-parent" onclick="setView('characterDashboard')">👤 Character Dashboard</button>
+          <button class="story-nav nav-parent" onclick="setView('relationships')">💞 Relationships</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>World Building</h4>
+          <button class="story-nav nav-parent" onclick="setView('locations')">📍 Locations</button>
+          <button class="story-nav nav-parent" onclick="setView('organizations')">⚜️ Organizations</button>
+          <button class="story-nav nav-parent" onclick="setView('magic')">✨ Magic / Systems</button>
+          <button class="story-nav nav-parent" onclick="setView('world')">🏺 Items / Artifacts</button>
+          <button class="story-nav nav-parent" onclick="setView('scenes')">🎬 Scene Database</button>
+          <button class="story-nav nav-parent" onclick="setView('timeline')">⏳ Timeline</button>
+          <button class="story-nav nav-parent" onclick="setView('visualTimeline')">🧭 Visual Timeline</button>
+          <button class="story-nav nav-parent" onclick="setView('maps')">🗺️ Maps</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Series</h4>
+          <button class="story-nav nav-parent" onclick="setView('seriesTools')">★ Series-Level Tools</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Story Notes</h4>
+          <button class="story-nav nav-parent" onclick="setView('goals')">🎯 Writing Goals</button>
+          <button class="story-nav nav-parent" onclick="setView('covers')">🖼️ Covers & Artwork</button>
+          <button class="story-nav nav-parent" onclick="setView('encyclopedia')">📚 Encyclopedia</button>
+          <button class="story-nav nav-parent" onclick="setView('research')">🔖 Research Vault</button>
+          <button class="story-nav nav-parent" onclick="setView('versionHistory')">🕰️ Version History</button>
+          <button class="story-nav nav-parent" onclick="setView('exports')">⇩ Export</button>
+          <button class="story-nav nav-parent" onclick="setView('backup')">☁ Backup</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Cloud</h4>
+          <button class="story-nav" onclick="syncToCloud()">☁️ Sync Now</button>
+          <button class="story-nav" onclick="loadFromCloud()">⇩ Load Cloud</button>
+          <button class="story-nav" onclick="signOut()">🚪 Sign Out</button>
+        </div>
+
+      </div>
 
       <div class="account-card">
         <strong id="accountStatus">Signed in</strong>
@@ -212,6 +304,7 @@
           <p id="projectPath">No project selected.</p>
         </div>
         <div class="top-actions">
+          <button onclick="backToProjects()" class="ghost-btn top-main-back">← Main Page</button>
           <button onclick="toggleTheme()" class="ghost-btn">Theme</button>
           <button onclick="syncToCloud()" class="ghost-btn">Sync Now</button>
           <button onclick="loadFromCloud()" class="ghost-btn">Load Cloud</button>
@@ -571,6 +664,110 @@
           <button onclick="saveMusicLinks()">Save Playlist Links</button>
         </div>
         <div id="musicLinks" class="card-grid"></div>
+      </section>
+
+
+      <section id="characterDashboard" class="view">
+        <div id="characterDashboardContent"></div>
+      </section>
+
+      <section id="sceneCards" class="view">
+        <div class="form-panel">
+          <h3>Scene Cards</h3>
+          <p>Review and organize your scenes by purpose, conflict, outcome, POV, and location.</p>
+        </div>
+        <div id="sceneCardBoard" class="card-grid"></div>
+      </section>
+
+      <section id="goals" class="view">
+        <div class="form-panel">
+          <h3>Writing Goals</h3>
+          <div class="form-grid">
+            <input id="dailyGoalWords" type="number" placeholder="Daily word goal" />
+            <input id="weeklyGoalWords" type="number" placeholder="Weekly word goal" />
+            <input id="goalSessionWords" type="number" placeholder="Words written this session" />
+            <textarea id="goalNotes" placeholder="Goal notes / motivation"></textarea>
+          </div>
+          <button onclick="saveWritingGoals()">Save Goals</button>
+          <button onclick="logWritingSession()">Log Session</button>
+        </div>
+        <div class="grid stats-grid">
+          <div class="stat-card"><span id="goalTodayWords">0</span><p>Logged Today</p></div>
+          <div class="stat-card"><span id="goalDailyTarget">0</span><p>Daily Goal</p></div>
+          <div class="stat-card"><span id="goalStreak">0</span><p>Writing Streak</p></div>
+          <div class="stat-card"><span id="goalBestDay">0</span><p>Best Day</p></div>
+        </div>
+        <div id="goalHistory" class="panel"></div>
+      </section>
+
+      <section id="covers" class="view">
+        <div class="form-panel">
+          <h3>Project Artwork</h3>
+          <div class="form-grid">
+            <label class="file-label inline-file">Upload Cover <input id="coverUpload" type="file" accept="image/*" /></label>
+            <label class="file-label inline-file">Upload Banner <input id="bannerUpload" type="file" accept="image/*" /></label>
+            <input id="projectThemeColor" type="color" value="#9d4edd" />
+            <textarea id="artworkNotes" placeholder="Artwork notes, cover ideas, visual theme..."></textarea>
+          </div>
+          <button onclick="saveProjectArtwork()">Save Artwork</button>
+        </div>
+        <div id="artworkPreview" class="card-grid"></div>
+      </section>
+
+      <section id="encyclopedia" class="view">
+        <div class="panel">
+          <h3>Encyclopedia Search</h3>
+          <input id="encyclopediaSearch" placeholder="Search characters, scenes, locations, plot threads, timeline, research..." oninput="renderEncyclopedia()" />
+        </div>
+        <div id="encyclopediaResults" class="card-grid"></div>
+      </section>
+
+      <section id="visualTimeline" class="view">
+        <div class="panel">
+          <h3>Visual Timeline</h3>
+          <p>Grouped timeline events, scene dates, and story moments.</p>
+        </div>
+        <div id="visualTimelineList" class="visual-timeline"></div>
+      </section>
+
+      <section id="research" class="view">
+        <div class="form-panel">
+          <h3>Research Vault</h3>
+          <div class="form-grid">
+            <input id="researchTitle" placeholder="Research title" />
+            <input id="researchLink" placeholder="Link / URL" />
+            <label class="file-label inline-file">Attach Image/File <input id="researchFile" type="file" /></label>
+            <select id="researchCategory">
+              <option>General</option><option>Historical</option><option>Visual Reference</option><option>Location</option><option>Character</option><option>Worldbuilding</option><option>Publishing</option>
+            </select>
+            <textarea id="researchNotes" placeholder="Research notes"></textarea>
+          </div>
+          <button onclick="addResearchItem()">Add Research</button>
+        </div>
+        <div id="researchList" class="card-grid"></div>
+      </section>
+
+      <section id="maps" class="view">
+        <div class="form-panel">
+          <h3>Map System</h3>
+          <div class="form-grid">
+            <input id="mapName" placeholder="Map name" />
+            <label class="file-label inline-file">Upload Map Image <input id="mapImage" type="file" accept="image/*" /></label>
+            <select id="mapLocationLink"></select>
+            <textarea id="mapNotes" placeholder="Map notes, linked scenes, travel routes..."></textarea>
+          </div>
+          <button onclick="addMap()">Add Map</button>
+        </div>
+        <div id="mapList" class="card-grid"></div>
+      </section>
+
+      <section id="versionHistory" class="view">
+        <div class="panel">
+          <h3>Version History</h3>
+          <p>Create restore points before major edits. Auto snapshots are created during saves.</p>
+          <button onclick="createManualSnapshot()">Create Restore Point</button>
+        </div>
+        <div id="snapshotList" class="card-grid"></div>
       </section>
 
       <section id="stats" class="view">

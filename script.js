@@ -5,7 +5,7 @@ const defaultData = {
   activeSeriesId: null, activeBookId: null, activeChapterId: null, activeSceneId: null, selectedCharacterId: null,
   user: null, series: [], books: [], characters: [], relationships: [], timeline: [], chapterPlans: [], threads: [],
   scenes: [], world: [], locations: [], magicSystems: [], organizations: [], mysteries: [], foreshadowing: [], plotCards: [],
-  structureBeats: [], music: {}, theme: 'dark', pinnedNote: ''
+  structureBeats: [], music: {}, theme: 'dark', pinnedNote: '', goals: {}, writingSessions: [], research: [], maps: [], snapshots: [], music: {}, theme: 'dark', pinnedNote: '', goals: {}, writingSessions: [], research: [], maps: [], snapshots: []
 };
 
 let supabaseClient = null;
@@ -63,13 +63,18 @@ function activeBook(){return data.books.find(b=>b.id===data.activeBookId)||null}
 function activeChapter(){const b=activeBook(); return (b?.manuscript||[]).find(c=>c.id===data.activeChapterId)||null}
 function activeScene(){const ch=activeChapter(); return (ch?.scenes||[]).find(s=>s.id===data.activeSceneId)||null}
 function isSeriesProject(){return (activeSeries()?.type||"series")==="series"}
-function ensureCollections(){["series","books","characters","relationships","timeline","chapterPlans","threads","scenes","world","locations","magicSystems","organizations","mysteries","foreshadowing","plotCards","structureBeats"].forEach(k=>{if(!data[k])data[k]=[]}); if(!data.music)data.music={}; if(!data.theme)data.theme="dark"; }
+function ensureCollections(){["series","books","characters","relationships","timeline","chapterPlans","threads","scenes","world","locations","magicSystems","organizations","mysteries","foreshadowing","plotCards","structureBeats","writingSessions","research","maps","snapshots"].forEach(k=>{if(!data[k])data[k]=[]}); if(!data.music)data.music={}; if(!data.theme)data.theme="dark"; if(!data.goals)data.goals={}; if(!data.music)data.music={}; }
 function ensureProject(){ensureCollections(); const b=activeBook(); if(b){if(!b.manuscript)b.manuscript=[]; if(!b.manuscript.length){const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",created:new Date().toISOString()}; const ch={id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()}; b.manuscript.push(ch); data.activeChapterId=ch.id; data.activeSceneId=scene.id} b.manuscript.forEach(ch=>{if(!ch.scenes){ch.scenes=[{id:uid(),title:ch.title||"Scene 1",content:ch.content||"",pov:"",locationId:"",date:"",mood:"",purpose:"",created:ch.created||new Date().toISOString()}]; delete ch.content}}); if(!data.activeChapterId)data.activeChapterId=b.manuscript[0]?.id||null; if(!data.activeSceneId)data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null}}
 
 function switchAuthMode(mode){authMode=mode;document.getElementById("loginTab").classList.toggle("active",mode==="login");document.getElementById("signupTab").classList.toggle("active",mode==="signup");document.getElementById("authSubmitBtn").textContent=mode==="login"?"Login":"Create Account";setLoginMessage("")}
 async function submitAuth(){return authMode==="login"?signIn():signUp()}
 function setLoginMessage(message){const el=document.getElementById("loginMessage"); if(el)el.textContent=message||""}
-function setProjectMessage(message){const el=document.getElementById("projectMessage"); if(el)el.textContent=message||""}
+function setProjectMessage(message){
+  const el=document.getElementById("projectMessage");
+  if(el)el.textContent=message||"";
+  const el2=document.getElementById("createProjectMessage");
+  if(el2)el2.textContent=message||"";
+}
 async function refreshSession(){if(!supabaseClient)return; const {data:sessionData}=await supabaseClient.auth.getSession(); const user=sessionData?.session?.user||null; data.user=user?{id:user.id,email:user.email}:null; localStorage.setItem(STORAGE_KEY,JSON.stringify(data,null,2)); updateAuthGate()}
 function updateAuthGate(){applyTheme(); const loggedIn=!!data.user?.id; const hasProject=!!(data.activeSeriesId&&data.activeBookId); document.getElementById("loginScreen").classList.toggle("hidden",loggedIn); document.getElementById("projectScreen").classList.toggle("hidden",!loggedIn||hasProject); document.getElementById("appShell").classList.toggle("hidden",!loggedIn||!hasProject); renderAccount(); if(loggedIn&&!hasProject)renderProjectScreen()}
 async function signUp(){if(!supabaseClient)return setLoginMessage("Supabase could not load."); const {error}=await supabaseClient.auth.signUp({email:val("loginEmail"),password:val("loginPassword")}); if(error)return setLoginMessage(error.message); setLoginMessage("Account created. Check email if confirmation is required, then login.")}
@@ -287,7 +292,7 @@ async function syncToCloud(showAlert=true){if(!supabaseClient){if(showAlert)aler
 async function loadFromCloud(showAlert=true){if(!supabaseClient){if(showAlert)alert("Supabase is not loaded.");return} const session=await supabaseClient.auth.getSession(); const user=session.data?.session?.user; if(!user){if(showAlert)alert("Login first.");return} const {data:rows,error}=await supabaseClient.from(CLOUD_TABLE).select("vault_data, updated_at").eq("user_id",user.id).limit(1); if(error){if(showAlert)alert("Could not load cloud data. "+error.message);return} if(!rows||!rows.length||!rows[0].vault_data){data.user={id:user.id,email:user.email}; localStorage.setItem(STORAGE_KEY,JSON.stringify(data,null,2)); if(showAlert)alert("No cloud vault found yet."); return} data={...structuredClone(defaultData),...rows[0].vault_data,user:{id:user.id,email:user.email}}; ensureCollections(); localStorage.setItem(STORAGE_KEY,JSON.stringify(data,null,2)); if(showAlert){renderAll(); alert("Loaded from Supabase.")}}
 
 function toggleSidebar(){document.getElementById("appShell").classList.toggle("collapsed")}
-function setView(view,id=null,extra=null){saveCurrentScene(false,false); if(view==="write"){if(id)data.activeChapterId=id; if(extra)data.activeSceneId=extra; if(!data.activeSceneId)data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null} if(view==="characterDetail"&&id)data.selectedCharacterId=id; document.querySelectorAll(".view").forEach(v=>v.classList.remove("active")); document.getElementById(view).classList.add("active"); const titles={overview:"Overview",write:"Scene-Based Writing",storyBoard:"Story Structure Board",chapters:"Chapter Planner",threads:"Plot Threads",mysteries:"Mystery Tracker",foreshadowing:"Foreshadowing Tracker",plotBoard:"Plot Board",characters:"Characters",characterDetail:"Character Detail",relationships:"Relationship System",locations:"Locations",magic:"Magic System",organizations:"Organizations",scenes:"Scene Database",timeline:"Timeline",world:"Worldbuilding Notes",seriesTools:"Series-Level Tools",music:"Project Playlist",stats:"Writing Analytics",exports:"Export",backup:"Backup"}; setText("viewTitle",titles[view]||"Workspace"); renderAll()}
+function setView(view,id=null,extra=null){saveCurrentScene(false,false); if(view==="write"){if(id)data.activeChapterId=id; if(extra)data.activeSceneId=extra; if(!data.activeSceneId)data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null} if(view==="characterDetail"&&id)data.selectedCharacterId=id; document.querySelectorAll(".view").forEach(v=>v.classList.remove("active")); document.getElementById(view).classList.add("active"); const titles={overview:"Overview",write:"Scene-Based Writing",storyBoard:"Story Structure Board",chapters:"Chapter Planner",threads:"Plot Threads",mysteries:"Mystery Tracker",foreshadowing:"Foreshadowing Tracker",plotBoard:"Plot Board",characters:"Characters",characterDetail:"Character Detail",relationships:"Relationship System",locations:"Locations",magic:"Magic System",organizations:"Organizations",scenes:"Scene Database",timeline:"Timeline",world:"Worldbuilding Notes",seriesTools:"Series-Level Tools",music:"Project Playlist",stats:"Writing Analytics",exports:"Export",backup:"Backup",characterDashboard:"Character Dashboard",sceneCards:"Scene Cards",goals:"Writing Goals",covers:"Covers & Artwork",encyclopedia:"Encyclopedia",visualTimeline:"Visual Timeline",research:"Research Vault",maps:"Maps",versionHistory:"Version History"}; setText("viewTitle",titles[view]||"Workspace"); renderAll()}
 function renderNestedNav(){
   const nav=document.getElementById("nestedNav");
   if(!nav)return;
@@ -465,7 +470,16 @@ function renderNestedNav(){
         <span>Story Notes</span><span>${sectionArrow('storynotes')}</span>
       </button>
       <div class="menu-content">
-        <button class="story-nav nav-parent" onclick="setView('exports')">⇩ Export</button>
+        <button class="story-nav nav-parent" onclick="setView('characterDashboard')">👤 Character Dashboard</button>
+      <button class="story-nav nav-parent" onclick="setView('sceneCards')">🎴 Scene Cards</button>
+      <button class="story-nav nav-parent" onclick="setView('goals')">🎯 Writing Goals</button>
+      <button class="story-nav nav-parent" onclick="setView('covers')">🖼️ Covers & Artwork</button>
+      <button class="story-nav nav-parent" onclick="setView('encyclopedia')">📚 Encyclopedia</button>
+      <button class="story-nav nav-parent" onclick="setView('visualTimeline')">🧭 Visual Timeline</button>
+      <button class="story-nav nav-parent" onclick="setView('research')">🔖 Research Vault</button>
+      <button class="story-nav nav-parent" onclick="setView('maps')">🗺️ Maps</button>
+      <button class="story-nav nav-parent" onclick="setView('versionHistory')">🕰️ Version History</button>
+      <button class="story-nav nav-parent" onclick="setView('exports')">⇩ Export</button>
         <button class="story-nav nav-parent" onclick="setView('backup')">☁ Backup</button>
       </div>
     </div>
@@ -486,7 +500,7 @@ function renderNestedNav(){
 function addManuscriptChapter(){const book=activeBook(); if(!book)return alert("Open a book first."); saveCurrentScene(false,false); const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",created:new Date().toISOString()}; const ch={id:uid(),title:`Chapter ${(book.manuscript||[]).length+1}`,scenes:[scene],created:new Date().toISOString()}; book.manuscript.push(ch); data.activeChapterId=ch.id; data.activeSceneId=scene.id; saveData()}
 function addSceneToActiveChapter(){const ch=activeChapter(); if(!ch)return alert("Select a chapter first."); saveCurrentScene(false,false); if(!ch.scenes)ch.scenes=[]; const scene={id:uid(),title:`Scene ${ch.scenes.length+1}`,content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",created:new Date().toISOString()}; ch.scenes.push(scene); data.activeSceneId=scene.id; saveData()}
 function selectScene(chapterId,sceneId){setView("write",chapterId,sceneId)}
-function saveCurrentScene(render=false,scheduleCloud=true){if(isRendering)return; const scene=activeScene(); const ch=activeChapter(); const editor=document.getElementById("richEditor"); if(!scene||!ch||!editor)return; ch.title=val("currentChapterTitle")||ch.title; scene.title=val("currentSceneTitle")||scene.title; scene.pov=val("scenePOV"); scene.locationId=val("sceneLocation"); scene.date=val("sceneDate"); scene.mood=val("sceneMood"); scene.purpose=val("scenePurpose"); scene.content=editor.innerHTML; setText("autosaveStatus","Saving..."); saveData(render,scheduleCloud); updateEditorStats()}
+function saveCurrentScene(render=false,scheduleCloud=true){if(isRendering)return; const scene=activeScene(); const ch=activeChapter(); const editor=document.getElementById("richEditor"); if(!scene||!ch||!editor)return; ch.title=val("currentChapterTitle")||ch.title; scene.title=val("currentSceneTitle")||scene.title; scene.pov=val("scenePOV"); scene.locationId=val("sceneLocation"); scene.date=val("sceneDate"); scene.mood=val("sceneMood"); scene.purpose=val("scenePurpose"); scene.content=editor.innerHTML; setText("autosaveStatus","Saving..."); if(scheduleCloud) createAutoSnapshot("Auto save"); saveData(render,scheduleCloud); updateEditorStats()}
 function deleteManuscriptChapter(id){const book=activeBook(); if(!book)return; if(!confirm("Delete this chapter and all scenes?"))return; book.manuscript=book.manuscript.filter(c=>c.id!==id); data.activeChapterId=book.manuscript[0]?.id||null; data.activeSceneId=book.manuscript[0]?.scenes?.[0]?.id||null; saveData()}
 function deleteScene(chId,sceneId){const ch=(activeBook()?.manuscript||[]).find(c=>c.id===chId); if(!ch)return; if(!confirm("Delete this scene?"))return; ch.scenes=(ch.scenes||[]).filter(s=>s.id!==sceneId); data.activeSceneId=ch.scenes[0]?.id||null; saveData()}
 function moveScene(direction){const ch=activeChapter(); if(!ch?.scenes)return; const index=ch.scenes.findIndex(s=>s.id===data.activeSceneId); const ni=index+direction; if(index<0||ni<0||ni>=ch.scenes.length)return; const [scene]=ch.scenes.splice(index,1); ch.scenes.splice(ni,0,scene); saveData()}
@@ -548,7 +562,7 @@ function renderTimeline(){const tl=document.getElementById("timelineList"); if(!
 function renderWritingStats(){const book=activeBook(); const chapters=book?.manuscript||[]; const counts=chapters.map(c=>(c.scenes||[]).reduce((sum,s)=>sum+countWords(stripHTML(s.content||"")),0)); const total=counts.reduce((a,b)=>a+b,0); const avg=counts.length?Math.round(total/counts.length):0; const longest=counts.length?Math.max(...counts):0; const bibleItems=["characters","threads","timeline","world","relationships","locations","magicSystems","organizations","mysteries","foreshadowing","plotCards"].reduce((sum,k)=>sum+(data[k]||[]).filter(k==="magicSystems"||k==="organizations"||k==="mysteries"||k==="foreshadowing"?seriesScope:visibleByScope).length,0); setText("statsTotalWords",total); setText("statsAvgWords",avg); setText("statsLongestChapter",longest); setText("statsBibleItems",bibleItems); setHTML("chapterStatsList",chapters.map((c,i)=>`<div class="chapter-stat-row"><span>${i+1}. ${escapeHTML(c.title||"Untitled")}</span><strong>${counts[i]} words</strong></div>`).join("")||"<p>No chapters yet.</p>"); const povCounts={}; chapters.flatMap(c=>c.scenes||[]).forEach(s=>{if(s.pov)povCounts[characterName(s.pov)]=(povCounts[characterName(s.pov)]||0)+countWords(stripHTML(s.content||""))}); setHTML("povStatsList",Object.entries(povCounts).map(([name,count])=>`<div class="chapter-stat-row"><span>${escapeHTML(name)}</span><strong>${count} words</strong></div>`).join("")||"<p>No POV data yet. Choose POV characters on scenes.</p>")}
 function renderSeriesTools(){const warn=document.getElementById("seriesOnlyWarning"), content=document.getElementById("seriesToolsContent"); if(!warn||!content)return; if(!isSeriesProject()){warn.innerHTML="Series-level tools only appear for projects marked as Series."; content.classList.add("hidden"); return} warn.innerHTML=""; content.classList.remove("hidden"); const books=data.books.filter(b=>b.seriesId===data.activeSeriesId); const seriesWords=books.reduce((sum,b)=>sum+(b.manuscript||[]).flatMap(c=>c.scenes||[]).reduce((s,sc)=>s+countWords(stripHTML(sc.content||"")),0),0); setText("seriesBookCount",books.length); setText("seriesTotalWords",seriesWords); setText("seriesTimelineCount",data.timeline.filter(seriesScope).length); setText("seriesThreadCount",data.threads.filter(seriesScope).length); setHTML("crossBookArcs",data.characters.filter(seriesScope).map(c=>`<p><strong>${escapeHTML(c.name)}</strong><br>${escapeHTML(c.arc||"No arc notes yet.")}</p>`).join("")||"<p>No characters yet.</p>"); setHTML("seriesContinuity",`<p><strong>Characters:</strong> ${data.characters.filter(seriesScope).length}</p><p><strong>Relationships:</strong> ${data.relationships.filter(seriesScope).length}</p><p><strong>Locations:</strong> ${data.locations.filter(seriesScope).length}</p><p><strong>Artifacts / World Notes:</strong> ${data.world.filter(seriesScope).length}</p><p><strong>Major Events:</strong> ${data.timeline.filter(seriesScope).length}</p>`)}
 function renderRawData(){const raw=document.getElementById("rawData"); if(raw)raw.value=JSON.stringify(data,null,2)}
-function renderAll(){if(!data.user?.id){updateAuthGate();return} ensureProject(); if(!data.activeSeriesId||!data.activeBookId){updateAuthGate();return} applyTheme(); renderOverview(); renderSelects(); renderManuscript(); renderAllLists(); renderMusic(); renderRawData(); renderAccount(); renderNestedNav(); runSearch()}
+function renderAll(){if(!data.user?.id){updateAuthGate();return} ensureProject(); if(!data.activeSeriesId||!data.activeBookId){updateAuthGate();return} applyTheme(); renderOverview(); renderSelects(); renderManuscript(); renderAllLists(); renderMusic(); renderArtwork(); renderGoals(); renderSceneCards(); renderCharacterDashboard(); renderEncyclopedia(); renderVisualTimeline(); renderResearch(); renderMaps(); renderSnapshots(); renderRawData(); renderAccount(); renderNestedNavSafe(); runSearch(); ensureSidebarVisible(); initializeCollapsibleSidebar()}
 
 function searchableItems(){const b=activeBook(); const manuscript=(b?.manuscript||[]).flatMap(ch=>(ch.scenes||[]).map(sc=>({type:"Scene",title:`${ch.title} — ${sc.title}`,text:(ch.title+" "+sc.title+" "+stripHTML(sc.content||"")).toLowerCase()}))); const collections=[["Character",data.characters,"name"],["Relationship",data.relationships,"type"],["Timeline",data.timeline,"when"],["Chapter Plan",data.chapterPlans,"number"],["Plot Thread",data.threads,"title"],["Worldbuilding",data.world,"name"],["Location",data.locations,"name"],["Magic",data.magicSystems,"name"],["Organization",data.organizations,"name"],["Mystery",data.mysteries,"question"],["Foreshadowing",data.foreshadowing,"hint"]]; return[{type:"Project",title:activeSeries()?.title,text:JSON.stringify(activeSeries()||{}).toLowerCase()},{type:"Book",title:b?.title,text:JSON.stringify(b||{}).toLowerCase()},...manuscript,...collections.flatMap(([type,arr,key])=>(arr||[]).filter(seriesScope).map(item=>({type,title:item[key]||"Untitled",text:JSON.stringify(item).toLowerCase()})))]}
 function runSearch(){const search=document.getElementById("globalSearch"), box=document.getElementById("searchResults"); if(!search||!box)return; const q=search.value.trim().toLowerCase(); if(!q){box.classList.add("hidden"); box.innerHTML=""; return} const matches=searchableItems().filter(item=>item.text.includes(q)); box.classList.remove("hidden"); box.innerHTML=`<h3>Search Results</h3>`+(matches.length?matches.map(m=>`<p><strong>${escapeHTML(m.type)}:</strong> ${escapeHTML(m.title||"Untitled")}</p>`).join(""):"<p>No matches found.</p>")}
@@ -573,7 +587,331 @@ function resetAll(){if(!confirm("Delete all local writing data from this browser
 document.getElementById("richEditor").addEventListener("input",()=>saveCurrentScene(false));
 document.getElementById("richEditor").addEventListener("blur",()=>syncToCloud(false));
 document.getElementById("globalSearch").addEventListener("input",runSearch);
-document.getElementById("clearSearch").addEventListener("click",()=>{setVal("globalSearch","");runSearch()});
+document.getElementById("clearSearch").addEventListener("click",()=>{setVal("globalSearch","");runSearch(); ensureSidebarVisible(); initializeCollapsibleSidebar()});
 
 initSupabase();
 refreshSession().then(()=>{if(data.user?.id){loadFromCloud(false).then(()=>{data.activeSeriesId=null;data.activeBookId=null;updateAuthGate()})}else updateAuthGate()});
+
+
+function createSeriesFromProject(){
+  const type=val("newProjectType")||"series";
+  const name=val("newSeriesTitle")|| (type==="series"?"Untitled Series":"Untitled Book Project");
+  Promise.all([readFileAsDataURL("newProjectCover"), readFileAsDataURL("newProjectBanner")]).then(([cover,banner])=>{
+    const series={id:uid(),title:name,type,genre:"",synopsis:"",theme:"",mysteries:"",foreshadowing:"",artwork:{cover,banner,color:val("newProjectColor")||"#9d4edd",notes:""},created:new Date().toISOString()};
+    data.series.push(series);
+    if(type==="standalone"){
+      const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",created:new Date().toISOString()};
+      const book={id:uid(),seriesId:series.id,title:name,status:"Planning",summary:"",theme:"",notes:"",manuscript:[{id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()}],created:new Date().toISOString()};
+      data.books.push(book);
+    }
+    setVal("newSeriesTitle","");
+    const coverInput=document.getElementById("newProjectCover"); if(coverInput) coverInput.value="";
+    const bannerInput=document.getElementById("newProjectBanner"); if(bannerInput) bannerInput.value="";
+    saveData(false);
+    renderProjectScreen();
+    setProjectMessage(type==="standalone"?"Standalone book project created.":"Series created. Now create/select a book.");
+  });
+}
+
+
+/* PlotPals V15.1 project-opening hotfix */
+function normalizeBookForOpening(book){
+  if(!book) return null;
+  if(!book.manuscript) book.manuscript = [];
+  if(!book.manuscript.length){
+    const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",created:new Date().toISOString()};
+    book.manuscript.push({id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()});
+  }
+  book.manuscript.forEach(ch=>{
+    if(!ch.scenes){
+      ch.scenes=[{id:uid(),title:ch.title||"Scene 1",content:ch.content||"",pov:"",locationId:"",date:"",mood:"",purpose:"",created:ch.created||new Date().toISOString()}];
+      delete ch.content;
+    }
+    if(!ch.scenes.length){
+      ch.scenes.push({id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",created:new Date().toISOString()});
+    }
+  });
+  return book;
+}
+function projectSeriesChanged(){
+  const projectSelect = document.getElementById("projectSeriesSelect");
+  const bookSelect = document.getElementById("projectBookSelect");
+  if(!projectSelect || !bookSelect) return;
+  const seriesId = projectSelect.value || data.series?.[0]?.id || "";
+  const books = (data.books||[]).filter(b => b.seriesId === seriesId);
+  bookSelect.innerHTML = books.length
+    ? books.map(b => `<option value="${b.id}">${escapeHTML(b.title)}</option>`).join("")
+    : `<option value="">No books in this project</option>`;
+}
+function openWorkspace(){
+  const seriesId = val("projectSeriesSelect");
+  const bookId = val("projectBookSelect");
+  if(!seriesId || !bookId){
+    setProjectMessage("Select both a project and a book first.");
+    return;
+  }
+  const book = normalizeBookForOpening(data.books.find(b => b.id === bookId));
+  if(!book){
+    setProjectMessage("Could not find that book. Try reloading or choose another.");
+    return;
+  }
+  data.activeSeriesId = seriesId;
+  data.activeBookId = bookId;
+  data.activeChapterId = book.manuscript[0]?.id || null;
+  data.activeSceneId = book.manuscript[0]?.scenes?.[0]?.id || null;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data,null,2));
+  document.getElementById("projectScreen")?.classList.add("hidden");
+  document.getElementById("loginScreen")?.classList.add("hidden");
+  document.getElementById("appShell")?.classList.remove("hidden");
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.getElementById("overview")?.classList.add("active");
+  setText("viewTitle","Overview");
+  renderAll();
+  renderNestedNavSafe();
+  syncToCloud(false);
+}
+function openProjectFromDashboard(seriesId, bookId){
+  if(!bookId){
+    setProjectMessage("This project has no books yet. Create a book first.");
+    showCreateProjectPanel();
+    return;
+  }
+  const book = normalizeBookForOpening(data.books.find(b => b.id === bookId));
+  if(!book){
+    setProjectMessage("Could not find that book. Try selecting it from Open Existing Story.");
+    return;
+  }
+  data.activeSeriesId = seriesId;
+  data.activeBookId = bookId;
+  data.activeChapterId = book.manuscript[0]?.id || null;
+  data.activeSceneId = book.manuscript[0]?.scenes?.[0]?.id || null;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data,null,2));
+  document.getElementById("projectScreen")?.classList.add("hidden");
+  document.getElementById("loginScreen")?.classList.add("hidden");
+  document.getElementById("appShell")?.classList.remove("hidden");
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.getElementById("overview")?.classList.add("active");
+  setText("viewTitle","Overview");
+  renderAll();
+  renderNestedNavSafe();
+  syncToCloud(false);
+}
+
+
+/* PlotPals V15.3 Sidebar Recovery */
+function renderNestedNavSafe(){
+  ensureSidebarVisible();
+  try {
+    renderNestedNav();
+    const nav = document.getElementById("nestedNav");
+    if(nav && nav.innerHTML.trim()) return;
+  } catch (error) {
+    console.error("renderNestedNav failed:", error);
+  }
+
+  const nav = document.getElementById("nestedNav");
+  if(!nav) return;
+
+  const book = activeBook ? activeBook() : null;
+  const chapters = book?.manuscript || [];
+  const chars = (data.characters || []).filter(visibleByScope || (()=>true));
+  const seriesOnly = typeof isSeriesProject === "function" ? isSeriesProject() : true;
+
+  nav.innerHTML = `
+    <div class="story-nav-group">
+      <h4>Library</h4>
+      <button class="story-nav" onclick="backToProjects()">📖 My Stories</button>
+      <button class="story-nav" onclick="setView('overview')">🏠 Project Overview</button>
+      <button class="story-nav" onclick="setView('stats')">📈 Writing Stats</button>
+      <button class="story-nav" onclick="setView('music')">♫ Project Playlist</button>
+    </div>
+
+    <div class="story-nav-group">
+      <h4>Manuscript</h4>
+      <button class="story-nav nav-parent" onclick="setView('write')">📘 Manuscript Editor</button>
+      ${chapters.map((c,i)=>`
+        <button class="story-nav nav-child" onclick="setView('write','${c.id}')">${i+1}. ${escapeHTML(c.title||"Untitled")}</button>
+        ${(c.scenes||[]).map((s,j)=>`<button class="story-nav nav-grandchild" onclick="setView('write','${c.id}','${s.id}')">${j+1}. ${escapeHTML(s.title||"Scene")}</button>`).join("")}
+      `).join("")}
+    </div>
+
+    <div class="story-nav-group">
+      <h4>Plot</h4>
+      <button class="story-nav" onclick="setView('storyBoard')">🧭 Story Structure</button>
+      <button class="story-nav" onclick="setView('chapters')">📄 Chapter Planner</button>
+      <button class="story-nav" onclick="setView('threads')">🧵 Plot Threads</button>
+      <button class="story-nav" onclick="setView('mysteries')">🔎 Mystery Tracker</button>
+      <button class="story-nav" onclick="setView('foreshadowing')">🕯️ Foreshadowing</button>
+      <button class="story-nav" onclick="setView('plotBoard')">🗂️ Plot Board</button>
+    </div>
+
+    <div class="story-nav-group">
+      <h4>Characters</h4>
+      <button class="story-nav" onclick="setView('characters')">👥 All Characters</button>
+      ${chars.map(c=>`<button class="story-nav nav-grandchild" onclick="setView('characterDetail','${c.id}')">${escapeHTML(c.name||"Unnamed")}</button>`).join("")}
+      <button class="story-nav" onclick="setView('relationships')">💞 Relationships</button>
+    </div>
+
+    <div class="story-nav-group">
+      <h4>World Building</h4>
+      <button class="story-nav" onclick="setView('locations')">📍 Locations</button>
+      <button class="story-nav" onclick="setView('organizations')">⚜️ Organizations</button>
+      <button class="story-nav" onclick="setView('magic')">✨ Magic / Systems</button>
+      <button class="story-nav" onclick="setView('world')">🏺 Items / Artifacts</button>
+      <button class="story-nav" onclick="setView('scenes')">🎬 Scene Database</button>
+      <button class="story-nav" onclick="setView('timeline')">⏳ Timeline</button>
+    </div>
+
+    ${seriesOnly ? `<div class="story-nav-group"><h4>Series</h4><button class="story-nav" onclick="setView('seriesTools')">★ Series-Level Tools</button></div>` : ""}
+
+    <div class="story-nav-group">
+      <h4>Story Notes</h4>
+      <button class="story-nav" onclick="setView('characterDashboard')">👤 Character Dashboard</button>
+      <button class="story-nav" onclick="setView('sceneCards')">🎴 Scene Cards</button>
+      <button class="story-nav" onclick="setView('goals')">🎯 Writing Goals</button>
+      <button class="story-nav" onclick="setView('covers')">🖼️ Covers & Artwork</button>
+      <button class="story-nav" onclick="setView('encyclopedia')">📚 Encyclopedia</button>
+      <button class="story-nav" onclick="setView('visualTimeline')">🧭 Visual Timeline</button>
+      <button class="story-nav" onclick="setView('research')">🔖 Research Vault</button>
+      <button class="story-nav" onclick="setView('maps')">🗺️ Maps</button>
+      <button class="story-nav" onclick="setView('versionHistory')">🕰️ Version History</button>
+      <button class="story-nav" onclick="setView('exports')">⇩ Export</button>
+      <button class="story-nav" onclick="setView('backup')">☁ Backup</button>
+    </div>
+  `;
+}
+
+
+/* PlotPals V15.4 hard static sidebar fallback */
+const STATIC_SIDEBAR_HTML = `
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Library</h4>
+          <button class="story-nav" onclick="backToProjects()">📖 My Stories</button>
+          <button class="story-nav" onclick="setView('overview')">🏠 Project Overview</button>
+          <button class="story-nav" onclick="setView('stats')">📈 Writing Stats</button>
+          <button class="story-nav" onclick="setView('music')">♫ Project Playlist</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Manuscript</h4>
+          <button class="story-nav nav-parent" onclick="setView('write')">📘 Manuscript Editor</button>
+          <button class="story-nav nav-child" onclick="setView('write')">Chapters</button>
+          <button class="story-nav nav-child" onclick="setView('sceneCards')">Scene Cards</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Plot</h4>
+          <button class="story-nav nav-parent" onclick="setView('storyBoard')">🧭 Story Structure</button>
+          <button class="story-nav nav-parent" onclick="setView('chapters')">📄 Chapter Planner</button>
+          <button class="story-nav nav-parent" onclick="setView('threads')">🧵 Plot Threads</button>
+          <button class="story-nav nav-parent" onclick="setView('mysteries')">🔎 Mystery Tracker</button>
+          <button class="story-nav nav-parent" onclick="setView('foreshadowing')">🕯️ Foreshadowing</button>
+          <button class="story-nav nav-parent" onclick="setView('plotBoard')">🗂️ Plot Board</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Characters</h4>
+          <button class="story-nav nav-parent" onclick="setView('characters')">👥 All Characters</button>
+          <button class="story-nav nav-parent" onclick="setView('characterDashboard')">👤 Character Dashboard</button>
+          <button class="story-nav nav-parent" onclick="setView('relationships')">💞 Relationships</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>World Building</h4>
+          <button class="story-nav nav-parent" onclick="setView('locations')">📍 Locations</button>
+          <button class="story-nav nav-parent" onclick="setView('organizations')">⚜️ Organizations</button>
+          <button class="story-nav nav-parent" onclick="setView('magic')">✨ Magic / Systems</button>
+          <button class="story-nav nav-parent" onclick="setView('world')">🏺 Items / Artifacts</button>
+          <button class="story-nav nav-parent" onclick="setView('scenes')">🎬 Scene Database</button>
+          <button class="story-nav nav-parent" onclick="setView('timeline')">⏳ Timeline</button>
+          <button class="story-nav nav-parent" onclick="setView('visualTimeline')">🧭 Visual Timeline</button>
+          <button class="story-nav nav-parent" onclick="setView('maps')">🗺️ Maps</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Series</h4>
+          <button class="story-nav nav-parent" onclick="setView('seriesTools')">★ Series-Level Tools</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Story Notes</h4>
+          <button class="story-nav nav-parent" onclick="setView('goals')">🎯 Writing Goals</button>
+          <button class="story-nav nav-parent" onclick="setView('covers')">🖼️ Covers & Artwork</button>
+          <button class="story-nav nav-parent" onclick="setView('encyclopedia')">📚 Encyclopedia</button>
+          <button class="story-nav nav-parent" onclick="setView('research')">🔖 Research Vault</button>
+          <button class="story-nav nav-parent" onclick="setView('versionHistory')">🕰️ Version History</button>
+          <button class="story-nav nav-parent" onclick="setView('exports')">⇩ Export</button>
+          <button class="story-nav nav-parent" onclick="setView('backup')">☁ Backup</button>
+        </div>
+
+        <div class="story-nav-group static-sidebar-fallback">
+          <h4>Cloud</h4>
+          <button class="story-nav" onclick="syncToCloud()">☁️ Sync Now</button>
+          <button class="story-nav" onclick="loadFromCloud()">⇩ Load Cloud</button>
+          <button class="story-nav" onclick="signOut()">🚪 Sign Out</button>
+        </div>
+`;
+
+function ensureSidebarVisible(){
+  const nav = document.getElementById("nestedNav");
+  if(!nav) return;
+  if(!nav.innerHTML.trim()) nav.innerHTML = STATIC_SIDEBAR_HTML;
+  nav.style.display = "block";
+  const sidebar = document.getElementById("sidebar");
+  if(sidebar) sidebar.style.display = "block";
+}
+
+document.addEventListener("DOMContentLoaded", ensureSidebarVisible);
+setTimeout(ensureSidebarVisible, 300);
+setTimeout(ensureSidebarVisible, 1200);
+
+
+/* PlotPals V15.5 collapsible overview sidebar */
+function initializeCollapsibleSidebar(){
+  const nav = document.getElementById("nestedNav");
+  if(!nav) return;
+
+  const groups = Array.from(nav.querySelectorAll(".story-nav-group"));
+  groups.forEach((group, index) => {
+    if(group.classList.contains("collapsible-ready")) return;
+
+    const heading = group.querySelector("h4");
+    if(!heading) return;
+
+    const label = heading.textContent.trim();
+    const body = document.createElement("div");
+    body.className = "collapsible-menu-content";
+
+    Array.from(group.children).forEach(child => {
+      if(child !== heading) body.appendChild(child);
+    });
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "collapsible-menu-heading";
+    button.innerHTML = `<span>${label}</span><span class="collapse-arrow">▾</span>`;
+    button.onclick = () => {
+      group.classList.toggle("collapsed-menu");
+      const arrow = group.querySelector(".collapse-arrow");
+      if(arrow) arrow.textContent = group.classList.contains("collapsed-menu") ? "›" : "▾";
+    };
+
+    heading.replaceWith(button);
+    group.appendChild(body);
+    group.classList.add("collapsible-ready");
+
+    // Keep main writing sections open by default; collapse Cloud.
+    if(label.toLowerCase() === "cloud"){
+      group.classList.add("collapsed-menu");
+      const arrow = group.querySelector(".collapse-arrow");
+      if(arrow) arrow.textContent = "›";
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  ensureSidebarVisible();
+  initializeCollapsibleSidebar();
+});
+setTimeout(() => { ensureSidebarVisible(); initializeCollapsibleSidebar(); }, 400);
+setTimeout(() => { ensureSidebarVisible(); initializeCollapsibleSidebar(); }, 1300);
