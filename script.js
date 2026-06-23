@@ -1934,17 +1934,16 @@ function renderAllLists(){
 }
 
 
-/* PlotPals V16.3 HTML Sidebar Hierarchy Fix */
-function toggleHtmlSidebarSection(id){
-  const section = document.getElementById(id);
-  if(!section) return;
-  section.classList.toggle("open");
-  const btn = section.querySelector("button");
-  if(btn){
-    btn.innerHTML = btn.innerHTML.replace(section.classList.contains("open") ? "▶" : "▼", section.classList.contains("open") ? "▼" : "▶");
+/* PlotPals V16.4 Character Dashboard + Wiki Flow */
+function characterImage(character){
+  if(!character) return "";
+  if(character.photo) return character.photo;
+  if(character.mediaId && data.mediaLibrary){
+    return (data.mediaLibrary || []).find(m => m.id === character.mediaId)?.data || "";
   }
+  return "";
 }
-function htmlSidebarRoleLabel(role){
+function characterRoleLabel(role){
   const labels = {
     Main: "Main Character",
     Side: "Side Character",
@@ -1955,100 +1954,585 @@ function htmlSidebarRoleLabel(role){
   };
   return labels[role] || role || "Other";
 }
-function htmlSidebarMediaImage(id){
-  return (data.mediaLibrary || []).find(m => m.id === id)?.data || "";
+function openCharacterWiki(characterId){
+  data.selectedCharacterId = characterId;
+  setView("characterDetail", characterId);
 }
-function renderNestedNav(){
-  renderHtmlSidebarHierarchy();
-}
-function renderHtmlSidebarHierarchy(){
-  const book = activeBook();
-  const chapters = book?.manuscript || [];
-  const manuscriptTree = document.getElementById("htmlManuscriptTree");
-  const chapterCount = document.getElementById("sidebarChapterCount");
-  if(chapterCount) chapterCount.textContent = chapters.length;
+function renderCharacterDashboard(){
+  const el = document.getElementById("characterDashboardList");
+  if(!el) return;
+  const characters = (data.characters || []).filter(visibleByScope);
+  const roles = ["Main","Side","Love Interest","Antagonist","Mentor","Other"];
 
-  if(manuscriptTree){
-    manuscriptTree.innerHTML = chapters.length ? chapters.map((chapter, chapterIndex) => `
-      <div class="html-nav-subsection open" id="htmlChapter_${chapter.id}">
-        <button class="html-nav-parent" onclick="toggleHtmlSidebarSection('htmlChapter_${chapter.id}')">
-          ▼ Chapter ${chapterIndex + 1}: ${escapeHTML(chapter.title || "Untitled")}
-          <span class="nav-count">${(chapter.scenes || []).length}</span>
-        </button>
-        <div class="html-nav-children">
-          ${(chapter.scenes || []).map((scene, sceneIndex) => `
-            <button class="html-nav-scene" onclick="setView('write','${chapter.id}','${scene.id}')">
-              Scene ${sceneIndex + 1}: ${escapeHTML(scene.title || "Untitled Scene")}
-            </button>
-          `).join("") || `<button class="html-nav-scene" onclick="setView('write','${chapter.id}')">No scenes yet</button>`}
+  if(!characters.length){
+    el.innerHTML = `<article class="item-card"><div class="card-body"><p>No characters yet. Add one from the Characters tab.</p><button onclick="setView('characters')">Add Character</button></div></article>`;
+    return;
+  }
+
+  el.innerHTML = roles.map(role => {
+    const roleCharacters = characters.filter(c => (c.role || "Other") === role);
+    if(!roleCharacters.length) return "";
+    return `
+      <div class="character-dashboard-role">
+        <h3>${characterRoleLabel(role)}</h3>
+        <div class="card-grid">
+          ${roleCharacters.map(character => {
+            const img = characterImage(character);
+            return `
+              <article class="item-card character-dashboard-card" onclick="openCharacterWiki('${character.id}')">
+                <div class="character-card-image-wrap">
+                  ${img ? `<img class="character-dashboard-photo" src="${img}" alt="${escapeHTML(character.name || "Character")}">` : `<div class="character-dashboard-photo empty-photo">No Photo</div>`}
+                </div>
+                <div class="card-body">
+                  <h3>${escapeHTML(character.name || "Unnamed Character")}</h3>
+                  <span class="tag">${escapeHTML(characterRoleLabel(character.role))}</span>
+                  ${character.species ? `<span class="tag">${escapeHTML(character.species)}</span>` : ""}
+                  ${detail("Personality", stripHTML(character.personality || "").slice(0, 160))}
+                  ${detail("Arc", stripHTML(character.arc || "").slice(0, 160))}
+                  <button onclick="event.stopPropagation(); openCharacterWiki('${character.id}')">Open Wiki Page</button>
+                </div>
+              </article>
+            `;
+          }).join("")}
         </div>
       </div>
-    `).join("") : `<p class="muted sidebar-empty">No chapters yet.</p>`;
+    `;
+  }).join("");
+}
+
+/* Replace/strengthen character detail into a wiki page */
+function renderCharacterDetail(){
+  const el = document.getElementById("characterDetailContent");
+  if(!el) return;
+  const c = (data.characters || []).find(x => x.id === data.selectedCharacterId);
+  if(!c){
+    el.innerHTML = `<div class="panel"><p>Select a character from the Character Dashboard.</p><button onclick="setView('characterDashboard')">Open Character Dashboard</button></div>`;
+    return;
   }
 
-  const plans = (data.chapterPlans || []).filter(visibleByScope);
-  const plannerTree = document.getElementById("htmlChapterPlannerTree");
-  if(plannerTree){
-    plannerTree.innerHTML = plans.length ? plans.map(plan => `
-      <button class="html-nav-scene" onclick="setView('chapters')">${escapeHTML(plan.number || "Untitled Chapter Plan")}</button>
-    `).join("") : `<p class="muted sidebar-empty">No chapter plans yet.</p>`;
-  }
+  const img = characterImage(c);
+  const rels = characterRelationships(c.id);
+  const apps = characterAppearances(c.id);
 
-  const threads = (data.threads || []).filter(visibleByScope);
-  const threadTree = document.getElementById("htmlPlotThreadsTree");
-  if(threadTree){
-    threadTree.innerHTML = threads.length ? threads.map(thread => `
-      <button class="html-nav-scene" onclick="setView('threads')">${escapeHTML(thread.title || "Untitled Thread")}</button>
-    `).join("") : `<p class="muted sidebar-empty">No plot threads yet.</p>`;
-  }
+  el.innerHTML = `
+    <div class="character-wiki-page">
+      <aside class="panel character-wiki-sidebar">
+        ${img ? `<img class="character-wiki-photo" src="${img}" alt="${escapeHTML(c.name || "Character")}">` : `<div class="character-wiki-photo empty-photo">No Photo</div>`}
+        <h2>${escapeHTML(c.name || "Unnamed Character")}</h2>
+        <span class="tag">${escapeHTML(characterRoleLabel(c.role))}</span>
+        ${c.species ? `<span class="tag">${escapeHTML(c.species)}</span>` : ""}
+        <button onclick="setView('characterDashboard')">← Back to Dashboard</button>
+      </aside>
 
-  const arcs = (data.plotArcs || []).filter(visibleByScope);
-  const cards = (data.plotCards || []).filter(visibleByScope);
-  const plotBoardTree = document.getElementById("htmlPlotBoardTree");
-  if(plotBoardTree){
-    plotBoardTree.innerHTML = arcs.length ? arcs.map(arc => `
-      <div class="html-nav-subsection open" id="htmlArc_${arc.id}">
-        <button class="html-nav-parent" onclick="toggleHtmlSidebarSection('htmlArc_${arc.id}')">
-          ▼ ${escapeHTML(arc.name || "Untitled Arc")}
-          <span class="nav-count">${cards.filter(card => card.arcId === arc.id).length}</span>
-        </button>
-        <div class="html-nav-children">
-          ${cards.filter(card => card.arcId === arc.id).map(card => `
-            <button class="html-nav-scene html-nav-deep" onclick="setView('plotBoard')">${escapeHTML(card.title || "Untitled Card")}</button>
-          `).join("") || `<button class="html-nav-scene html-nav-deep" onclick="setView('plotBoard')">No cards yet</button>`}
+      <main class="panel character-wiki-main">
+        <div class="wiki-tabs">
+          <button onclick="showCharacterWikiTab('overview')">Overview</button>
+          <button onclick="showCharacterWikiTab('bio')">Biography</button>
+          <button onclick="showCharacterWikiTab('appearance')">Appearance</button>
+          <button onclick="showCharacterWikiTab('psychology')">Psychology</button>
+          <button onclick="showCharacterWikiTab('relationships')">Relationships</button>
+          <button onclick="showCharacterWikiTab('scenes')">Scenes</button>
+          <button onclick="showCharacterWikiTab('notes')">Notes</button>
         </div>
-      </div>
-    `).join("") : `<p class="muted sidebar-empty">No plot arcs yet.</p>`;
+
+        <section id="characterWiki_overview" class="character-wiki-tab active">
+          <h3>Overview</h3>
+          ${detail("Description", c.description)}
+          ${detail("Personality", c.personality)}
+          ${detail("Voice / Speech", c.voice)}
+          ${detail("Character Arc", c.arc)}
+        </section>
+
+        <section id="characterWiki_bio" class="character-wiki-tab">
+          <h3>Biography</h3>
+          ${c.bio ? `<div class="wiki-text">${c.bio}</div>` : "<p>No biography yet.</p>"}
+        </section>
+
+        <section id="characterWiki_appearance" class="character-wiki-tab">
+          <h3>Appearance</h3>
+          ${detail("Species / Identity", c.species)}
+          ${detail("Physical Description", c.description)}
+        </section>
+
+        <section id="characterWiki_psychology" class="character-wiki-tab">
+          <h3>Psychology</h3>
+          ${detail("Core Wound / Fear / Desire", c.wound)}
+          ${detail("Personality", c.personality)}
+          ${detail("Secrets", c.secrets)}
+        </section>
+
+        <section id="characterWiki_relationships" class="character-wiki-tab">
+          <h3>Relationships</h3>
+          ${rels.length ? rels.map(r => `
+            <article class="wiki-mini-card">
+              <strong>${escapeHTML(characterName(r.a))} + ${escapeHTML(characterName(r.b))}</strong>
+              ${detail("Type", r.type)}
+              ${detail("Status", r.status)}
+              ${detail("History", r.history)}
+              ${detail("Important Moments", r.moments)}
+              ${detail("Arc", r.arc)}
+            </article>
+          `).join("") : "<p>No relationships yet.</p>"}
+        </section>
+
+        <section id="characterWiki_scenes" class="character-wiki-tab">
+          <h3>Scenes Appeared In</h3>
+          ${apps.length ? apps.map(a => `<p>${escapeHTML(a)}</p>`).join("") : "<p>No appearances detected yet.</p>"}
+        </section>
+
+        <section id="characterWiki_notes" class="character-wiki-tab">
+          <h3>Notes</h3>
+          ${detail("Quotes", c.quotes)}
+          ${detail("Secrets", c.secrets)}
+        </section>
+      </main>
+    </div>
+  `;
+}
+function showCharacterWikiTab(tabName){
+  document.querySelectorAll(".character-wiki-tab").forEach(tab => tab.classList.remove("active"));
+  const tab = document.getElementById("characterWiki_" + tabName);
+  if(tab) tab.classList.add("active");
+}
+
+/* Make setView recognize Character Dashboard and still open individual wiki pages */
+const originalSetViewV164 = typeof setView === "function" ? setView : null;
+function setView(view,id=null,extra=null){
+  saveCurrentScene(false,false);
+  if(view==="write"){
+    if(id) data.activeChapterId=id;
+    if(extra) data.activeSceneId=extra;
+    if(!data.activeSceneId) data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null;
   }
+  if((view==="characterDetail" || view==="characterWiki") && id){
+    data.selectedCharacterId=id;
+    view="characterDetail";
+  }
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  const target = document.getElementById(view);
+  if(target) target.classList.add("active");
+  const titles={overview:"Overview",write:"Scene-Based Writing",storyBoard:"Story Structure Board",chapters:"Chapter Planner",threads:"Plot Threads",mysteries:"Mystery Tracker",foreshadowing:"Foreshadowing Tracker",plotBoard:"Plot Board",characters:"Characters",characterDashboard:"Character Dashboard",characterDetail:"Character Wiki",relationships:"Relationship System",locations:"Locations",magic:"Magic System",organizations:"Organizations",scenes:"Scene Database",timeline:"Timeline",world:"Worldbuilding Notes",seriesTools:"Series-Level Tools",music:"Project Playlist",mediaLibrary:"Media Library",stats:"Writing Analytics",exports:"Export",backup:"Backup"};
+  setText("viewTitle",titles[view]||"Workspace");
+  renderAll();
+}
+
+/* Ensure character creation populates dashboard immediately */
+const originalAddCharacterV164 = typeof addCharacter === "function" ? addCharacter : null;
+function addCharacter(){
+  const file=document.getElementById("charPhoto")?.files?.[0];
+  const finish=photo=>{
+    data.characters.push({
+      id:uid(),
+      ...scopedItem(val("charScope")),
+      name:val("charName"),
+      role:val("charRole"),
+      species:val("charSpecies"),
+      photo,
+      description:val("charDescription"),
+      personality:val("charPersonality"),
+      wound:val("charWound"),
+      arc:val("charArc"),
+      voice:val("charVoice"),
+      bio:val("charBio"),
+      secrets:val("charSecrets"),
+      quotes:val("charQuotes"),
+      created:new Date().toISOString()
+    });
+    clearFields(["charName","charSpecies","charDescription","charPersonality","charWound","charArc","charVoice","charBio","charSecrets","charQuotes"]);
+    const input=document.getElementById("charPhoto");
+    if(input) input.value="";
+    saveData();
+    setView("characterDashboard");
+  };
+  if(!file) return finish("");
+  const reader=new FileReader();
+  reader.onload=()=>finish(reader.result);
+  reader.readAsDataURL(file);
+}
+
+/* Render hook */
+const originalRenderAllListsV164 = typeof renderAllLists === "function" ? renderAllLists : null;
+function renderAllLists(){
+  if(originalRenderAllListsV164) originalRenderAllListsV164();
+  renderCharacterDashboard();
+  renderCharacterDetail();
+}
+
+
+/* PlotPals V16.5 Simplified Character Dashboard Creator */
+function toggleCharacterCreator(force){
+  const panel = document.getElementById("characterCreatorPanel");
+  if(!panel) return;
+  if(force === true) panel.classList.remove("hidden");
+  else if(force === false) panel.classList.add("hidden");
+  else panel.classList.toggle("hidden");
+}
+function addCharacterFromDashboard(){
+  const file=document.getElementById("dashCharPhoto")?.files?.[0];
+  const finish=photo=>{
+    const character = {
+      id:uid(),
+      ...scopedItem(val("dashCharScope")),
+      name:val("dashCharName"),
+      role:val("dashCharRole"),
+      species:val("dashCharSpecies"),
+      photo,
+      description:val("dashCharDescription"),
+      personality:val("dashCharPersonality"),
+      wound:val("dashCharWound"),
+      arc:val("dashCharArc"),
+      voice:val("dashCharVoice"),
+      bio:val("dashCharBio"),
+      secrets:val("dashCharSecrets"),
+      quotes:val("dashCharQuotes"),
+      created:new Date().toISOString()
+    };
+
+    if(!character.name) return alert("Give the character a name first.");
+
+    data.characters.push(character);
+
+    if(photo && data.mediaLibrary){
+      const media = {
+        id:uid(),
+        seriesId:data.activeSeriesId,
+        bookId:data.activeBookId,
+        title:`${character.name} Portrait`,
+        category:"Character",
+        notes:"Saved from Character Dashboard upload.",
+        data:photo,
+        created:new Date().toISOString()
+      };
+      data.mediaLibrary.push(media);
+      character.mediaId = media.id;
+    }
+
+    ["dashCharName","dashCharSpecies","dashCharDescription","dashCharPersonality","dashCharWound","dashCharArc","dashCharVoice","dashCharBio","dashCharSecrets","dashCharQuotes"].forEach(id=>setVal(id,""));
+    const input=document.getElementById("dashCharPhoto");
+    if(input) input.value="";
+    toggleCharacterCreator(false);
+    saveData();
+    setView("characterDashboard");
+  };
+
+  if(!file) return finish("");
+  const reader=new FileReader();
+  reader.onload=()=>finish(reader.result);
+  reader.readAsDataURL(file);
+}
+
+
+/* PlotPals V16.6 Character Sidebar Hierarchy */
+function sidebarCharacterImage(character){
+  if(!character) return "";
+  if(character.photo) return character.photo;
+  if(character.mediaId && data.mediaLibrary){
+    return (data.mediaLibrary || []).find(m => m.id === character.mediaId)?.data || "";
+  }
+  return "";
+}
+function sidebarCharacterRoleLabel(role){
+  const labels = {
+    Main: "Main Character",
+    Side: "Side Character",
+    "Love Interest": "Love Interest",
+    Antagonist: "Antagonist",
+    Mentor: "Mentor",
+    Other: "Other"
+  };
+  return labels[role] || role || "Other";
+}
+function renderCharacterSidebarHierarchy(){
+  const nav = document.getElementById("nestedNav");
+  if(!nav) return;
 
   const roles = ["Main","Side","Love Interest","Antagonist","Mentor","Other"];
   const characters = (data.characters || []).filter(visibleByScope);
-  const characterTree = document.getElementById("htmlCharacterTree");
-  const characterCount = document.getElementById("sidebarCharacterCount");
-  if(characterCount) characterCount.textContent = characters.length;
+  const charsByRole = role => characters.filter(c => (c.role || "Other") === role);
 
-  if(characterTree){
-    characterTree.innerHTML = roles.map(role => {
-      const roleChars = characters.filter(c => (c.role || "Other") === role);
-      return `
-        <div class="html-nav-subsection open" id="htmlRole_${role.replaceAll(" ","_")}">
-          <button class="html-nav-parent" onclick="toggleHtmlSidebarSection('htmlRole_${role.replaceAll(" ","_")}')">
-            ▼ ${htmlSidebarRoleLabel(role)}
-            <span class="nav-count">${roleChars.length}</span>
-          </button>
-          <div class="html-nav-children">
-            ${roleChars.length ? roleChars.map(character => {
-              const img = character.photo || htmlSidebarMediaImage(character.mediaId);
+  const characterSection = `
+    <div class="nav-section character-sidebar-section">
+      <button class="nav-parent" onclick="setView('characterDashboard')">
+        <span class="nav-label">Characters</span>
+        <span class="nav-count">${characters.length}</span>
+      </button>
+      <div class="nav-children">
+        <button class="nav-child" onclick="setView('characterDashboard')">Character Dashboard</button>
+        ${roles.map(role => `
+          <div class="sidebar-role-group">
+            <button class="nav-child sidebar-role-header" onclick="setView('characterDashboard')">
+              <span>${sidebarCharacterRoleLabel(role)}</span>
+              <span class="nav-count">${charsByRole(role).length}</span>
+            </button>
+            ${charsByRole(role).map(character => {
+              const img = sidebarCharacterImage(character);
               return `
-                <button class="html-nav-character" onclick="setView('characterWiki','${character.id}')">
-                  ${img ? `<img src="${img}" alt="">` : `<span class="character-dot"></span>`}
+                <button class="nav-grandchild sidebar-character-link" onclick="openCharacterWiki('${character.id}')">
+                  ${img ? `<img src="${img}" alt="">` : `<span class="sidebar-character-dot"></span>`}
                   <span>${escapeHTML(character.name || "Unnamed Character")}</span>
                 </button>
               `;
-            }).join("") : `<button class="html-nav-scene" onclick="setView('characters')">No ${htmlSidebarRoleLabel(role)} characters yet</button>`}
+            }).join("")}
           </div>
-        </div>
-      `;
-    }).join("");
+        `).join("")}
+        <button class="nav-child" onclick="setView('relationships')">Relationships</button>
+      </div>
+    </div>
+  `;
+
+  const existing = nav.querySelector(".character-sidebar-section");
+  if(existing){
+    existing.outerHTML = characterSection;
+    return;
   }
+
+  // Try replacing old Characters nav section if it exists.
+  const sections = Array.from(nav.querySelectorAll(".nav-section"));
+  const oldCharacterSection = sections.find(section => section.textContent.trim().toLowerCase().includes("characters"));
+  if(oldCharacterSection){
+    oldCharacterSection.outerHTML = characterSection;
+    return;
+  }
+
+  // Otherwise append it so it always appears.
+  nav.insertAdjacentHTML("beforeend", characterSection);
+}
+
+/* Keep original sidebar renderer, then inject the Character hierarchy into it */
+const originalRenderNestedNavV166 = typeof renderNestedNav === "function" ? renderNestedNav : null;
+function renderNestedNav(){
+  if(originalRenderNestedNavV166) originalRenderNestedNavV166();
+  renderCharacterSidebarHierarchy();
+}
+
+/* Refresh sidebar immediately after adding a dashboard character */
+const originalAddCharacterFromDashboardV166 = typeof addCharacterFromDashboard === "function" ? addCharacterFromDashboard : null;
+function addCharacterFromDashboard(){
+  if(originalAddCharacterFromDashboardV166){
+    originalAddCharacterFromDashboardV166();
+    setTimeout(renderCharacterSidebarHierarchy, 50);
+    return;
+  }
+}
+
+/* Refresh sidebar immediately after adding a character from old Characters tab */
+const originalAddCharacterV166 = typeof addCharacter === "function" ? addCharacter : null;
+function addCharacter(){
+  if(originalAddCharacterV166){
+    originalAddCharacterV166();
+    setTimeout(renderCharacterSidebarHierarchy, 50);
+    return;
+  }
+}
+
+
+/* PlotPals V16.7 Character Save + Photo Upload Fix */
+function setCharacterCreatorMessage(message){
+  const el = document.getElementById("characterCreatorMessage");
+  if(el) el.textContent = message || "";
+}
+function toggleCharacterCreator(force){
+  const panel = document.getElementById("characterCreatorPanel");
+  if(!panel) return;
+  if(force === true) panel.classList.remove("hidden");
+  else if(force === false) panel.classList.add("hidden");
+  else panel.classList.toggle("hidden");
+  setCharacterCreatorMessage("");
+}
+function getDashboardCharacterValue(id){
+  return document.getElementById(id)?.value?.trim() || "";
+}
+function clearDashboardCharacterForm(){
+  ["dashCharName","dashCharSpecies","dashCharDescription","dashCharPersonality","dashCharWound","dashCharArc","dashCharVoice","dashCharBio","dashCharSecrets","dashCharQuotes"].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = "";
+  });
+  const photo = document.getElementById("dashCharPhoto");
+  if(photo) photo.value = "";
+}
+function readDashboardCharacterPhoto(){
+  return new Promise(resolve => {
+    const input = document.getElementById("dashCharPhoto");
+    const file = input?.files?.[0];
+    if(!file) return resolve("");
+    if(!file.type.startsWith("image/")){
+      setCharacterCreatorMessage("Please upload an image file.");
+      return resolve(null);
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result || "");
+    reader.onerror = () => {
+      setCharacterCreatorMessage("The photo could not be read.");
+      resolve(null);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+async function addCharacterFromDashboard(){
+  ensureCollections();
+  if(!data.activeSeriesId || !data.activeBookId){
+    setCharacterCreatorMessage("Open a book/project before adding a character.");
+    return;
+  }
+
+  const name = getDashboardCharacterValue("dashCharName");
+  if(!name){
+    setCharacterCreatorMessage("Give the character a name first.");
+    return;
+  }
+
+  const photo = await readDashboardCharacterPhoto();
+  if(photo === null) return;
+
+  const scope = getDashboardCharacterValue("dashCharScope") || "book";
+  const character = {
+    id: uid(),
+    ...scopedItem(scope),
+    name,
+    role: getDashboardCharacterValue("dashCharRole") || "Other",
+    species: getDashboardCharacterValue("dashCharSpecies"),
+    photo: photo || "",
+    description: getDashboardCharacterValue("dashCharDescription"),
+    personality: getDashboardCharacterValue("dashCharPersonality"),
+    wound: getDashboardCharacterValue("dashCharWound"),
+    arc: getDashboardCharacterValue("dashCharArc"),
+    voice: getDashboardCharacterValue("dashCharVoice"),
+    bio: getDashboardCharacterValue("dashCharBio"),
+    secrets: getDashboardCharacterValue("dashCharSecrets"),
+    quotes: getDashboardCharacterValue("dashCharQuotes"),
+    created: new Date().toISOString()
+  };
+
+  if(!data.characters) data.characters = [];
+  data.characters.push(character);
+
+  if(photo){
+    if(!data.mediaLibrary) data.mediaLibrary = [];
+    const media = {
+      id: uid(),
+      seriesId: data.activeSeriesId,
+      bookId: data.activeBookId,
+      title: `${name} Portrait`,
+      category: "Character",
+      notes: "Saved from Character Dashboard upload.",
+      data: photo,
+      created: new Date().toISOString()
+    };
+    data.mediaLibrary.push(media);
+    character.mediaId = media.id;
+  }
+
+  clearDashboardCharacterForm();
+  toggleCharacterCreator(false);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data,null,2));
+  renderAll();
+  setView("characterDashboard");
+  setCharacterCreatorMessage("Character saved.");
+  scheduleCloudSave();
+}
+function characterDashboardImage(character){
+  if(!character) return "";
+  if(character.photo) return character.photo;
+  if(character.mediaId && data.mediaLibrary){
+    return (data.mediaLibrary || []).find(m => m.id === character.mediaId)?.data || "";
+  }
+  return "";
+}
+function characterDashboardRoleLabel(role){
+  const labels = {Main:"Main Character",Side:"Side Character","Love Interest":"Love Interest",Antagonist:"Antagonist",Mentor:"Mentor",Other:"Other"};
+  return labels[role] || role || "Other";
+}
+function renderCharacterDashboard(){
+  const el = document.getElementById("characterDashboardList");
+  if(!el) return;
+  const characters = (data.characters || []).filter(visibleByScope);
+  const roles = ["Main","Side","Love Interest","Antagonist","Mentor","Other"];
+
+  if(!characters.length){
+    el.innerHTML = `<article class="item-card"><div class="card-body"><p>No characters yet.</p><button onclick="toggleCharacterCreator(true)">+ Add Character</button></div></article>`;
+    return;
+  }
+
+  el.innerHTML = roles.map(role => {
+    const roleCharacters = characters.filter(c => (c.role || "Other") === role);
+    if(!roleCharacters.length) return "";
+    return `
+      <div class="character-dashboard-role">
+        <h3>${characterDashboardRoleLabel(role)}</h3>
+        <div class="card-grid">
+          ${roleCharacters.map(character => {
+            const img = characterDashboardImage(character);
+            return `
+              <article class="item-card character-dashboard-card" onclick="openCharacterWiki('${character.id}')">
+                <div class="character-card-image-wrap">
+                  ${img ? `<img class="character-dashboard-photo" src="${img}" alt="${escapeHTML(character.name || "Character")}">` : `<div class="character-dashboard-photo empty-photo">No Photo</div>`}
+                </div>
+                <div class="card-body">
+                  <h3>${escapeHTML(character.name || "Unnamed Character")}</h3>
+                  <span class="tag">${escapeHTML(characterDashboardRoleLabel(character.role))}</span>
+                  ${character.species ? `<span class="tag">${escapeHTML(character.species)}</span>` : ""}
+                  ${detail("Personality", stripHTML(character.personality || "").slice(0, 160))}
+                  ${detail("Arc", stripHTML(character.arc || "").slice(0, 160))}
+                  <button onclick="event.stopPropagation(); openCharacterWiki('${character.id}')">Open Wiki Page</button>
+                </div>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+function openCharacterWiki(characterId){
+  data.selectedCharacterId = characterId;
+  setView("characterDetail", characterId);
+}
+
+/* Keep the older Characters tab working too, but route saves through reliable logic when possible. */
+function addCharacter(){
+  const oldName = document.getElementById("charName")?.value?.trim() || "";
+  if(!oldName){
+    alert("Give the character a name first.");
+    return;
+  }
+
+  // Copy old form values into dashboard form and reuse the fixed save path.
+  const map = {
+    charName:"dashCharName",
+    charScope:"dashCharScope",
+    charRole:"dashCharRole",
+    charSpecies:"dashCharSpecies",
+    charDescription:"dashCharDescription",
+    charPersonality:"dashCharPersonality",
+    charWound:"dashCharWound",
+    charArc:"dashCharArc",
+    charVoice:"dashCharVoice",
+    charBio:"dashCharBio",
+    charSecrets:"dashCharSecrets",
+    charQuotes:"dashCharQuotes"
+  };
+  Object.entries(map).forEach(([from,to]) => {
+    const fromEl = document.getElementById(from);
+    const toEl = document.getElementById(to);
+    if(fromEl && toEl) toEl.value = fromEl.value;
+  });
+
+  const oldPhoto = document.getElementById("charPhoto");
+  const dashPhoto = document.getElementById("dashCharPhoto");
+  if(oldPhoto?.files?.length && dashPhoto){
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(oldPhoto.files[0]);
+      dashPhoto.files = dt.files;
+    } catch(e) {}
+  }
+
+  addCharacterFromDashboard();
+}
+
+/* Make sure renderAllLists always populates dashboard after normal lists */
+const renderAllListsBeforeV167 = typeof renderAllLists === "function" ? renderAllLists : null;
+function renderAllLists(){
+  if(renderAllListsBeforeV167) renderAllListsBeforeV167();
+  renderCharacterDashboard();
 }

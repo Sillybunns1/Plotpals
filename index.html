@@ -534,7 +534,7 @@
 
       <section id="characters" class="view">
         <div class="form-panel">
-          <h3>Add Character</h3><p class="muted">Long character fields support rich formatting after saving through the Character Wiki page.</p>
+          <h3>Add Character</h3><button onclick="setView('characterDashboard')" class="wide glow">Open Character Dashboard</button><p class="muted">Long character fields support rich formatting after saving through the Character Wiki page.</p>
           <div class="form-grid">
             <input id="charName" placeholder="Character name" />
             <select id="charScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
@@ -694,9 +694,47 @@
       </section>
 
 
+
+
       <section id="characterDashboard" class="view">
-        <div id="characterDashboardContent"></div>
+        <div class="panel">
+          <div class="card-header">
+            <div>
+              <h3>Character Dashboard</h3>
+              <p>Every character you create appears here. Click a character to open their wiki page.</p>
+            </div>
+            <button class="glow" onclick="toggleCharacterCreator()">+ Add Character</button>
+          </div>
+        </div>
+
+        <div id="characterCreatorPanel" class="form-panel hidden">
+          <div class="card-header">
+            <h3>Create Character</h3>
+            <button class="delete-btn" onclick="toggleCharacterCreator(false)">Close</button>
+          </div>
+          <div class="form-grid">
+            <input id="dashCharName" placeholder="Character name" />
+            <select id="dashCharScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
+            <select id="dashCharRole"><option>Main</option><option>Side</option><option>Love Interest</option><option>Antagonist</option><option>Mentor</option><option>Other</option></select>
+            <input id="dashCharSpecies" placeholder="Species / identity" />
+            <label class="file-label inline-file">Upload Character Photo <input id="dashCharPhoto" type="file" accept="image/*" /></label>
+            <textarea id="dashCharDescription" placeholder="Physical description"></textarea>
+            <textarea id="dashCharPersonality" placeholder="Personality"></textarea>
+            <textarea id="dashCharWound" placeholder="Core wound / fear / desire"></textarea>
+            <textarea id="dashCharArc" placeholder="Character arc"></textarea>
+            <textarea id="dashCharVoice" placeholder="Voice / speech patterns"></textarea>
+            <textarea id="dashCharBio" placeholder="Biography"></textarea>
+            <textarea id="dashCharSecrets" placeholder="Secrets"></textarea>
+            <textarea id="dashCharQuotes" placeholder="Quotes"></textarea>
+          </div>
+          <button class="glow" onclick="addCharacterFromDashboard()">Create Character</button>
+          <p id="characterCreatorMessage" class="muted"></p>
+        </div>
+
+        <div id="characterDashboardList" class="card-grid"></div>
       </section>
+
+
 
       <section id="sceneCards" class="view">
         <div class="form-panel">
