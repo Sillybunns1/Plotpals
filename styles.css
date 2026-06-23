@@ -31,3 +31,67 @@ main{padding:28px;overflow:hidden}.topbar{display:flex;justify-content:space-bet
 .backup-row{display:flex;flex-wrap:wrap;gap:12px;margin:14px 0}.file-label input{display:none}.danger{color:var(--danger)}#rawData{min-height:300px;font-family:Consolas,monospace;font-size:.85rem}.search-results{margin-bottom:24px}.search-results h3{margin-top:0}.chapter-stat-row{display:grid;grid-template-columns:1fr 120px;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}.series-only-warning{margin-bottom:18px;color:var(--gold)}
 .print-area{display:none}@media print{body{background:white;color:black}.app-shell>aside,.topbar,.view:not(#exports),#exports .panel>*:not(.print-area){display:none!important}.app-shell,main{display:block;padding:0}.print-area{display:block;color:black;background:white;font-family:Georgia,serif}.print-area h1,.print-area h2{color:black}}
 @media(max-width:1050px){.app-shell,.two-col,.editor-layout,.project-grid,.character-detail-grid{grid-template-columns:1fr}.sidebar{position:relative;height:auto}.stats-grid,.form-grid,.scene-meta{grid-template-columns:1fr}.form-grid textarea{grid-column:span 1}}
+
+
+/* PlotPals V11 polish */
+body.light-mode {
+  --bg:#fff7fb;
+  --panel:#ffffff;
+  --panel-2:#f7e8ff;
+  --text:#26152d;
+  --muted:#715878;
+  --border:rgba(74,35,88,0.18);
+  background: linear-gradient(135deg, #fff7fb, #f9edff 55%, #fff6f9);
+}
+.feature-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 8px;
+}
+.feature-strip span {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255,255,255,.06);
+  color: var(--gold);
+  font-size: .85rem;
+}
+body.light-mode .feature-strip span { color:#8b3d7d; background:#fff; }
+.project-card:before, .login-card:before {
+  content:"PlotPals";
+  display:block;
+  text-transform:uppercase;
+  letter-spacing:.28em;
+  color:var(--gold);
+  font-size:.72rem;
+  margin-bottom:8px;
+}
+body.light-mode .stat-card,
+body.light-mode .panel,
+body.light-mode .form-panel,
+body.light-mode .item-card,
+body.light-mode .search-results,
+body.light-mode .login-card,
+body.light-mode .project-card {
+  background: rgba(255,255,255,.9);
+}
+body.light-mode input,
+body.light-mode textarea,
+body.light-mode select,
+body.light-mode .rich-editor {
+  background: rgba(74,35,88,.05);
+}
+.playlist-link {
+  display:inline-block;
+  margin: 6px 8px 6px 0;
+  padding: 8px 10px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  color:var(--text);
+  text-decoration:none;
+  background:rgba(255,255,255,.06);
+}
+.theme-card {
+  border-left: 4px solid var(--accent);
+}
