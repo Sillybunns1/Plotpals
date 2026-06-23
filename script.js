@@ -5,7 +5,7 @@ const defaultData = {
   activeSeriesId: null, activeBookId: null, activeChapterId: null, activeSceneId: null, selectedCharacterId: null,
   user: null, series: [], books: [], characters: [], relationships: [], timeline: [], chapterPlans: [], threads: [],
   scenes: [], world: [], locations: [], magicSystems: [], organizations: [], mysteries: [], foreshadowing: [], plotArcs: [], plotCards: [],
-  structureBeats: [], music: {}, theme: 'dark', pinnedNote: '', libraryView: 'stories', lastOpened: null, currentView: 'projectDashboard'
+  structureBeats: [], music: {}, theme: 'dark', pinnedNote: '', libraryView: 'stories', lastOpened: null, currentView: 'projectDashboard', trash: [], backups: [], searchFilter: 'all'
 };
 
 let supabaseClient = null;
@@ -55,11 +55,12 @@ function sectionArrow(section){
 
 function initSupabase() {
   if (!window.supabase) { setLoginMessage("Supabase could not load. Check your internet connection."); return; }
+  if(!window.WRITERS_VAULT_SUPABASE_URL || !window.WRITERS_VAULT_SUPABASE_KEY){ setLoginMessage("Supabase credentials are missing. Cloud login is disabled until they are added."); return; }
   supabaseClient = window.supabase.createClient(window.WRITERS_VAULT_SUPABASE_URL, window.WRITERS_VAULT_SUPABASE_KEY);
 }
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2)}
 function loadData(){const saved=localStorage.getItem(STORAGE_KEY); if(!saved) return structuredClone(defaultData); try{return {...structuredClone(defaultData),...JSON.parse(saved)}}catch{return structuredClone(defaultData)}}
-function saveData(render=true,scheduleCloud=true){localStorage.setItem(STORAGE_KEY,JSON.stringify(data,null,2)); if(render) renderAll(); if(scheduleCloud) scheduleCloudSave()}
+function saveData(render=true,scheduleCloud=true){try{makeBackupSnapshot(); localStorage.setItem(STORAGE_KEY,JSON.stringify(data,null,2));}catch(e){try{data.backups=(data.backups||[]).slice(0,3); localStorage.setItem(STORAGE_KEY,JSON.stringify(data,null,2)); alert("Storage is nearly full. Older automatic backups were pruned. Export a backup soon.");}catch(err){alert("Save failed because browser storage is full. Export a backup and remove large images or music."); return;}} if(render) renderAll(); if(scheduleCloud) scheduleCloudSave()}
 function val(id){return document.getElementById(id)?.value.trim()||""}
 function setVal(id,value){const el=document.getElementById(id); if(el) el.value=value||""}
 function setText(id,value){const el=document.getElementById(id); if(el) el.textContent=value}
@@ -133,13 +134,63 @@ function escapeAttr(str=""){return escapeHTML(str)}
 function stripHTML(html=""){const div=document.createElement("div"); div.innerHTML=html; return div.textContent||div.innerText||""}
 function detail(label,value){if(!value)return""; return `<p><strong>${escapeHTML(label)}:</strong> ${escapeHTML(value).replaceAll("\n","<br>")}</p>`}
 function countWords(text=""){return (text.trim().match(/\b[\w’'-]+\b/g)||[]).length}
+
+function notDeleted(item){return !item?.deletedAt}
+function activeItem(collection,id){return (data[collection]||[]).find(item=>item.id===id && notDeleted(item))||null}
+function collectionLabel(collection){return ({characters:"Character",relationships:"Relationship",timeline:"Timeline Event",chapterPlans:"Chapter Plan",threads:"Plot Thread",world:"World Building Entry",locations:"Location",magicSystems:"Magic System",organizations:"Organization",mysteries:"Mystery",foreshadowing:"Foreshadowing",plotCards:"Plot Point",plotArcs:"Plot Arc",structureBeats:"Structure Beat",books:"Book",manuscriptChapters:"Chapter",manuscriptScenes:"Scene"}[collection]||collection)}
+function makeBackupSnapshot(reason="Auto-save"){
+  if(!data.backups)data.backups=[];
+  const now=Date.now();
+  const last=Number(data._lastBackupAt||0);
+  if(reason==="Auto-save" && now-last<60000)return;
+  const snapshot=JSON.stringify({...data,backups:[],_lastBackupAt:now});
+  data.backups.unshift({id:uid(),reason,created:new Date().toISOString(),snapshot});
+  data.backups=data.backups.slice(0,10);
+  data._lastBackupAt=now;
+}
+function renderBackupSnapshots(){
+  const el=document.getElementById("backupSnapshots"); if(!el)return;
+  const backups=data.backups||[];
+  el.innerHTML=backups.length?backups.map(b=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(b.reason||"Backup")}</h3><span class="tag">${escapeHTML(new Date(b.created).toLocaleString())}</span></div><button onclick="restoreBackupSnapshot('${b.id}')">Restore Backup</button><button class="delete-btn" onclick="deleteBackupSnapshot('${b.id}')">Delete Backup</button></article>`).join(""):`<p class="muted">No automatic backup snapshots yet. A snapshot is created during saves.</p>`;
+}
+function restoreBackupSnapshot(id){
+  const b=(data.backups||[]).find(x=>x.id===id); if(!b)return;
+  if(!confirm("Restore this backup? Current local changes will be replaced."))return;
+  const user=data.user;
+  try{ data={...structuredClone(defaultData),...JSON.parse(b.snapshot)}; data.user=user||data.user; saveData(true,false); alert("Backup restored."); }catch(e){ alert("This backup could not be restored."); }
+}
+function deleteBackupSnapshot(id){data.backups=(data.backups||[]).filter(b=>b.id!==id); saveData(true,false)}
+function renderTrashManager(){
+  const el=document.getElementById("trashManager"); if(!el)return;
+  const trash=(data.trash||[]).filter(t=>t.seriesId===data.activeSeriesId || !t.seriesId);
+  el.innerHTML=trash.length?trash.map(t=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(t.title||"Deleted Item")}</h3><span class="tag">${escapeHTML(collectionLabel(t.collection))}</span></div><p class="muted">Deleted ${escapeHTML(new Date(t.deletedAt).toLocaleString())}</p><button onclick="restoreDeletedItem('${t.id}')">Restore</button><button class="delete-btn" onclick="permanentlyDeleteItem('${t.id}')">Delete Forever</button></article>`).join(""):`<p class="muted">Trash is empty.</p>`;
+}
+function restoreDeletedItem(trashId){
+  const t=(data.trash||[]).find(x=>x.id===trashId); if(!t)return;
+  const item={...(t.item||{})}; delete item.deletedAt;
+  if(t.collection==="manuscriptChapters"){
+    const book=(data.books||[]).find(b=>b.id===t.bookId); if(book){ if(!book.manuscript)book.manuscript=[]; book.manuscript.push(item); }
+  }else if(t.collection==="manuscriptScenes"){
+    const book=(data.books||[]).find(b=>b.id===t.bookId); const chapter=(book?.manuscript||[]).find(ch=>ch.id===t.chapterId); if(ch){ if(!ch.scenes)ch.scenes=[]; ch.scenes.push(item); }
+  }else{
+    if(!data[t.collection])data[t.collection]=[];
+    const existing=data[t.collection].find(x=>x.id===item.id);
+    if(existing)Object.assign(existing,item); else data[t.collection].push(item);
+  }
+  data.trash=data.trash.filter(x=>x.id!==trashId);
+  saveData(true);
+}
+function permanentlyDeleteItem(trashId){if(!confirm("Permanently delete this item?"))return; data.trash=(data.trash||[]).filter(x=>x.id!==trashId); saveData(true)}
+function storageHealthMessage(){
+  try{const used=(localStorage.getItem(STORAGE_KEY)||"").length; return used>4500000?"Storage is getting full. Export a backup and consider removing unused large images/audio.":"Local storage looks healthy."}catch(e){return "Storage health unavailable."}
+}
 function activeSeries(){return data.series.find(s=>s.id===data.activeSeriesId)||null}
-function activeBook(){return data.books.find(b=>b.id===data.activeBookId)||null}
+function activeBook(){return data.books.find(b=>b.id===data.activeBookId && notDeleted(b))||null}
 function activeChapter(){const b=activeBook(); return (b?.manuscript||[]).find(c=>c.id===data.activeChapterId)||null}
 function activeScene(){const ch=activeChapter(); return (ch?.scenes||[]).find(s=>s.id===data.activeSceneId)||null}
 function isSeriesProject(){return (activeSeries()?.type||"series")==="series"}
-function ensureCollections(){["series","books","characters","relationships","timeline","chapterPlans","threads","scenes","world","locations","magicSystems","organizations","mysteries","foreshadowing","plotArcs","plotCards","structureBeats"].forEach(k=>{if(!data[k])data[k]=[]}); if(!data.music)data.music={}; if(!data.worldCategories)data.worldCategories=[]; if(!data.theme)data.theme="dark"; if(!data.libraryView)data.libraryView="stories"; if(!data.currentView)data.currentView="projectDashboard"; if(!data.editorCollapsedChapters)data.editorCollapsedChapters={}; if(typeof data.manuscriptSidebarCollapsed!=="boolean")data.manuscriptSidebarCollapsed=false; }
-function ensureProject(){ensureCollections(); const b=activeBook(); if(b){if(!b.manuscript)b.manuscript=[]; if(!b.manuscript.length){const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],plotCardId:"",created:new Date().toISOString()}; const ch={id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()}; b.manuscript.push(ch); data.activeChapterId=ch.id; data.activeSceneId=scene.id} b.manuscript.forEach(ch=>{if(!ch.scenes){ch.scenes=[{id:uid(),title:ch.title||"Scene 1",content:ch.content||"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],plotCardId:"",created:ch.created||new Date().toISOString()}]; delete ch.content} (ch.scenes||[]).forEach(sc=>{if(!Array.isArray(sc.characterIds))sc.characterIds=[]; if(!Array.isArray(sc.organizationIds))sc.organizationIds=[]; if(!Array.isArray(sc.magicSystemIds))sc.magicSystemIds=[]; if(!Array.isArray(sc.itemArtifactIds))sc.itemArtifactIds=[]; if(!Array.isArray(sc.floraFaunaIds))sc.floraFaunaIds=[]; if(typeof sc.plotCardId!=="string")sc.plotCardId="";});}); if(!data.activeChapterId)data.activeChapterId=b.manuscript[0]?.id||null; if(!data.activeSceneId)data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null}}
+function ensureCollections(){["series","books","characters","relationships","timeline","chapterPlans","threads","scenes","world","locations","magicSystems","organizations","mysteries","foreshadowing","plotArcs","plotCards","structureBeats"].forEach(k=>{if(!data[k])data[k]=[]}); if(!data.music)data.music={}; if(!data.worldCategories)data.worldCategories=[]; if(!data.trash)data.trash=[]; if(!data.backups)data.backups=[]; if(!data.searchFilter)data.searchFilter='all'; if(!data.theme)data.theme="dark"; if(!data.libraryView)data.libraryView="stories"; if(!data.currentView)data.currentView="projectDashboard"; if(!data.editorCollapsedChapters)data.editorCollapsedChapters={}; if(typeof data.manuscriptSidebarCollapsed!=="boolean")data.manuscriptSidebarCollapsed=false; }
+function ensureProject(){ensureCollections(); const b=activeBook(); if(b){if(!b.manuscript)b.manuscript=[]; if(!b.manuscript.length){const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],locationIds:[],plotCardId:"",created:new Date().toISOString()}; const ch={id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()}; b.manuscript.push(ch); data.activeChapterId=ch.id; data.activeSceneId=scene.id} b.manuscript.forEach(ch=>{if(!ch.scenes){ch.scenes=[{id:uid(),title:ch.title||"Scene 1",content:ch.content||"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],locationIds:[],plotCardId:"",created:ch.created||new Date().toISOString()}]; delete ch.content} (ch.scenes||[]).forEach(sc=>{if(!Array.isArray(sc.characterIds))sc.characterIds=[]; if(!Array.isArray(sc.organizationIds))sc.organizationIds=[]; if(!Array.isArray(sc.magicSystemIds))sc.magicSystemIds=[]; if(!Array.isArray(sc.itemArtifactIds))sc.itemArtifactIds=[]; if(!Array.isArray(sc.floraFaunaIds))sc.floraFaunaIds=[]; if(!Array.isArray(sc.locationIds))sc.locationIds=[]; if(sc.locationId && !sc.locationIds.includes(sc.locationId))sc.locationIds.unshift(sc.locationId); if(typeof sc.plotCardId!=="string")sc.plotCardId="";});}); if(!data.activeChapterId)data.activeChapterId=b.manuscript[0]?.id||null; if(!data.activeSceneId)data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null}}
 
 function switchAuthMode(mode){authMode=mode;document.getElementById("loginTab").classList.toggle("active",mode==="login");document.getElementById("signupTab").classList.toggle("active",mode==="signup");document.getElementById("authSubmitBtn").textContent=mode==="login"?"Login":"Create Account";setLoginMessage("")}
 async function submitAuth(){return authMode==="login"?signIn():signUp()}
@@ -762,7 +813,7 @@ function projectTypeChanged(){
   if(label) label.textContent = type === "standalone" ? "Series / Project Title (optional)" : "Series / Project Title";
   if(input) input.placeholder = type === "standalone" ? "Optional — Book Title is enough" : "Series title";
 }
-function makeStarterBook(seriesId,name){const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],plotCardId:"",created:new Date().toISOString()}; return {id:uid(),seriesId,title:name,status:"Planning",summary:"",theme:"",notes:"",cover:"",manuscript:[{id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()}],created:new Date().toISOString()}}
+function makeStarterBook(seriesId,name){const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],locationIds:[],plotCardId:"",created:new Date().toISOString()}; return {id:uid(),seriesId,title:name,status:"Planning",summary:"",theme:"",notes:"",cover:"",manuscript:[{id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()}],created:new Date().toISOString()}}
 function createStandaloneBook(name){const series={id:uid(),title:name,type:"standalone",genre:"",synopsis:"",theme:"",mysteries:"",foreshadowing:"",created:new Date().toISOString()}; data.series.push(series); data.books.push(makeStarterBook(series.id,name)); return series;}
 function createSeriesFromProject(){const type=val("newProjectType")||"series"; const bookTitle=val("newBookTitle"); const seriesTitle=val("newSeriesTitle"); if(type==="standalone"){const name=bookTitle||seriesTitle||"Untitled Book"; createStandaloneBook(name); clearFields(["newSeriesTitle","newBookTitle"]); saveData(false); renderProjectScreen(); return setProjectMessage("Standalone book created. No Series/Project Title required.");} const name=seriesTitle||"Untitled Series"; const series={id:uid(),title:name,type,genre:"",synopsis:"",theme:"",mysteries:"",foreshadowing:"",created:new Date().toISOString()}; data.series.push(series); setVal("newSeriesTitle",""); saveData(false); renderProjectScreen(); setProjectMessage("Series created. Now create/select a book.")}
 function createBookFromProject(){let seriesId=val("newBookSeriesSelect"); const name=val("newBookTitle")||"Untitled Book"; if(!seriesId){const series=createStandaloneBook(name); seriesId=series.id;} else {data.books.push(makeStarterBook(seriesId,name));} setVal("newBookTitle",""); saveData(false); renderProjectScreen(); setProjectMessage(seriesId?"Book created.":"Standalone book created.")}
@@ -789,6 +840,7 @@ function renderNestedNav(){
   const plotCards=(data.plotCards||[]).filter(visibleByScope);
   const locations=(data.locations||[]).filter(seriesScope);
   const orgs=(data.organizations||[]).filter(seriesScope);
+  const locs=(data.locations||[]).filter(seriesScope);
   const magic=(data.magicSystems||[]).filter(seriesScope);
   const timeline=(data.timeline||[]).filter(seriesScope);
   const rels=(data.relationships||[]).filter(seriesScope);
@@ -990,11 +1042,13 @@ function sceneTrackingCard(title,emptyText,key,items){
 function renderSceneTracking(){
   const chars=(data.characters||[]).filter(seriesScope);
   const orgs=(data.organizations||[]).filter(seriesScope);
+  const locs=(data.locations||[]).filter(seriesScope);
   const magic=(data.magicSystems||[]).filter(seriesScope);
   const artifacts=(data.world||[]).filter(w=>seriesScope(w)&&worldTrackingKeyForCategory(w.category)==="itemArtifactIds");
   const floraFauna=(data.world||[]).filter(w=>seriesScope(w)&&worldTrackingKeyForCategory(w.category)==="floraFaunaIds");
   const html=`
     ${sceneTrackingCard("Characters in this scene","Create characters first, then they will appear here.","characterIds",chars)}
+    ${sceneTrackingCard("Locations in this scene","Create locations first, then they will appear here.","locationIds",locs)}
     ${sceneTrackingCard("Organizations in this scene","Create organizations first, then they will appear here.","organizationIds",orgs)}
     ${sceneTrackingCard("Magic / Systems in this scene","Create magic systems first, then they will appear here.","magicSystemIds",magic)}
     ${sceneTrackingCard("Items / Artifacts in this scene","Create Items / Artifacts in World Building first, then they will appear here.","itemArtifactIds",artifacts)}
@@ -1012,12 +1066,12 @@ function saveScenePlotPoint(){
   saveData(true);
 }
 
-function addManuscriptChapter(){const book=activeBook(); if(!book)return alert("Open a book first."); saveCurrentScene(false,false); const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],plotCardId:"",created:new Date().toISOString()}; const ch={id:uid(),title:`Chapter ${(book.manuscript||[]).length+1}`,scenes:[scene],created:new Date().toISOString()}; book.manuscript.push(ch); data.activeChapterId=ch.id; data.activeSceneId=scene.id; saveData()}
-function addSceneToActiveChapter(){const ch=activeChapter(); if(!ch)return alert("Select a chapter first."); saveCurrentScene(false,false); if(!ch.scenes)ch.scenes=[]; const scene={id:uid(),title:`Scene ${ch.scenes.length+1}`,content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],plotCardId:"",created:new Date().toISOString()}; ch.scenes.push(scene); data.activeSceneId=scene.id; saveData()}
+function addManuscriptChapter(){const book=activeBook(); if(!book)return alert("Open a book first."); saveCurrentScene(false,false); const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],locationIds:[],plotCardId:"",created:new Date().toISOString()}; const ch={id:uid(),title:`Chapter ${(book.manuscript||[]).length+1}`,scenes:[scene],created:new Date().toISOString()}; book.manuscript.push(ch); data.activeChapterId=ch.id; data.activeSceneId=scene.id; saveData()}
+function addSceneToActiveChapter(){const ch=activeChapter(); if(!ch)return alert("Select a chapter first."); saveCurrentScene(false,false); if(!ch.scenes)ch.scenes=[]; const scene={id:uid(),title:`Scene ${ch.scenes.length+1}`,content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],locationIds:[],plotCardId:"",created:new Date().toISOString()}; ch.scenes.push(scene); data.activeSceneId=scene.id; saveData()}
 function selectScene(chapterId,sceneId){setView("write",chapterId,sceneId)}
-function saveCurrentScene(render=false,scheduleCloud=true){if(isRendering)return; const scene=activeScene(); const ch=activeChapter(); const editor=document.getElementById("richEditor"); if(!scene||!ch||!editor)return; ch.title=val("currentChapterTitle")||ch.title; scene.title=val("currentSceneTitle")||scene.title; scene.pov=val("scenePOV"); scene.locationId=val("sceneLocation"); scene.plotCardId=val("scenePlotPoint"); scene.date=val("sceneDate"); scene.mood=val("sceneMood"); scene.purpose=val("scenePurpose"); scene.content=editor.innerHTML; setText("autosaveStatus","Saving..."); saveData(render,scheduleCloud); updateEditorStats()}
-function deleteManuscriptChapter(id){const book=activeBook(); if(!book)return; if(!confirm("Delete this chapter and all scenes?"))return; book.manuscript=book.manuscript.filter(c=>c.id!==id); data.activeChapterId=book.manuscript[0]?.id||null; data.activeSceneId=book.manuscript[0]?.scenes?.[0]?.id||null; saveData()}
-function deleteScene(chId,sceneId){const ch=(activeBook()?.manuscript||[]).find(c=>c.id===chId); if(!ch)return; if(!confirm("Delete this scene?"))return; ch.scenes=(ch.scenes||[]).filter(s=>s.id!==sceneId); data.activeSceneId=ch.scenes[0]?.id||null; saveData()}
+function saveCurrentScene(render=false,scheduleCloud=true){if(isRendering)return; const scene=activeScene(); const ch=activeChapter(); const editor=document.getElementById("richEditor"); if(!scene||!ch||!editor)return; ch.title=val("currentChapterTitle")||ch.title; scene.title=val("currentSceneTitle")||scene.title; scene.pov=val("scenePOV"); scene.locationId=val("sceneLocation"); if(!Array.isArray(scene.locationIds))scene.locationIds=[]; if(scene.locationId && !scene.locationIds.includes(scene.locationId))scene.locationIds.unshift(scene.locationId); scene.plotCardId=val("scenePlotPoint"); scene.date=val("sceneDate"); scene.mood=val("sceneMood"); scene.purpose=val("scenePurpose"); scene.content=editor.innerHTML; setText("autosaveStatus","Saving..."); saveData(render,scheduleCloud); updateEditorStats()}
+function deleteManuscriptChapter(id){const book=activeBook(); if(!book)return; const ch=(book.manuscript||[]).find(c=>c.id===id); if(!ch)return; if(!confirm("Move this chapter and all scenes to Trash?"))return; data.trash=data.trash||[]; data.trash.unshift({id:uid(),collection:"manuscriptChapters",title:ch.title||"Chapter",seriesId:data.activeSeriesId,bookId:book.id,item:{...ch,deletedAt:new Date().toISOString()},deletedAt:new Date().toISOString()}); book.manuscript=book.manuscript.filter(c=>c.id!==id); data.activeChapterId=book.manuscript[0]?.id||null; data.activeSceneId=book.manuscript[0]?.scenes?.[0]?.id||null; saveData()}
+function deleteScene(chId,sceneId){const book=activeBook(); const ch=(book?.manuscript||[]).find(c=>c.id===chId); if(!ch)return; const sc=(ch.scenes||[]).find(s=>s.id===sceneId); if(!sc)return; if(!confirm("Move this scene to Trash?"))return; data.trash=data.trash||[]; data.trash.unshift({id:uid(),collection:"manuscriptScenes",title:`${ch.title||"Chapter"} — ${sc.title||"Scene"}`,seriesId:data.activeSeriesId,bookId:book.id,chapterId:ch.id,item:{...sc,deletedAt:new Date().toISOString()},deletedAt:new Date().toISOString()}); ch.scenes=(ch.scenes||[]).filter(s=>s.id!==sceneId); data.activeSceneId=ch.scenes[0]?.id||null; saveData()}
 function moveScene(direction){const ch=activeChapter(); if(!ch?.scenes)return; const index=ch.scenes.findIndex(s=>s.id===data.activeSceneId); const ni=index+direction; if(index<0||ni<0||ni>=ch.scenes.length)return; const [scene]=ch.scenes.splice(index,1); ch.scenes.splice(ni,0,scene); saveData()}
 function formatDoc(command){document.execCommand(command,false,null);document.getElementById("richEditor").focus();saveCurrentScene(false)}
 function formatBlock(tag){document.execCommand("formatBlock",false,tag);document.getElementById("richEditor").focus();saveCurrentScene(false)}
@@ -1026,8 +1080,8 @@ function toggleFullscreen(){document.getElementById("manuscriptPanel").classList
 function updateEditorStats(){const scene=activeScene(); const text=stripHTML(scene?.content||""); const book=activeBook(); const bookWords=(book?.manuscript||[]).flatMap(c=>c.scenes||[]).reduce((sum,s)=>sum+countWords(stripHTML(s.content||"")),0); setText("sceneWordCount",countWords(text)); setText("bookWordCountInline",bookWords); setText("sceneCharCount",text.length); setText("sceneParagraphCount",((scene?.content||"").match(/<p|<div|<h[1-6]/gi)||[]).length||(text.trim()?1:0))}
 
 function scopedItem(scope){return scope==="series"?{scope,seriesId:data.activeSeriesId,bookId:null}:{scope,seriesId:data.activeSeriesId,bookId:data.activeBookId}}
-function visibleByScope(item){return item.seriesId===data.activeSeriesId&&(item.scope==="series"||item.bookId===data.activeBookId)}
-function seriesScope(item){return item.seriesId===data.activeSeriesId}
+function visibleByScope(item){return notDeleted(item)&&item.seriesId===data.activeSeriesId&&(item.scope==="series"||item.bookId===data.activeBookId)}
+function seriesScope(item){return notDeleted(item)&&item.seriesId===data.activeSeriesId}
 function characterName(id){return data.characters.find(c=>c.id===id)?.name||"Unknown"}
 function locationName(id){return data.locations.find(l=>l.id===id)?.name||""}
 function characterRelationships(characterId){return data.relationships.filter(r=>seriesScope(r)&&(r.a===characterId||r.b===characterId))}
@@ -1036,7 +1090,7 @@ function getAppearanceConfig(kind){
     character:{collection:"characters",label:"Character",nameKey:"name",trackedKey:"characterIds"},
     organization:{collection:"organizations",label:"Organization",nameKey:"name",trackedKey:"organizationIds"},
     magic:{collection:"magicSystems",label:"Magic / System",nameKey:"name",trackedKey:"magicSystemIds"},
-    location:{collection:"locations",label:"Location",nameKey:"name",trackedKey:"locationId"},
+    location:{collection:"locations",label:"Location",nameKey:"name",trackedKey:"locationIds"},
     plotCard:{collection:"plotCards",label:"Plot Point",nameKey:"title",trackedKey:"plotCardId"},
     world:{collection:"world",label:"Worldbuilding",nameKey:"name",trackedKey:"worldCategory"}
   };
@@ -1056,6 +1110,7 @@ function appearanceLogEntries(kind,itemId){
       const trackedKey = kind==="world" ? worldTrackingKeyForCategory(item.category) : cfg.trackedKey;
       if(trackedKey){
         if(Array.isArray(scene[trackedKey]) && scene[trackedKey].includes(itemId))reasons.push("selected in scene tracker");
+        if(kind==="location" && scene.locationId===itemId && !reasons.includes("scene location"))reasons.push("scene location");
         if(!Array.isArray(scene[trackedKey]) && scene[trackedKey]===itemId)reasons.push(kind==="plotCard"?"selected plot point":kind==="location"?"scene location":"selected in scene tracker");
       }
       if(kind==="character" && scene.pov===itemId)reasons.push("POV");
@@ -1084,14 +1139,14 @@ function sceneAppearancesHTML(scene){
   if(scene.pov){const pov=characterName(scene.pov); if(pov&&pov!=="Unknown"&&!characters.includes(pov))characters.unshift(`${pov} (POV)`);}
   const organizations=itemNamesFromIds(data.organizations,scene.organizationIds);
   const magic=itemNamesFromIds(data.magicSystems,scene.magicSystemIds);
-  const location=scene.locationId?locationName(scene.locationId):"";
+  const locationNames=itemNamesFromIds(data.locations,scene.locationIds||[]); const location=scene.locationId?locationName(scene.locationId):""; if(location && !locationNames.includes(location))locationNames.unshift(location);
   const artifacts=itemNamesFromIds(data.world,scene.itemArtifactIds);
   const floraFauna=itemNamesFromIds(data.world,scene.floraFaunaIds);
   const plot=scene.plotCardId?((data.plotCards||[]).find(p=>p.id===scene.plotCardId)?.title||""):"";
   const rows=[
     ["Plot Point",plot?[plot]:[]],
     ["Characters",characters],
-    ["Location",location?[location]:[]],
+    ["Locations",locationNames],
     ["Organizations",organizations],
     ["Magic / Systems",magic],
     ["Items / Artifacts",artifacts],
@@ -1455,11 +1510,11 @@ function applyStructureTemplate(){const template=val("structureTemplate"); const
 function addStructureBeat(){data.structureBeats.push({id:uid(),...scopedItem("book"),name:val("structureBeatName")||"Untitled Beat",notes:val("structureBeatNotes"),order:data.structureBeats.filter(visibleByScope).length,created:new Date().toISOString()}); clearFields(["structureBeatName","structureBeatNotes"]); saveData()}
 
 function makeCard(title,body,onDelete){const template=document.getElementById("cardTemplate"); const node=template.content.cloneNode(true); node.querySelector("h3").textContent=title||"Untitled"; node.querySelector(".card-body").innerHTML=body; node.querySelector(".delete-btn").onclick=onDelete; return node}
-function deleteItem(collection,id){data[collection]=data[collection].filter(item=>item.id!==id); saveData()}
+function deleteItem(collection,id){const item=(data[collection]||[]).find(x=>x.id===id); if(!item)return; if(!confirm(`Move this ${collectionLabel(collection)} to Trash?`))return; const deleted={...item,deletedAt:new Date().toISOString()}; data.trash=data.trash||[]; data.trash.unshift({id:uid(),collection,title:item.name||item.title||item.question||item.when||collectionLabel(collection),seriesId:item.seriesId||data.activeSeriesId,bookId:item.bookId||null,item:deleted,deletedAt:deleted.deletedAt}); data[collection]=data[collection].filter(x=>x.id!==id); saveData()}
 
 
 function activeProjectBooks(){
-  return (data.books||[]).filter(b=>b.seriesId===data.activeSeriesId).sort((a,b)=>(a.created||"").localeCompare(b.created||""));
+  return (data.books||[]).filter(b=>b.seriesId===data.activeSeriesId && notDeleted(b)).sort((a,b)=>(a.created||"").localeCompare(b.created||""));
 }
 function bookScenes(book){return (book?.manuscript||[]).flatMap((ch,ci)=>(ch.scenes||[]).map((sc,si)=>({book,chapter:ch,scene:sc,chapterIndex:ci,sceneIndex:si})))}
 function projectScenesAll(){return activeProjectBooks().flatMap(bookScenes)}
@@ -1541,8 +1596,7 @@ function renderProjectDashboard(){
   const appearedChars=chars.filter(c=>appearanceLogEntries("character",c.id).length); const unusedChars=chars.filter(c=>!appearanceLogEntries("character",c.id).length);
   setHTML("projectAppearanceSummary",`<p><strong>${appearedChars.length}</strong> characters have appeared. <strong>${unusedChars.length}</strong> have not appeared yet.</p>${unusedChars.slice(0,5).map(c=>`<span class="tag">${escapeHTML(c.name||"Unnamed")}</span>`).join(" ")||"<p>No unused characters.</p>"}`);
   const unusedPoints=cards.filter(c=>!plotPointUsageForBook(selectedBook||c.bookId).usage[c.id]);
-  const warnings=[]; if(unusedPoints.length)warnings.push(`${unusedPoints.length} plot point${unusedPoints.length===1?"":"s"} never used in scenes.`); if(unusedChars.length)warnings.push(`${unusedChars.length} character${unusedChars.length===1?"":"s"} never marked in scenes.`); if(!books.length)warnings.push("This project has no books yet.");
-  setHTML("projectContinuityWarnings", warnings.length?warnings.map(w=>`<p>⚠ ${escapeHTML(w)}</p>`).join(""):`<p>No major warnings right now.</p>`);
+  const warnings=[]; if(unusedPoints.length)warnings.push(`${unusedPoints.length} plot point${unusedPoints.length===1?"":"s"} never used in scenes.`); if(unusedChars.length)warnings.push(`${unusedChars.length} character${unusedChars.length===1?"":"s"} never marked in scenes.`); if(!books.length)warnings.push("This project has no books yet."); const scenesMissingPlot=allScenes.filter(x=>!x.scene.plotCardId).length; if(scenesMissingPlot)warnings.push(`${scenesMissingPlot} scene${scenesMissingPlot===1?"":"s"} do not have a plot point selected.`); const scenesMissingLocation=allScenes.filter(x=>!x.scene.locationId && !(x.scene.locationIds||[]).length).length; if(scenesMissingLocation)warnings.push(`${scenesMissingLocation} scene${scenesMissingLocation===1?"":"s"} do not have a location tracked.`); const emptyWorld=(data.world||[]).filter(w=>seriesScope(w)&&!(w.description||w.basicInfo||w.history||w.plotRelevance)).length; if(emptyWorld)warnings.push(`${emptyWorld} worldbuilding entr${emptyWorld===1?"y is":"ies are"} mostly empty.`); setHTML("projectContinuityWarnings", warnings.length?warnings.map(w=>`<p>⚠ ${escapeHTML(w)}</p>`).join(""):`<p>No major warnings right now.</p>`);
 }
 function renderOverview(){const s=activeSeries(), b=activeBook(); setVal("seriesTitleEdit",s?.title); setVal("seriesTypeEdit",s?.type||"series"); setVal("seriesGenreEdit",s?.genre); setVal("seriesSynopsisEdit",s?.synopsis); setVal("seriesThemeEdit",s?.theme); setVal("seriesMysteriesEdit",s?.mysteries); setVal("seriesForeshadowingEdit",s?.foreshadowing); setVal("bookTitleEdit",b?.title); setVal("bookStatusEdit",b?.status); setVal("bookSummaryEdit",b?.summary); setVal("bookThemeEdit",b?.theme); setVal("bookNotesEdit",b?.notes); const scenes=(b?.manuscript||[]).flatMap(c=>c.scenes||[]); const words=scenes.reduce((sum,s)=>sum+countWords(stripHTML(s.content||"")),0); setText("statWords",words); setText("statChapters",(b?.manuscript||[]).length); setText("statScenes",scenes.length); setText("statCharacters",data.characters.filter(seriesScope).length); setText("projectPath",`${s?.title||"No project"} → ${b?.title||"No book selected"}`); setText("sidebarProjectName",b?.title||"Project")}
 function saveOverviewFields(render=false){const s=activeSeries(), b=activeBook(); if(s){s.title=val("seriesTitleEdit"); s.type=val("seriesTypeEdit")||"series"; s.genre=val("seriesGenreEdit"); s.synopsis=val("seriesSynopsisEdit"); s.theme=val("seriesThemeEdit"); s.mysteries=val("seriesMysteriesEdit"); s.foreshadowing=val("seriesForeshadowingEdit")} if(b){b.title=val("bookTitleEdit"); b.status=val("bookStatusEdit"); b.summary=val("bookSummaryEdit"); b.theme=val("bookThemeEdit"); b.notes=val("bookNotesEdit")} saveData(render)}
@@ -1662,11 +1716,42 @@ function renderSceneDatabase(){const el=document.getElementById("sceneList"); if
 function renderTimeline(){const tl=document.getElementById("timelineList"); if(!tl)return; tl.innerHTML=""; data.timeline.filter(seriesScope).forEach(item=>{const div=document.createElement("article"); div.className="item-card timeline-item"; div.innerHTML=`<div class="card-header"><h3>${escapeHTML(item.when||"Unplaced Event")}</h3><button class="delete-btn">Delete</button></div><div class="card-body"><span class="tag">${escapeHTML(item.scope)}</span>${detail("Event",item.event)}${detail("Impact",item.impact)}</div>`; div.querySelector("button").onclick=()=>deleteItem("timeline",item.id); tl.appendChild(div)})}
 function renderWritingStats(){const book=activeBook(); const chapters=book?.manuscript||[]; const counts=chapters.map(c=>(c.scenes||[]).reduce((sum,s)=>sum+countWords(stripHTML(s.content||"")),0)); const total=counts.reduce((a,b)=>a+b,0); const avg=counts.length?Math.round(total/counts.length):0; const longest=counts.length?Math.max(...counts):0; const bibleItems=["characters","threads","timeline","world","relationships","locations","magicSystems","organizations","mysteries","foreshadowing","plotArcs","plotCards"].reduce((sum,k)=>sum+(data[k]||[]).filter(k==="magicSystems"||k==="organizations"||k==="mysteries"||k==="foreshadowing"?seriesScope:visibleByScope).length,0); setText("statsTotalWords",total); setText("statsAvgWords",avg); setText("statsLongestChapter",longest); setText("statsBibleItems",bibleItems); setHTML("chapterStatsList",chapters.map((c,i)=>`<div class="chapter-stat-row"><span>${i+1}. ${escapeHTML(c.title||"Untitled")}</span><strong>${counts[i]} words</strong></div>`).join("")||"<p>No chapters yet.</p>"); const povCounts={}; chapters.flatMap(c=>c.scenes||[]).forEach(s=>{if(s.pov)povCounts[characterName(s.pov)]=(povCounts[characterName(s.pov)]||0)+countWords(stripHTML(s.content||""))}); setHTML("povStatsList",Object.entries(povCounts).map(([name,count])=>`<div class="chapter-stat-row"><span>${escapeHTML(name)}</span><strong>${count} words</strong></div>`).join("")||"<p>No POV data yet. Choose POV characters on scenes.</p>")}
 function renderSeriesTools(){const warn=document.getElementById("seriesOnlyWarning"), content=document.getElementById("seriesToolsContent"); if(!warn||!content)return; if(!isSeriesProject()){warn.innerHTML="Series-level tools only appear for projects marked as Series."; content.classList.add("hidden"); return} warn.innerHTML=""; content.classList.remove("hidden"); const books=data.books.filter(b=>b.seriesId===data.activeSeriesId); const seriesWords=books.reduce((sum,b)=>sum+(b.manuscript||[]).flatMap(c=>c.scenes||[]).reduce((s,sc)=>s+countWords(stripHTML(sc.content||"")),0),0); setText("seriesBookCount",books.length); setText("seriesTotalWords",seriesWords); setText("seriesTimelineCount",data.timeline.filter(seriesScope).length); setText("seriesThreadCount",data.threads.filter(seriesScope).length); setHTML("crossBookArcs",data.characters.filter(seriesScope).map(c=>`<p><strong>${escapeHTML(c.name)}</strong><br>${escapeHTML(c.arc||"No arc notes yet.")}</p>`).join("")||"<p>No characters yet.</p>"); setHTML("seriesContinuity",`<p><strong>Characters:</strong> ${data.characters.filter(seriesScope).length}</p><p><strong>Relationships:</strong> ${data.relationships.filter(seriesScope).length}</p><p><strong>Locations:</strong> ${data.locations.filter(seriesScope).length}</p><p><strong>Artifacts / World Notes:</strong> ${data.world.filter(seriesScope).length}</p><p><strong>Major Events:</strong> ${data.timeline.filter(seriesScope).length}</p>`)}
-function renderRawData(){const raw=document.getElementById("rawData"); if(raw)raw.value=JSON.stringify(data,null,2)}
-function renderAll(){if(!data.user?.id){updateAuthGate();return} ensureProject(); if(!data.activeSeriesId||!data.activeBookId){updateAuthGate();return} applyTheme(); renderProjectDashboard(); renderOverview(); renderSelects(); renderManuscript(); renderAllLists(); renderMusic(); renderRawData(); renderAccount(); renderNestedNav(); addBulletButtons(); runSearch()}
+function renderRawData(){const raw=document.getElementById("rawData"); if(raw)raw.value=JSON.stringify(data,null,2); setText("storageHealth",storageHealthMessage())}
+function renderAll(){if(!data.user?.id){updateAuthGate();return} ensureProject(); if(!data.activeSeriesId||!data.activeBookId){updateAuthGate();return} applyTheme(); renderProjectDashboard(); renderOverview(); renderSelects(); renderManuscript(); renderAllLists(); renderMusic(); renderRawData(); renderAccount(); renderBackupSnapshots(); renderTrashManager(); renderNestedNav(); addBulletButtons(); runSearch()}
 
-function searchableItems(){const b=activeBook(); const manuscript=(b?.manuscript||[]).flatMap(ch=>(ch.scenes||[]).map(sc=>({type:"Scene",title:`${ch.title} — ${sc.title}`,text:(ch.title+" "+sc.title+" "+stripHTML(sc.content||"")).toLowerCase()}))); const collections=[["Character",data.characters,"name"],["Relationship",data.relationships,"type"],["Timeline",data.timeline,"when"],["Chapter Plan",data.chapterPlans,"number"],["Plot Thread",data.threads,"title"],["Worldbuilding",data.world,"name"],["Location",data.locations,"name"],["Magic",data.magicSystems,"name"],["Organization",data.organizations,"name"],["Mystery",data.mysteries,"question"],["Foreshadowing",data.foreshadowing,"hint"]]; return[{type:"Project",title:activeSeries()?.title,text:JSON.stringify(activeSeries()||{}).toLowerCase()},{type:"Book",title:b?.title,text:JSON.stringify(b||{}).toLowerCase()},...manuscript,...collections.flatMap(([type,arr,key])=>(arr||[]).filter(seriesScope).map(item=>({type,title:item[key]||"Untitled",text:JSON.stringify(item).toLowerCase()})))]}
-function runSearch(){const search=document.getElementById("globalSearch"), box=document.getElementById("searchResults"); if(!search||!box)return; const q=search.value.trim().toLowerCase(); if(!q){box.classList.add("hidden"); box.innerHTML=""; return} const matches=searchableItems().filter(item=>item.text.includes(q)); box.classList.remove("hidden"); box.innerHTML=`<h3>Search Results</h3>`+(matches.length?matches.map(m=>`<p><strong>${escapeHTML(m.type)}:</strong> ${escapeHTML(m.title||"Untitled")}</p>`).join(""):"<p>No matches found.</p>")}
+function searchableItems(){
+  const b=activeBook();
+  const manuscript=(b?.manuscript||[]).flatMap(ch=>(ch.scenes||[]).map(sc=>({type:"Scene",category:"manuscript",title:`${ch.title} — ${sc.title}`,text:(ch.title+" "+sc.title+" "+stripHTML(sc.content||"")).toLowerCase(),action:`setView('write','${ch.id}','${sc.id}')`})));
+  const collections=[
+    ["Character","characters","name","characters",item=>`setView('characterDetail','${item.id}')`],
+    ["Relationship","relationships","type","characters",()=>`setView('relationships')`],
+    ["Timeline","timeline","when","series",()=>`setView('timeline')`],
+    ["Chapter Plan","chapterPlans","number","plot",()=>`setView('chapters')`],
+    ["Plot Thread","threads","title","plot",()=>`setView('threads')`],
+    ["Plot Point","plotCards","title","plot",()=>`setView('plotBoard')`],
+    ["Worldbuilding","world","name","world",item=>`setView('worldDetail','${item.id}')`],
+    ["Location","locations","name","world",item=>`setView('locationDetail','${item.id}')`],
+    ["Magic","magicSystems","name","world",item=>`setView('magicDetail','${item.id}')`],
+    ["Organization","organizations","name","world",item=>`setView('organizationDetail','${item.id}')`],
+    ["Mystery","mysteries","question","plot",()=>`setView('mysteries')`],
+    ["Foreshadowing","foreshadowing","hint","plot",()=>`setView('foreshadowing')`]
+  ];
+  return[
+    {type:"Project",category:"project",title:activeSeries()?.title,text:JSON.stringify(activeSeries()||{}).toLowerCase(),action:"setView('projectDashboard')"},
+    {type:"Book",category:"project",title:b?.title,text:JSON.stringify(b||{}).toLowerCase(),action:"setView('overview')"},
+    ...manuscript,
+    ...collections.flatMap(([type,collection,key,category,actionFn])=>(data[collection]||[]).filter(seriesScope).map(item=>({type,category,title:item[key]||"Untitled",text:JSON.stringify(item).toLowerCase(),action:actionFn(item)})))
+  ];
+}
+function setSearchFilter(filter){data.searchFilter=filter||'all'; runSearch();}
+function runSearch(){
+  const search=document.getElementById("globalSearch"), box=document.getElementById("searchResults"); if(!search||!box)return;
+  const q=search.value.trim().toLowerCase(); if(!q){box.classList.add("hidden"); box.innerHTML=""; return}
+  const filter=data.searchFilter||'all';
+  const matches=searchableItems().filter(item=>item.text.includes(q)&&(filter==='all'||item.category===filter));
+  box.classList.remove("hidden");
+  box.innerHTML=`<div class="search-filter-row"><strong>Search Results</strong><select onchange="setSearchFilter(this.value)"><option value="all" ${filter==='all'?'selected':''}>All</option><option value="characters" ${filter==='characters'?'selected':''}>Characters / Relationships</option><option value="world" ${filter==='world'?'selected':''}>World Building</option><option value="plot" ${filter==='plot'?'selected':''}>Plot</option><option value="manuscript" ${filter==='manuscript'?'selected':''}>Manuscript</option><option value="project" ${filter==='project'?'selected':''}>Project / Book</option></select></div>`+(matches.length?matches.slice(0,30).map(m=>`<button class="search-result-btn" onclick="${m.action||''}; setVal('globalSearch',''); runSearch();"><strong>${escapeHTML(m.type)}:</strong> ${escapeHTML(m.title||"Untitled")}</button>`).join(""):"<p>No matches found.</p>");
+}
 
 function manuscriptHTML(){return (activeBook()?.manuscript||[]).map(ch=>`<h2>${escapeHTML(ch.title||"Untitled")}</h2>${(ch.scenes||[]).map(sc=>`<h3>${escapeHTML(sc.title||"Scene")}</h3>${sc.content||""}`).join("")}`).join("<div style='page-break-after: always;'></div>")}
 function seriesBibleHTML(){return `<h1>${escapeHTML(activeSeries()?.title||"Project Bible")}</h1><h2>Project</h2><p>${escapeHTML(activeSeries()?.synopsis||"")}</p><h2>Characters</h2>${data.characters.filter(seriesScope).map(c=>`<h3>${escapeHTML(c.name)}</h3><p>${escapeHTML(c.bio||c.description||"")}</p>`).join("")}<h2>Locations</h2>${data.locations.filter(seriesScope).map(l=>`<h3>${escapeHTML(l.name)}</h3><p>${escapeHTML(l.description||"")}</p>`).join("")}<h2>Magic</h2>${data.magicSystems.filter(seriesScope).map(m=>`<h3>${escapeHTML(m.name)}</h3><p>${escapeHTML(m.rules||"")}</p>`).join("")}<h2>Organizations</h2>${data.organizations.filter(seriesScope).map(o=>`<h3>${escapeHTML(o.name)}</h3><p>${escapeHTML(o.description||"")}</p>`).join("")}<h2>Timeline</h2>${data.timeline.filter(seriesScope).map(t=>`<p><strong>${escapeHTML(t.when||"")}</strong>: ${escapeHTML(t.event||"")}</p>`).join("")}<h2>Project Playlist</h2><p>${escapeHTML((normalizeMusicRecord(data.music?.[data.activeSeriesId]||{}).tracks||[]).length)} uploaded track(s)</p><p>${escapeHTML((data.music?.[data.activeSeriesId]?.notes)||"")}</p>`}

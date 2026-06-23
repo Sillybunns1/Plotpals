@@ -778,3 +778,4 @@ body.light .global-music-inner{background:rgba(255,255,255,.92);}
 .plot-card .appearance-log-detail{margin-top:10px;background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:12px}
 .plot-card .appearance-log-toggle summary{padding:10px 12px;font-size:.9rem}
 .plot-card .appearance-log-content{padding:0 12px 12px}
+.search-filter-row{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px}.search-result-btn{display:block;width:100%;text-align:left;margin:6px 0;padding:8px 10px;border-radius:10px}.appearance-log-toggle summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px}.appearance-log-count{font-size:.8rem;opacity:.8;border:1px solid var(--border);border-radius:999px;padding:2px 8px}.tracker-card{margin-bottom:12px}

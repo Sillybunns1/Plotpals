@@ -201,7 +201,7 @@
       </div>
 
       <div class="sidebar-footer">
-        <input id="globalSearch" placeholder="Search project..." />
+        <input id="globalSearch" placeholder="Search project..." /><small class="muted">Filter appears with results.</small>
       </div>
     </aside>
 
@@ -827,7 +827,7 @@
             <label class="file-label">Import Backup <input type="file" id="importFile" accept="application/json" onchange="importData(event)" /></label>
             <button class="danger" onclick="resetAll()">Delete Local Data</button>
           </div>
-          <textarea id="rawData" readonly></textarea>
+          <p id="storageHealth" class="muted"></p><h4>Automatic Backup Snapshots</h4><div id="backupSnapshots" class="card-grid"></div><h4>Trash / Restore</h4><div id="trashManager" class="card-grid"></div><textarea id="rawData" readonly></textarea>
         </div>
       </section>
     </main>
