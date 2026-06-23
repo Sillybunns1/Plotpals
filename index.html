@@ -8,20 +8,48 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <div class="app-shell">
+  <section id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <div class="brand center">
+        <div class="brand-mark">✦</div>
+        <div>
+          <h1>PlotPals</h1>
+          <p>Login required to access your books.</p>
+        </div>
+      </div>
+
+      <div class="login-tabs">
+        <button id="loginTab" class="active" onclick="switchAuthMode('login')">Login</button>
+        <button id="signupTab" onclick="switchAuthMode('signup')">Sign Up</button>
+      </div>
+
+      <label>Email</label>
+      <input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+
+      <label>Password</label>
+      <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" />
+
+      <button id="authSubmitBtn" class="wide glow" onclick="submitAuth()">Login</button>
+      <button class="wide ghost-btn" onclick="sendPasswordResetFromLogin()">Reset Password</button>
+
+      <p id="loginMessage"></p>
+    </div>
+  </section>
+
+  <div id="appShell" class="app-shell hidden">
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">✦</div>
         <div>
-          <h1>PlotPals</h1>
+          <h1>Writer's Vault Cloud</h1>
           <p>Books, bible, manuscript & cloud sync</p>
         </div>
       </div>
 
       <div class="account-card">
-        <strong id="accountStatus">Checking account...</strong>
+        <strong id="accountStatus">Signed in</strong>
         <p id="syncStatus">Cloud sync ready.</p>
-        <button onclick="openModal('authModal')" class="wide">Account</button>
+        <button onclick="signOut()" class="wide">Sign Out</button>
       </div>
 
       <button class="wide" onclick="createSeries()">+ New Series</button>
@@ -46,13 +74,14 @@
         <button class="nav-btn" data-view="timeline">Timeline</button>
         <button class="nav-btn" data-view="world">Worldbuilding</button>
         <button class="nav-btn" data-view="relationships">Relationships</button>
+        <button class="nav-btn" data-view="stats">Writing Stats</button>
         <button class="nav-btn" data-view="exports">Export</button>
         <button class="nav-btn" data-view="backup">Backup</button>
       </nav>
 
       <div class="sidebar-footer">
         <input id="globalSearch" placeholder="Search active project..." />
-        <p>Local + cloud backup when signed in.</p>
+        <p>Auto-save: local + cloud.</p>
       </div>
     </aside>
 
@@ -109,23 +138,43 @@
       <section id="write" class="view">
         <div class="editor-layout">
           <aside class="chapter-sidebar panel">
-            <h3>Manuscript</h3>
+            <h3>Chapter Navigation</h3>
             <button onclick="addManuscriptChapter()">+ Add Chapter</button>
+            <button onclick="moveChapter(-1)">Move Up</button>
+            <button onclick="moveChapter(1)">Move Down</button>
             <div id="manuscriptChapterList"></div>
           </aside>
 
-          <div class="panel manuscript-panel">
+          <div id="manuscriptPanel" class="panel manuscript-panel">
             <div class="editor-top">
               <input id="currentChapterTitle" placeholder="Chapter title" />
               <div class="word-pill"><span id="chapterWordCount">0</span> words</div>
             </div>
+
             <div class="format-bar">
-              <button onclick="wrapSelection('**','**')">Bold</button>
-              <button onclick="wrapSelection('*','*')">Italic</button>
-              <button onclick="insertText('\n\n---\n\n')">Scene Break</button>
+              <button onclick="formatDoc('bold')"><b>B</b></button>
+              <button onclick="formatDoc('italic')"><i>I</i></button>
+              <button onclick="formatDoc('underline')"><u>U</u></button>
+              <button onclick="formatDoc('strikeThrough')"><s>S</s></button>
+              <button onclick="formatBlock('h2')">Heading</button>
+              <button onclick="formatBlock('p')">Paragraph</button>
+              <button onclick="formatDoc('insertUnorderedList')">Bullets</button>
+              <button onclick="formatDoc('insertOrderedList')">Numbers</button>
+              <button onclick="formatDoc('justifyLeft')">Left</button>
+              <button onclick="formatDoc('justifyCenter')">Center</button>
+              <button onclick="formatDoc('justifyRight')">Right</button>
+              <button onclick="insertSceneBreak()">Scene Break</button>
               <button onclick="toggleFullscreen()">Full Screen</button>
             </div>
-            <textarea id="manuscriptEditor" class="manuscript-editor" placeholder="Start writing your chapter here..."></textarea>
+
+            <div class="editor-stats">
+              <span>Book words: <strong id="bookWordCountInline">0</strong></span>
+              <span>Characters: <strong id="chapterCharCount">0</strong></span>
+              <span>Paragraphs: <strong id="chapterParagraphCount">0</strong></span>
+              <span>Auto-save: <strong id="autosaveStatus">Ready</strong></span>
+            </div>
+
+            <div id="richEditor" class="rich-editor" contenteditable="true" spellcheck="true"></div>
           </div>
         </div>
       </section>
@@ -263,16 +312,30 @@
         <div id="relationshipList" class="card-grid"></div>
       </section>
 
+      <section id="stats" class="view">
+        <div class="grid stats-grid">
+          <div class="stat-card"><span id="statsTotalWords">0</span><p>Total Book Words</p></div>
+          <div class="stat-card"><span id="statsAvgWords">0</span><p>Average Words / Chapter</p></div>
+          <div class="stat-card"><span id="statsLongestChapter">0</span><p>Longest Chapter Words</p></div>
+          <div class="stat-card"><span id="statsBibleItems">0</span><p>Bible Entries</p></div>
+        </div>
+        <div class="panel">
+          <h3>Chapter Word Counts</h3>
+          <div id="chapterStatsList"></div>
+        </div>
+      </section>
+
       <section id="exports" class="view">
         <div class="panel">
-          <h3>Export Manuscript</h3>
+          <h3>Export Improvements</h3>
+          <p>Export your full manuscript or series bible. DOCX is Word-compatible and PDF uses the browser print/save dialog.</p>
           <div class="backup-row">
-            <button onclick="exportManuscriptTxt()">Export TXT</button>
-            <button onclick="exportManuscriptDoc()">Export Word-Compatible DOC</button>
-            <button onclick="exportManuscriptPDF()">Export PDF</button>
-            <button onclick="exportSeriesBibleDoc()">Export Series Bible DOC</button>
+            <button onclick="exportFullManuscriptTxt()">Full Manuscript TXT</button>
+            <button onclick="exportFullManuscriptDocx()">Full Manuscript DOCX</button>
+            <button onclick="exportFullManuscriptPDF()">Full Manuscript PDF</button>
+            <button onclick="exportSeriesBibleDocx()">Series Bible DOCX</button>
+            <button onclick="exportSeriesBiblePDF()">Series Bible PDF</button>
           </div>
-          <p>PDF export uses your browser print dialog. Choose “Save as PDF.”</p>
           <div id="printArea" class="print-area"></div>
         </div>
       </section>
@@ -282,7 +345,7 @@
           <h3>Backup & Restore</h3>
           <p>Export your full writing vault as JSON or import a backup.</p>
           <div class="backup-row">
-            <button onclick="exportData()">Export Backup</button>
+            <button onclick="exportData()">Export Backup JSON</button>
             <label class="file-label">Import Backup
               <input type="file" id="importFile" accept="application/json" onchange="importData(event)" />
             </label>
@@ -292,34 +355,6 @@
         </div>
       </section>
     </main>
-  </div>
-
-  <div id="authModal" class="modal hidden">
-    <div class="modal-card">
-      <div class="card-header">
-        <h3>Account & Cloud Sync</h3>
-        <button onclick="closeModal('authModal')" class="delete-btn">Close</button>
-      </div>
-
-      <p>Use your Supabase account to save and load your vault across devices.</p>
-
-      <label>Email</label>
-      <input id="authEmail" type="email" placeholder="you@example.com" />
-
-      <label>Password</label>
-      <input id="authPassword" type="password" placeholder="Password" />
-
-      <div class="backup-row">
-        <button onclick="signUp()">Sign Up</button>
-        <button onclick="signIn()">Sign In</button>
-        <button onclick="signOut()">Sign Out</button>
-        <button onclick="sendPasswordReset()">Reset Password</button>
-      </div>
-
-      <hr />
-      <p><strong>Cloud Sync:</strong> after signing in, use “Sync Now” to upload your current vault, or “Load Cloud” to pull your saved vault.</p>
-      <p id="authMessage"></p>
-    </div>
   </div>
 
   <template id="cardTemplate">

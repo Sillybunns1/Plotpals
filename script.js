@@ -1,4 +1,4 @@
-const STORAGE_KEY = "writersVaultV6";
+const STORAGE_KEY = "writersVaultV7";
 const CLOUD_TABLE = "writer_vaults";
 
 const defaultData = {
@@ -19,10 +19,12 @@ const defaultData = {
 let supabaseClient = null;
 let data = loadData();
 let cloudSaveTimer = null;
+let authMode = "login";
+let isRendering = false;
 
 function initSupabase() {
   if (!window.supabase) {
-    console.warn("Supabase library did not load. Local mode only.");
+    setLoginMessage("Supabase could not load. Check your internet connection.");
     return;
   }
   supabaseClient = window.supabase.createClient(
@@ -49,6 +51,11 @@ function clearFields(ids) { ids.forEach(id => setVal(id, "")); }
 function escapeHTML(str = "") {
   return String(str).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
+function stripHTML(html = "") {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent || div.innerText || "";
+}
 function detail(label, value) {
   if (!value) return "";
   return `<p><strong>${escapeHTML(label)}:</strong> ${escapeHTML(value).replaceAll("\n", "<br>")}</p>`;
@@ -73,70 +80,81 @@ function ensureProject() {
   }
 }
 
+function switchAuthMode(mode) {
+  authMode = mode;
+  document.getElementById("loginTab").classList.toggle("active", mode === "login");
+  document.getElementById("signupTab").classList.toggle("active", mode === "signup");
+  document.getElementById("authSubmitBtn").textContent = mode === "login" ? "Login" : "Create Account";
+  setLoginMessage("");
+}
+async function submitAuth() {
+  if (authMode === "login") return signIn();
+  return signUp();
+}
+function setLoginMessage(message) {
+  const el = document.getElementById("loginMessage");
+  if (el) el.textContent = message || "";
+}
 async function refreshSession() {
   if (!supabaseClient) return;
   const { data: sessionData } = await supabaseClient.auth.getSession();
   const user = sessionData?.session?.user || null;
   data.user = user ? { id: user.id, email: user.email } : null;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data, null, 2));
+  updateAuthGate();
+}
+function updateAuthGate() {
+  const loggedIn = !!data.user?.id;
+  document.getElementById("loginScreen").classList.toggle("hidden", loggedIn);
+  document.getElementById("appShell").classList.toggle("hidden", !loggedIn);
   renderAccount();
 }
 async function signUp() {
-  if (!supabaseClient) return setAuthMessage("Supabase could not load. Check internet connection.");
-  const email = val("authEmail");
-  const password = val("authPassword");
-  const { data: result, error } = await supabaseClient.auth.signUp({ email, password });
-  if (error) return setAuthMessage(error.message);
-  setAuthMessage("Sign up successful. Check your email if confirmation is required.");
-  await refreshSession();
+  if (!supabaseClient) return setLoginMessage("Supabase could not load. Check your internet connection.");
+  const email = val("loginEmail");
+  const password = val("loginPassword");
+  const { error } = await supabaseClient.auth.signUp({ email, password });
+  if (error) return setLoginMessage(error.message);
+  setLoginMessage("Account created. Check your email if confirmation is required, then login.");
 }
 async function signIn() {
-  if (!supabaseClient) return setAuthMessage("Supabase could not load. Check internet connection.");
-  const email = val("authEmail");
-  const password = val("authPassword");
+  if (!supabaseClient) return setLoginMessage("Supabase could not load. Check your internet connection.");
+  const email = val("loginEmail");
+  const password = val("loginPassword");
   const { data: result, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if (error) return setAuthMessage(error.message);
+  if (error) return setLoginMessage(error.message);
   data.user = { id: result.user.id, email: result.user.email };
-  saveData(true, false);
-  setAuthMessage("Signed in.");
-  closeModal("authModal");
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data, null, 2));
+  updateAuthGate();
   await loadFromCloud(false);
+  renderAll();
 }
 async function signOut() {
   if (supabaseClient) await supabaseClient.auth.signOut();
   data.user = null;
-  saveData(true, false);
-  setAuthMessage("Signed out.");
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data, null, 2));
+  updateAuthGate();
 }
-async function sendPasswordReset() {
-  if (!supabaseClient) return setAuthMessage("Supabase could not load.");
-  const email = val("authEmail");
+async function sendPasswordResetFromLogin() {
+  if (!supabaseClient) return setLoginMessage("Supabase could not load.");
+  const email = val("loginEmail");
+  if (!email) return setLoginMessage("Enter your email first.");
   const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
-  setAuthMessage(error ? error.message : "Password reset email sent.");
-}
-function setAuthMessage(message) {
-  const el = document.getElementById("authMessage");
-  if (el) el.textContent = message;
+  setLoginMessage(error ? error.message : "Password reset email sent.");
 }
 function renderAccount() {
   const status = document.getElementById("accountStatus");
   const sync = document.getElementById("syncStatus");
   if (!status || !sync) return;
-  if (data.user?.email) {
-    status.textContent = data.user.email;
-    sync.textContent = "Signed in. Cloud sync available.";
-  } else {
-    status.textContent = "Local Mode";
-    sync.textContent = "Sign in to sync across devices.";
-  }
+  status.textContent = data.user?.email || "Not signed in";
+  sync.textContent = data.user?.id ? "Signed in. Auto-save enabled." : "Login required.";
 }
 
 function scheduleCloudSave() {
   if (!data.user?.id || !supabaseClient) return;
   clearTimeout(cloudSaveTimer);
-  cloudSaveTimer = setTimeout(() => syncToCloud(false), 1500);
+  cloudSaveTimer = setTimeout(() => syncToCloud(false), 1600);
 }
-
 async function syncToCloud(showAlert = true) {
   if (!supabaseClient) {
     if (showAlert) alert("Supabase is not loaded. Check your internet connection.");
@@ -144,33 +162,30 @@ async function syncToCloud(showAlert = true) {
   }
   await refreshSession();
   if (!data.user?.id) {
-    if (showAlert) alert("Sign in first.");
+    if (showAlert) alert("Login first.");
     return;
   }
-
   const payload = {
     user_id: data.user.id,
     user_email: data.user.email,
     vault_data: data,
     updated_at: new Date().toISOString()
   };
-
   const { error } = await supabaseClient
     .from(CLOUD_TABLE)
     .upsert(payload, { onConflict: "user_id" });
 
   if (error) {
-    const msg = "Cloud sync failed. Make sure the writer_vaults table exists and RLS policies are set. " + error.message;
     document.getElementById("syncStatus").textContent = "Sync failed.";
-    if (showAlert) alert(msg);
-    console.error(msg);
+    if (showAlert) alert("Cloud sync failed. Check the Supabase table/RLS setup. " + error.message);
+    console.error(error);
     return;
   }
-
   document.getElementById("syncStatus").textContent = "Synced " + new Date().toLocaleTimeString();
+  const autosave = document.getElementById("autosaveStatus");
+  if (autosave) autosave.textContent = "Saved";
   if (showAlert) alert("Synced to Supabase.");
 }
-
 async function loadFromCloud(showAlert = true) {
   if (!supabaseClient) {
     if (showAlert) alert("Supabase is not loaded. Check your internet connection.");
@@ -178,10 +193,9 @@ async function loadFromCloud(showAlert = true) {
   }
   await refreshSession();
   if (!data.user?.id) {
-    if (showAlert) alert("Sign in first.");
+    if (showAlert) alert("Login first.");
     return;
   }
-
   const { data: rows, error } = await supabaseClient
     .from(CLOUD_TABLE)
     .select("vault_data, updated_at")
@@ -189,17 +203,14 @@ async function loadFromCloud(showAlert = true) {
     .limit(1);
 
   if (error) {
-    const msg = "Could not load cloud data. Make sure the writer_vaults table exists and RLS policies are set. " + error.message;
-    if (showAlert) alert(msg);
-    console.error(msg);
+    if (showAlert) alert("Could not load cloud data. Check the Supabase table/RLS setup. " + error.message);
+    console.error(error);
     return;
   }
-
   if (!rows || !rows.length || !rows[0].vault_data) {
     if (showAlert) alert("No cloud vault found yet. Use Sync Now to create one.");
     return;
   }
-
   const currentUser = data.user;
   data = { ...structuredClone(defaultData), ...rows[0].vault_data, user: currentUser };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data, null, 2));
@@ -229,6 +240,7 @@ function createBook(title = null, shouldRender = true) {
   if (shouldRender) saveData(); else saveData(false, false);
 }
 function setActiveSeries(id) {
+  saveCurrentManuscriptChapter(false, false);
   data.activeSeriesId = id;
   const firstBook = data.books.find(b => b.seriesId === id);
   data.activeBookId = firstBook?.id || null;
@@ -236,6 +248,7 @@ function setActiveSeries(id) {
   saveData();
 }
 function setActiveBook(id) {
+  saveCurrentManuscriptChapter(false, false);
   data.activeBookId = id;
   const book = activeBook();
   data.activeChapterId = book?.manuscript?.[0]?.id || null;
@@ -266,20 +279,29 @@ function visibleByScope(item) {
 function addManuscriptChapter() {
   const book = activeBook();
   if (!book) return alert("Create or select a book first.");
+  saveCurrentManuscriptChapter(false, false);
   if (!book.manuscript) book.manuscript = [];
   const chapter = { id: uid(), title: `Chapter ${book.manuscript.length + 1}`, content: "", created: new Date().toISOString() };
   book.manuscript.push(chapter);
   data.activeChapterId = chapter.id;
   saveData();
 }
-function selectManuscriptChapter(id) { data.activeChapterId = id; saveData(); }
-function saveCurrentManuscriptChapter(render = false) {
+function selectManuscriptChapter(id) {
+  saveCurrentManuscriptChapter(false, false);
+  data.activeChapterId = id;
+  saveData();
+}
+function saveCurrentManuscriptChapter(render = false, scheduleCloud = true) {
+  if (isRendering) return;
   const ch = activeManuscriptChapter();
-  if (!ch) return;
+  const editor = document.getElementById("richEditor");
+  if (!ch || !editor) return;
   ch.title = val("currentChapterTitle");
-  ch.content = document.getElementById("manuscriptEditor").value;
-  saveData(render);
-  document.getElementById("chapterWordCount").textContent = countWords(ch.content);
+  ch.content = editor.innerHTML;
+  const autosave = document.getElementById("autosaveStatus");
+  if (autosave) autosave.textContent = "Saving...";
+  saveData(render, scheduleCloud);
+  updateEditorStats();
 }
 function deleteManuscriptChapter(id) {
   const book = activeBook();
@@ -289,27 +311,48 @@ function deleteManuscriptChapter(id) {
   data.activeChapterId = book.manuscript[0]?.id || null;
   saveData();
 }
-function wrapSelection(before, after) {
-  const editor = document.getElementById("manuscriptEditor");
-  const start = editor.selectionStart;
-  const end = editor.selectionEnd;
-  const selected = editor.value.slice(start, end);
-  editor.value = editor.value.slice(0, start) + before + selected + after + editor.value.slice(end);
-  editor.focus();
-  editor.selectionStart = start + before.length;
-  editor.selectionEnd = end + before.length;
+function moveChapter(direction) {
+  const book = activeBook();
+  if (!book?.manuscript) return;
+  const index = book.manuscript.findIndex(c => c.id === data.activeChapterId);
+  const newIndex = index + direction;
+  if (index < 0 || newIndex < 0 || newIndex >= book.manuscript.length) return;
+  const [chapter] = book.manuscript.splice(index, 1);
+  book.manuscript.splice(newIndex, 0, chapter);
+  saveData();
+}
+function formatDoc(command) {
+  document.execCommand(command, false, null);
+  document.getElementById("richEditor").focus();
   saveCurrentManuscriptChapter(false);
 }
-function insertText(text) {
-  const editor = document.getElementById("manuscriptEditor");
-  const start = editor.selectionStart;
-  editor.value = editor.value.slice(0, start) + text + editor.value.slice(start);
-  editor.focus();
-  editor.selectionStart = editor.selectionEnd = start + text.length;
+function formatBlock(tag) {
+  document.execCommand("formatBlock", false, tag);
+  document.getElementById("richEditor").focus();
+  saveCurrentManuscriptChapter(false);
+}
+function insertSceneBreak() {
+  document.execCommand("insertHTML", false, "<p style='text-align:center;'>✦ ✦ ✦</p>");
   saveCurrentManuscriptChapter(false);
 }
 function toggleFullscreen() {
-  document.querySelector(".manuscript-panel").classList.toggle("fullscreen");
+  document.getElementById("manuscriptPanel").classList.toggle("fullscreen");
+}
+function updateEditorStats() {
+  const ch = activeManuscriptChapter();
+  const text = stripHTML(ch?.content || "");
+  const book = activeBook();
+  const chapterWords = countWords(text);
+  const bookWords = (book?.manuscript || []).reduce((sum, c) => sum + countWords(stripHTML(c.content || "")), 0);
+  const paragraphs = ((ch?.content || "").match(/<p|<div|<h[1-6]/gi) || []).length || (text.trim() ? 1 : 0);
+  const chapterWordEl = document.getElementById("chapterWordCount");
+  const bookWordEl = document.getElementById("bookWordCountInline");
+  const charEl = document.getElementById("chapterCharCount");
+  const paraEl = document.getElementById("chapterParagraphCount");
+  if (chapterWordEl) chapterWordEl.textContent = chapterWords;
+  if (bookWordEl) bookWordEl.textContent = bookWords;
+  if (charEl) charEl.textContent = text.length;
+  if (paraEl) paraEl.textContent = paragraphs;
 }
 
 function addChapterPlan() {
@@ -360,6 +403,7 @@ function addRelationship() {
 
 function renderSelectors() {
   const seriesSelect = document.getElementById("activeSeries");
+  if (!seriesSelect) return;
   seriesSelect.innerHTML = data.series.map(s => `<option value="${s.id}" ${s.id === data.activeSeriesId ? "selected" : ""}>${escapeHTML(s.title)}</option>`).join("");
   const bookSelect = document.getElementById("activeBook");
   const books = data.books.filter(b => b.seriesId === data.activeSeriesId);
@@ -382,7 +426,7 @@ function renderOverview() {
   setVal("bookThemeEdit", b?.theme);
   setVal("bookNotesEdit", b?.notes);
 
-  const manuscriptWords = (b?.manuscript || []).reduce((sum, ch) => sum + countWords(ch.content), 0);
+  const manuscriptWords = (b?.manuscript || []).reduce((sum, ch) => sum + countWords(stripHTML(ch.content || "")), 0);
   document.getElementById("statWords").textContent = manuscriptWords;
   document.getElementById("statChapters").textContent = (b?.manuscript || []).length;
   document.getElementById("statCharacters").textContent = data.characters.filter(visibleByScope).length;
@@ -402,16 +446,17 @@ function saveOverviewFields(render = false) {
   }
   saveData(render);
 }
-
 function renderManuscript() {
   const book = activeBook();
   const list = document.getElementById("manuscriptChapterList");
+  if (!list) return;
   list.innerHTML = "";
-  (book?.manuscript || []).forEach(ch => {
+  (book?.manuscript || []).forEach((ch, i) => {
+    const words = countWords(stripHTML(ch.content || ""));
     const wrapper = document.createElement("div");
     wrapper.innerHTML = `
       <button class="chapter-button ${ch.id === data.activeChapterId ? "active" : ""}" onclick="selectManuscriptChapter('${ch.id}')">
-        ${escapeHTML(ch.title || "Untitled")}<br><small>${countWords(ch.content)} words</small>
+        ${i + 1}. ${escapeHTML(ch.title || "Untitled")}<br><small>${words} words</small>
       </button>
       <button class="delete-btn" onclick="deleteManuscriptChapter('${ch.id}')">Delete</button>
     `;
@@ -419,12 +464,17 @@ function renderManuscript() {
   });
   const ch = activeManuscriptChapter();
   setVal("currentChapterTitle", ch?.title || "");
-  const editor = document.getElementById("manuscriptEditor");
-  editor.value = ch?.content || "";
-  document.getElementById("chapterWordCount").textContent = countWords(editor.value);
+  const editor = document.getElementById("richEditor");
+  if (editor) {
+    isRendering = true;
+    editor.innerHTML = ch?.content || "";
+    isRendering = false;
+  }
+  updateEditorStats();
 }
 function renderCardList(collection, elId, titleKey, bodyFn) {
   const el = document.getElementById(elId);
+  if (!el) return;
   el.innerHTML = "";
   data[collection].filter(visibleByScope).forEach(item => {
     el.appendChild(makeCard(item[titleKey], bodyFn(item), () => deleteItem(collection, item.id)));
@@ -451,45 +501,76 @@ function renderAllLists() {
   `);
 
   const tl = document.getElementById("timelineList");
-  tl.innerHTML = "";
-  data.timeline.filter(visibleByScope).forEach(item => {
-    const div = document.createElement("article");
-    div.className = "item-card timeline-item";
-    div.innerHTML = `<div class="card-header"><h3>${escapeHTML(item.when || "Unplaced Event")}</h3><button class="delete-btn">Delete</button></div>
-    <div class="card-body"><span class="tag">${escapeHTML(item.scope)}</span>${detail("Event", item.event)}${detail("Impact", item.impact)}</div>`;
-    div.querySelector("button").onclick = () => deleteItem("timeline", item.id);
-    tl.appendChild(div);
-  });
+  if (tl) {
+    tl.innerHTML = "";
+    data.timeline.filter(visibleByScope).forEach(item => {
+      const div = document.createElement("article");
+      div.className = "item-card timeline-item";
+      div.innerHTML = `<div class="card-header"><h3>${escapeHTML(item.when || "Unplaced Event")}</h3><button class="delete-btn">Delete</button></div>
+      <div class="card-body"><span class="tag">${escapeHTML(item.scope)}</span>${detail("Event", item.event)}${detail("Impact", item.impact)}</div>`;
+      div.querySelector("button").onclick = () => deleteItem("timeline", item.id);
+      tl.appendChild(div);
+    });
+  }
 
   const map = document.getElementById("relationshipMap");
   const list = document.getElementById("relationshipList");
-  map.innerHTML = "";
-  list.innerHTML = "";
-  const rels = data.relationships.filter(visibleByScope);
-  if (!rels.length) map.innerHTML = "<p>No relationships yet.</p>";
-  rels.forEach(item => {
-    const node = document.createElement("div");
-    node.className = "rel-node";
-    node.textContent = `${item.a || "A"} → ${item.b || "B"} (${item.type || "connection"})`;
-    map.appendChild(node);
-    list.appendChild(makeCard(`${item.a} + ${item.b}`, `<span class="tag">${escapeHTML(item.scope)}</span>${detail("Type", item.type)}${detail("Notes", item.notes)}`, () => deleteItem("relationships", item.id)));
+  if (map && list) {
+    map.innerHTML = "";
+    list.innerHTML = "";
+    const rels = data.relationships.filter(visibleByScope);
+    if (!rels.length) map.innerHTML = "<p>No relationships yet.</p>";
+    rels.forEach(item => {
+      const node = document.createElement("div");
+      node.className = "rel-node";
+      node.textContent = `${item.a || "A"} → ${item.b || "B"} (${item.type || "connection"})`;
+      map.appendChild(node);
+      list.appendChild(makeCard(`${item.a} + ${item.b}`, `<span class="tag">${escapeHTML(item.scope)}</span>${detail("Type", item.type)}${detail("Notes", item.notes)}`, () => deleteItem("relationships", item.id)));
+    });
+  }
+}
+function renderWritingStats() {
+  const book = activeBook();
+  const chapters = book?.manuscript || [];
+  const counts = chapters.map(c => countWords(stripHTML(c.content || "")));
+  const total = counts.reduce((a,b) => a + b, 0);
+  const avg = counts.length ? Math.round(total / counts.length) : 0;
+  const longest = counts.length ? Math.max(...counts) : 0;
+  const bibleItems = data.characters.filter(visibleByScope).length + data.threads.filter(visibleByScope).length + data.timeline.filter(visibleByScope).length + data.world.filter(visibleByScope).length + data.relationships.filter(visibleByScope).length;
+  const ids = {
+    statsTotalWords: total,
+    statsAvgWords: avg,
+    statsLongestChapter: longest,
+    statsBibleItems: bibleItems
+  };
+  Object.entries(ids).forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
   });
+  const list = document.getElementById("chapterStatsList");
+  if (list) {
+    list.innerHTML = chapters.map((c, i) => `<div class="chapter-stat-row"><span>${i + 1}. ${escapeHTML(c.title || "Untitled")}</span><strong>${counts[i]} words</strong></div>`).join("") || "<p>No chapters yet.</p>";
+  }
 }
 function renderRawData() {
   const raw = document.getElementById("rawData");
   if (raw) raw.value = JSON.stringify(data, null, 2);
 }
 function renderAll() {
+  if (!data.user?.id) {
+    updateAuthGate();
+    return;
+  }
   ensureProject();
   renderSelectors();
   renderOverview();
   renderManuscript();
   renderAllLists();
+  renderWritingStats();
   renderRawData();
   renderAccount();
   runSearch();
 }
-
 function setView(view) {
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
@@ -498,13 +579,14 @@ function setView(view) {
   const titles = {
     overview: "Overview", write: "Manuscript Editor", chapters: "Chapter Planner", characters: "Characters",
     plot: "Plot Threads", timeline: "Timeline", world: "Worldbuilding", relationships: "Relationships",
-    exports: "Export", backup: "Backup"
+    stats: "Writing Statistics", exports: "Export", backup: "Backup"
   };
   document.getElementById("viewTitle").textContent = titles[view];
+  renderWritingStats();
 }
 function searchableItems() {
   const b = activeBook();
-  const manuscript = (b?.manuscript || []).map(ch => ({ type: "Manuscript", title: ch.title, text: JSON.stringify(ch).toLowerCase() }));
+  const manuscript = (b?.manuscript || []).map(ch => ({ type: "Manuscript", title: ch.title, text: (ch.title + " " + stripHTML(ch.content || "")).toLowerCase() }));
   const collections = [
     ["Character", data.characters, "name"], ["Relationship", data.relationships, "type"], ["Timeline", data.timeline, "when"],
     ["Chapter Plan", data.chapterPlans, "number"], ["Plot Thread", data.threads, "title"], ["Worldbuilding", data.world, "name"]
@@ -517,57 +599,89 @@ function searchableItems() {
   ];
 }
 function runSearch() {
-  const q = document.getElementById("globalSearch").value.trim().toLowerCase();
+  const search = document.getElementById("globalSearch");
   const box = document.getElementById("searchResults");
+  if (!search || !box) return;
+  const q = search.value.trim().toLowerCase();
   if (!q) { box.classList.add("hidden"); box.innerHTML = ""; return; }
   const matches = searchableItems().filter(item => item.text.includes(q));
   box.classList.remove("hidden");
   box.innerHTML = `<h3>Search Results</h3>` + (matches.length ? matches.map(m => `<p><strong>${escapeHTML(m.type)}:</strong> ${escapeHTML(m.title || "Untitled")}</p>`).join("") : "<p>No matches found.</p>");
 }
 
-function manuscriptText() {
+function manuscriptHTML() {
   const book = activeBook();
-  return (book?.manuscript || []).map(ch => `${ch.title}\n\n${ch.content}`).join("\n\n\n");
+  return (book?.manuscript || []).map(ch => `<h2>${escapeHTML(ch.title || "Untitled")}</h2>${ch.content || ""}`).join("<div style='page-break-after: always;'></div>");
 }
-function exportManuscriptTxt() {
-  const book = activeBook();
-  if (!book) return alert("No book selected.");
-  downloadFile(`${safeFile(book.title)}.txt`, manuscriptText(), "text/plain");
-}
-function exportManuscriptDoc() {
-  const book = activeBook();
-  if (!book) return alert("No book selected.");
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHTML(book.title)}</title></head><body><h1>${escapeHTML(book.title)}</h1>${(book.manuscript || []).map(ch => `<h2>${escapeHTML(ch.title)}</h2><p>${escapeHTML(ch.content).replaceAll("\n\n","</p><p>").replaceAll("\n","<br>")}</p>`).join("")}</body></html>`;
-  downloadFile(`${safeFile(book.title)}.doc`, html, "application/msword");
-}
-function exportSeriesBibleDoc() {
+function seriesBibleHTML() {
   const s = activeSeries();
   const b = activeBook();
-  if (!s) return alert("No series selected.");
   const chars = data.characters.filter(visibleByScope);
   const threads = data.threads.filter(visibleByScope);
   const world = data.world.filter(visibleByScope);
   const timeline = data.timeline.filter(visibleByScope);
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHTML(s.title)} Bible</title></head><body>
-  <h1>${escapeHTML(s.title)} Bible</h1>
-  <h2>Series</h2><p>${escapeHTML(s.synopsis || "")}</p><p><strong>Theme:</strong> ${escapeHTML(s.theme || "")}</p>
-  <h2>Book</h2><h3>${escapeHTML(b?.title || "")}</h3><p>${escapeHTML(b?.summary || "")}</p>
-  <h2>Characters</h2>${chars.map(c => `<h3>${escapeHTML(c.name)}</h3><p>${escapeHTML(c.personality || "")}</p><p>${escapeHTML(c.arc || "")}</p>`).join("")}
+  const rels = data.relationships.filter(visibleByScope);
+  const plans = data.chapterPlans.filter(visibleByScope);
+  return `
+  <h1>${escapeHTML(s?.title || "Series Bible")}</h1>
+  <h2>Series Overview</h2>
+  <p><strong>Genre/Tone:</strong> ${escapeHTML(s?.genre || "")}</p>
+  <p><strong>Synopsis:</strong> ${escapeHTML(s?.synopsis || "")}</p>
+  <p><strong>Theme:</strong> ${escapeHTML(s?.theme || "")}</p>
+  <p><strong>Mysteries:</strong> ${escapeHTML(s?.mysteries || "")}</p>
+  <p><strong>Foreshadowing:</strong> ${escapeHTML(s?.foreshadowing || "")}</p>
+  <h2>Active Book</h2>
+  <h3>${escapeHTML(b?.title || "")}</h3>
+  <p><strong>Status:</strong> ${escapeHTML(b?.status || "")}</p>
+  <p>${escapeHTML(b?.summary || "")}</p>
+  <p><strong>Theme:</strong> ${escapeHTML(b?.theme || "")}</p>
+  <h2>Characters</h2>${chars.map(c => `<h3>${escapeHTML(c.name)}</h3><p><strong>Role:</strong> ${escapeHTML(c.role || "")}</p><p>${escapeHTML(c.description || "")}</p><p>${escapeHTML(c.personality || "")}</p><p>${escapeHTML(c.arc || "")}</p>`).join("")}
+  <h2>Chapter Plans</h2>${plans.map(p => `<h3>${escapeHTML(p.number)}</h3><p><strong>POV:</strong> ${escapeHTML(p.pov || "")}</p><p><strong>Goal:</strong> ${escapeHTML(p.goal || "")}</p><p><strong>Conflict:</strong> ${escapeHTML(p.conflict || "")}</p>`).join("")}
   <h2>Timeline</h2>${timeline.map(t => `<p><strong>${escapeHTML(t.when || "")}</strong>: ${escapeHTML(t.event || "")}</p>`).join("")}
-  <h2>Plot Threads</h2>${threads.map(t => `<h3>${escapeHTML(t.title)}</h3><p>${escapeHTML(t.setup || "")}</p><p>${escapeHTML(t.payoff || "")}</p>`).join("")}
-  <h2>Worldbuilding</h2>${world.map(w => `<h3>${escapeHTML(w.name)}</h3><p>${escapeHTML(w.description || "")}</p>`).join("")}
-  </body></html>`;
-  downloadFile(`${safeFile(s.title)}-series-bible.doc`, html, "application/msword");
+  <h2>Plot Threads</h2>${threads.map(t => `<h3>${escapeHTML(t.title)}</h3><p>${escapeHTML(t.setup || "")}</p><p><strong>Payoff:</strong> ${escapeHTML(t.payoff || "")}</p>`).join("")}
+  <h2>Worldbuilding</h2>${world.map(w => `<h3>${escapeHTML(w.name)}</h3><p><strong>${escapeHTML(w.category || "")}</strong></p><p>${escapeHTML(w.description || "")}</p><p>${escapeHTML(w.rules || "")}</p>`).join("")}
+  <h2>Relationships</h2>${rels.map(r => `<h3>${escapeHTML(r.a)} + ${escapeHTML(r.b)}</h3><p><strong>${escapeHTML(r.type || "")}</strong></p><p>${escapeHTML(r.notes || "")}</p>`).join("")}`;
 }
-function exportManuscriptPDF() {
+function buildHTMLDoc(title, bodyHTML) {
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHTML(title)}</title>
+  <style>body{font-family:Georgia,serif;line-height:1.6;font-size:12pt;} h1{text-align:center;} h2{margin-top:32px;}</style>
+  </head><body><h1>${escapeHTML(title)}</h1>${bodyHTML}</body></html>`;
+}
+function exportFullManuscriptTxt() {
   const book = activeBook();
   if (!book) return alert("No book selected.");
+  const text = (book.manuscript || []).map(ch => `${ch.title}\n\n${stripHTML(ch.content || "")}`).join("\n\n\n");
+  downloadFile(`${safeFile(book.title)}-full-manuscript.txt`, text, "text/plain");
+}
+function exportFullManuscriptDocx() {
+  const book = activeBook();
+  if (!book) return alert("No book selected.");
+  const html = buildHTMLDoc(book.title || "Manuscript", manuscriptHTML());
+  downloadFile(`${safeFile(book.title)}-full-manuscript.docx`, html, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+}
+function exportSeriesBibleDocx() {
+  const s = activeSeries();
+  if (!s) return alert("No series selected.");
+  const html = buildHTMLDoc(`${s.title} Series Bible`, seriesBibleHTML());
+  downloadFile(`${safeFile(s.title)}-series-bible.docx`, html, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+}
+function exportFullManuscriptPDF() {
+  const book = activeBook();
+  if (!book) return alert("No book selected.");
+  printHTML(buildHTMLDoc(book.title || "Manuscript", manuscriptHTML()));
+}
+function exportSeriesBiblePDF() {
+  const s = activeSeries();
+  if (!s) return alert("No series selected.");
+  printHTML(buildHTMLDoc(`${s.title} Series Bible`, seriesBibleHTML()));
+}
+function printHTML(html) {
   const area = document.getElementById("printArea");
-  area.innerHTML = `<h1>${escapeHTML(book.title)}</h1>${(book.manuscript || []).map(ch => `<h2>${escapeHTML(ch.title)}</h2><p>${escapeHTML(ch.content).replaceAll("\n\n","</p><p>").replaceAll("\n","<br>")}</p>`).join("")}`;
+  area.innerHTML = html;
   window.print();
 }
 function exportData() {
-  downloadFile("writers-vault-v6-backup.json", JSON.stringify(data, null, 2), "application/json");
+  downloadFile("writers-vault-v7-backup.json", JSON.stringify(data, null, 2), "application/json");
 }
 function downloadFile(filename, content, type) {
   const blob = new Blob([content], { type });
@@ -583,19 +697,23 @@ function importData(event) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    try { data = { ...structuredClone(defaultData), ...JSON.parse(reader.result) }; saveData(); alert("Backup imported."); }
-    catch { alert("Could not import this file."); }
+    try {
+      const currentUser = data.user;
+      data = { ...structuredClone(defaultData), ...JSON.parse(reader.result), user: currentUser };
+      saveData();
+      alert("Backup imported.");
+    } catch {
+      alert("Could not import this file.");
+    }
   };
   reader.readAsText(file);
 }
 function resetAll() {
   if (!confirm("Delete all local writing data from this browser? This does not delete cloud data.")) return;
-  data = structuredClone(defaultData);
+  const currentUser = data.user;
+  data = { ...structuredClone(defaultData), user: currentUser };
   saveData(true, false);
 }
-
-function openModal(id) { document.getElementById(id).classList.remove("hidden"); }
-function closeModal(id) { document.getElementById(id).classList.add("hidden"); }
 
 document.querySelectorAll(".nav-btn").forEach(btn => btn.addEventListener("click", () => setView(btn.dataset.view)));
 document.getElementById("globalSearch").addEventListener("input", runSearch);
@@ -605,7 +723,14 @@ document.getElementById("clearSearch").addEventListener("click", () => { setVal(
   document.getElementById(id).addEventListener("input", () => saveOverviewFields(true));
 });
 document.getElementById("currentChapterTitle").addEventListener("input", () => saveCurrentManuscriptChapter(true));
-document.getElementById("manuscriptEditor").addEventListener("input", () => saveCurrentManuscriptChapter(false));
+document.getElementById("richEditor").addEventListener("input", () => saveCurrentManuscriptChapter(false));
+document.getElementById("richEditor").addEventListener("blur", () => syncToCloud(false));
 
 initSupabase();
-refreshSession().then(renderAll);
+refreshSession().then(() => {
+  if (data.user?.id) {
+    loadFromCloud(false).then(renderAll);
+  } else {
+    updateAuthGate();
+  }
+});
