@@ -51,10 +51,10 @@
 
         <div class="story-nav-group">
           <h4>Library</h4>
-          <button class="story-nav active">📖 My Stories</button>
-          <button class="story-nav">⭐ Favorites</button>
-          <button class="story-nav">🕘 Recently Opened</button>
-          <button class="story-nav">🗑️ Trash</button>
+          <button id="navMyStories" class="story-nav active" onclick="setLibraryView('all')">📖 My Stories</button>
+          <button id="navFavorites" class="story-nav" onclick="setLibraryView('favorites')">⭐ Favorites</button>
+          <button id="navRecent" class="story-nav" onclick="openRecentlyOpened()">🕘 Recently Opened</button>
+          <button id="navTrash" class="story-nav" onclick="setLibraryView('trash')">🗑️ Trash</button>
         </div>
 
         <div class="story-nav-group">
@@ -97,12 +97,13 @@
           <div class="project-grid compact">
             <div>
               <label>Project Type</label>
-              <select id="newProjectType">
+              <select id="newProjectType" onchange="updateProjectCreateFields()">
                 <option value="series">Series</option>
                 <option value="standalone">Standalone Book</option>
               </select>
-              <label>Series / Project Title</label>
-              <input id="newSeriesTitle" placeholder="Series or standalone project title" />
+              <label id="projectTitleLabel">Series / Project Title</label>
+              <input id="newSeriesTitle" placeholder="Only needed for a series" />
+              <p id="standaloneHint" class="muted">For Standalone Book, the Book Title is enough.</p>
               <label>Theme Color</label>
               <input id="newProjectColor" type="color" value="#9d4edd" />
               <label class="file-label inline-file">Cover Image <input id="newProjectCover" type="file" accept="image/*" /></label>
@@ -112,10 +113,11 @@
             <div>
               <label>Book Title</label>
               <input id="newBookTitle" placeholder="Book title" />
+              <p class="muted">Required for standalone books.</p>
               <label>Add to Project</label>
               <select id="newBookSeriesSelect"></select>
               <button onclick="createBookFromProject()">Create Book</button>
-              <button class="danger" onclick="deleteSelectedProject()">Delete Selected Project</button>
+              
             </div>
           </div>
           <p id="createProjectMessage"></p>
@@ -135,17 +137,18 @@
           </div>
           <div class="backup-row">
             <button class="glow" onclick="openWorkspace()">Open Overview</button>
-            <button class="danger" onclick="deleteSelectedProject()">Delete Selected Project</button>
+            
           </div>
           <p id="projectMessage"></p>
         </section>
 
         <section class="dashboard-section">
           <div class="section-title">
-            <h2>My Stories</h2>
+            <h2 id="libraryTitle">My Stories</h2>
             <button onclick="showCreateProjectPanel()">View / Create →</button>
           </div>
           <div id="dashboardStoryCards" class="story-card-grid"></div>
+          <p id="trashActionsInfo" class="muted"></p>
         </section>
 
         <section class="dashboard-widgets">

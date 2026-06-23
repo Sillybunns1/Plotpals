@@ -805,3 +805,36 @@ body.light-mode .workspace-sidebar .nav-grandchild:hover {
 .app-shell.collapsed .collapsible-menu-heading {
   justify-content: center;
 }
+
+/* PlotPals V15.6 main page library fixes */
+.story-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.story-card-actions button {
+  padding: 7px 10px;
+  font-size: .85rem;
+}
+.story-card-actions .danger {
+  margin-left: auto;
+}
+.story-cover-thumb {
+  height: 88px;
+  width: 62px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin: 8px;
+  box-shadow: 0 10px 25px rgba(0,0,0,.35);
+}
+.story-card:has(.story-card-actions button:hover) {
+  transform: none;
+}
+#standaloneHint {
+  margin: -4px 0 10px;
+}
+#trashActionsInfo {
+  margin-top: 12px;
+}

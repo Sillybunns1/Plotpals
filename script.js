@@ -5,7 +5,7 @@ const defaultData = {
   activeSeriesId: null, activeBookId: null, activeChapterId: null, activeSceneId: null, selectedCharacterId: null,
   user: null, series: [], books: [], characters: [], relationships: [], timeline: [], chapterPlans: [], threads: [],
   scenes: [], world: [], locations: [], magicSystems: [], organizations: [], mysteries: [], foreshadowing: [], plotCards: [],
-  structureBeats: [], music: {}, theme: 'dark', pinnedNote: '', goals: {}, writingSessions: [], research: [], maps: [], snapshots: [], music: {}, theme: 'dark', pinnedNote: '', goals: {}, writingSessions: [], research: [], maps: [], snapshots: []
+  structureBeats: [], music: {}, theme: 'dark', pinnedNote: '', libraryView: 'all', lastOpened: null, goals: {}, writingSessions: [], research: [], maps: [], snapshots: [], music: {}, theme: 'dark', pinnedNote: '', libraryView: 'all', lastOpened: null, goals: {}, writingSessions: [], research: [], maps: [], snapshots: []
 };
 
 let supabaseClient = null;
@@ -915,3 +915,288 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 setTimeout(() => { ensureSidebarVisible(); initializeCollapsibleSidebar(); }, 400);
 setTimeout(() => { ensureSidebarVisible(); initializeCollapsibleSidebar(); }, 1300);
+
+
+/* PlotPals V15.6 Main Page Library Fixes */
+function activeNavButton(view){
+  ["navMyStories","navFavorites","navRecent","navTrash"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.classList.remove("active");
+  });
+  const map={all:"navMyStories",favorites:"navFavorites",trash:"navTrash"};
+  const el=document.getElementById(map[view]);
+  if(el) el.classList.add("active");
+}
+function setLibraryView(view){
+  data.libraryView = view || "all";
+  activeNavButton(data.libraryView);
+  renderProjectScreen();
+}
+function updateProjectCreateFields(){
+  const type = val("newProjectType") || "series";
+  const label = document.getElementById("projectTitleLabel");
+  const seriesTitle = document.getElementById("newSeriesTitle");
+  const hint = document.getElementById("standaloneHint");
+  if(type === "standalone"){
+    if(label) label.textContent = "Series / Project Title";
+    if(seriesTitle){
+      seriesTitle.placeholder = "Not required for standalone";
+      seriesTitle.disabled = false;
+    }
+    if(hint) hint.textContent = "Standalone Book only needs the Book Title below. Project title will match the book title.";
+  } else {
+    if(label) label.textContent = "Series / Project Title";
+    if(seriesTitle){
+      seriesTitle.placeholder = "Series title";
+      seriesTitle.disabled = false;
+    }
+    if(hint) hint.textContent = "Series projects can contain multiple books.";
+  }
+}
+function favoriteProject(seriesId, event){
+  if(event) event.stopPropagation();
+  const s = data.series.find(x=>x.id===seriesId);
+  if(!s) return;
+  s.favorite = !s.favorite;
+  saveData(false);
+  renderProjectScreen();
+}
+function moveProjectToTrash(seriesId, event){
+  if(event) event.stopPropagation();
+  const s = data.series.find(x=>x.id===seriesId);
+  if(!s) return;
+  if(!confirm(`Move "${s.title}" to Trash?`)) return;
+  s.deleted = true;
+  s.deletedAt = new Date().toISOString();
+  if(data.activeSeriesId === seriesId){
+    data.activeSeriesId = null;
+    data.activeBookId = null;
+  }
+  saveData(false);
+  renderProjectScreen();
+  syncToCloud(false);
+}
+function restoreProject(seriesId, event){
+  if(event) event.stopPropagation();
+  const s = data.series.find(x=>x.id===seriesId);
+  if(!s) return;
+  s.deleted = false;
+  s.deletedAt = "";
+  saveData(false);
+  renderProjectScreen();
+  syncToCloud(false);
+}
+function permanentlyDeleteProject(seriesId, event){
+  if(event) event.stopPropagation();
+  const s = data.series.find(x=>x.id===seriesId);
+  if(!s) return;
+  if(!confirm(`Permanently delete "${s.title}" and all attached books/data? This cannot be undone.`)) return;
+  const bookIds = data.books.filter(b=>b.seriesId===seriesId).map(b=>b.id);
+  data.books = data.books.filter(b=>b.seriesId!==seriesId);
+  ["characters","relationships","timeline","chapterPlans","threads","scenes","world","locations","magicSystems","organizations","mysteries","foreshadowing","plotCards","structureBeats","research","maps","snapshots","writingSessions"].forEach(k=>{
+    data[k] = (data[k]||[]).filter(item => item.seriesId !== seriesId && !bookIds.includes(item.bookId));
+  });
+  if(data.music) delete data.music[seriesId];
+  if(data.goals) delete data.goals[seriesId];
+  data.series = data.series.filter(x=>x.id!==seriesId);
+  saveData(false);
+  renderProjectScreen();
+  syncToCloud(false);
+}
+function openRecentlyOpened(){
+  const last = data.lastOpened;
+  if(last && data.series.some(s=>s.id===last.seriesId && !s.deleted) && data.books.some(b=>b.id===last.bookId)){
+    openProjectFromDashboard(last.seriesId,last.bookId);
+    return;
+  }
+  setLibraryView("all");
+  setProjectMessage("No recently opened story yet.");
+}
+function getPreviewMusicProject(){
+  if(data.lastOpened?.seriesId && data.music?.[data.lastOpened.seriesId]) return data.lastOpened.seriesId;
+  const firstWithMusic = (data.series||[]).find(s => !s.deleted && data.music?.[s.id] && (data.music[s.id].spotify || data.music[s.id].apple || data.music[s.id].youtube || data.music[s.id].notes));
+  return firstWithMusic?.id || (data.series||[]).find(s=>!s.deleted)?.id || "";
+}
+
+/* Override create project so Standalone only needs Book Title */
+function createSeriesFromProject(){
+  const type = val("newProjectType") || "series";
+  const bookTitle = val("newBookTitle");
+  let projectTitle = val("newSeriesTitle");
+
+  if(type === "standalone"){
+    if(!bookTitle) return setProjectMessage("Enter a Book Title for the standalone book.");
+    projectTitle = bookTitle;
+  } else {
+    if(!projectTitle) return setProjectMessage("Enter a Series / Project Title.");
+  }
+
+  Promise.all([readFileAsDataURL("newProjectCover"), readFileAsDataURL("newProjectBanner")]).then(([cover,banner])=>{
+    const series={id:uid(),title:projectTitle,type,genre:"",synopsis:"",theme:"",mysteries:"",foreshadowing:"",favorite:false,deleted:false,artwork:{cover,banner,color:val("newProjectColor")||"#9d4edd",notes:""},created:new Date().toISOString()};
+    data.series.push(series);
+
+    if(type==="standalone"){
+      const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",created:new Date().toISOString()};
+      const book={id:uid(),seriesId:series.id,title:bookTitle,status:"Planning",summary:"",theme:"",notes:"",manuscript:[{id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()}],created:new Date().toISOString()};
+      data.books.push(book);
+    }
+
+    setVal("newSeriesTitle","");
+    setVal("newBookTitle","");
+    const coverInput=document.getElementById("newProjectCover"); if(coverInput) coverInput.value="";
+    const bannerInput=document.getElementById("newProjectBanner"); if(bannerInput) bannerInput.value="";
+    saveData(false);
+    renderProjectScreen();
+    setProjectMessage(type==="standalone"?"Standalone book created.":"Series created. Now create/select a book.");
+  });
+}
+
+/* Override project dashboard renderer with Favorites/Trash/Delete/Playlist fixes */
+function renderProjectScreen(){
+  ensureCollections();
+  applyTheme();
+  updateProjectCreateFields();
+
+  const name = data.user?.email ? data.user.email.split("@")[0] : "Writer";
+  setText("dashboardName", name.charAt(0).toUpperCase() + name.slice(1));
+
+  const visibleSeries = (data.series||[]).filter(s=>!s.deleted);
+  const projectOptions = visibleSeries.length
+    ? visibleSeries.map(s=>`<option value="${s.id}">${escapeHTML(s.title)} (${s.type==="standalone"?"Standalone":"Series"})</option>`).join("")
+    : `<option value="">No projects yet</option>`;
+  setHTML("projectSeriesSelect", projectOptions);
+  setHTML("newBookSeriesSelect", projectOptions);
+  projectSeriesChanged();
+
+  const view = data.libraryView || "all";
+  activeNavButton(view);
+  const q = (val("projectSearch") || "").toLowerCase();
+
+  let projects = data.series || [];
+  if(view === "trash") projects = projects.filter(s=>s.deleted);
+  else projects = projects.filter(s=>!s.deleted);
+
+  if(view === "favorites") projects = projects.filter(s=>s.favorite);
+
+  projects = projects.filter(s => !q || JSON.stringify(s).toLowerCase().includes(q) || data.books.some(b => b.seriesId === s.id && b.title.toLowerCase().includes(q)));
+
+  const titleMap = {all:"My Stories", favorites:"Favorite Stories", trash:"Trash"};
+  setText("libraryTitle", titleMap[view] || "My Stories");
+
+  const cards = projects.map((s) => {
+    const books = data.books.filter(b => b.seriesId === s.id);
+    const primaryBook = books[0];
+    const words = books.reduce((sum, b) => sum + projectWordCount(b), 0);
+    const scenes = books.reduce((sum, b) => sum + projectSceneCount(b), 0);
+    const progress = Math.min(100, Math.round(words / 50000 * 100));
+    const status = primaryBook?.status || (s.type === "standalone" ? "Planning" : `${books.length} book${books.length === 1 ? "" : "s"}`);
+    const art = s.artwork || {};
+    const coverStyle = art.banner ? `style="background-image:linear-gradient(90deg,rgba(5,6,12,.45),rgba(12,8,25,.45)),url('${art.banner}');background-size:cover;background-position:center;"` : "";
+    const openAction = s.deleted ? "" : `onclick="openProjectFromDashboard('${s.id}','${primaryBook?.id || ""}')"`;
+    const trashButtons = s.deleted
+      ? `<button onclick="restoreProject('${s.id}', event)">Restore</button><button class="danger" onclick="permanentlyDeleteProject('${s.id}', event)">Delete Forever</button>`
+      : `<button onclick="favoriteProject('${s.id}', event)">${s.favorite ? "★ Favorited" : "☆ Favorite"}</button><button class="danger" onclick="moveProjectToTrash('${s.id}', event)">Delete</button>`;
+
+    return `<article class="story-card" ${openAction}>
+      <div class="story-card-art" ${coverStyle}>${art.cover ? `<img class="story-cover-thumb" src="${art.cover}" alt="">` : ""}</div>
+      <div class="story-card-body">
+        <h3>${escapeHTML(s.title)}</h3>
+        <span class="tag">${escapeHTML(s.type === "standalone" ? "Standalone" : "Series")}</span>
+        ${s.favorite ? `<span class="tag">Favorite</span>` : ""}
+        ${s.deleted ? `<span class="tag">In Trash</span>` : ""}
+        <p>${escapeHTML(status)}</p>
+        <p>${books.length} book${books.length === 1 ? "" : "s"} · ${scenes} scenes</p>
+        <div class="progress-bar"><span style="width:${progress}%"></span></div>
+        <p>${words.toLocaleString()} words</p>
+        <div class="story-card-actions">${trashButtons}</div>
+      </div>
+    </article>`;
+  }).join("");
+
+  const addCard = view === "trash" ? "" : `<div class="add-story-card" onclick="showCreateProjectPanel()"><div><div style="font-size:3rem;">✒</div><strong>+ New Book<br>or Series</strong></div></div>`;
+  setHTML("dashboardStoryCards", cards + addCard);
+  setText("trashActionsInfo", view === "trash" ? "Trash shows deleted projects. Restore them or permanently delete them here." : "");
+
+  const item = firstProjectBook();
+  if(item) {
+    const ch = item.book.manuscript?.[0];
+    const sc = ch?.scenes?.[0];
+    setHTML("continueWritingCard", `<div class="continue-card">
+      <strong>${escapeHTML(sc?.title || ch?.title || item.book.title)}</strong>
+      <span>${escapeHTML(item.series.title)} — ${escapeHTML(item.book.title)}</span>
+      <div class="progress-bar"><span style="width:65%"></span></div>
+      <button onclick="quickOpenFirstProject()">Resume Writing</button>
+    </div>`);
+  } else {
+    setHTML("continueWritingCard", `<p>No stories yet.</p><button onclick="showCreateProjectPanel()">Create your first story</button>`);
+  }
+
+  const allBooks = data.books.filter(b => data.series.some(s => s.id === b.seriesId && !s.deleted));
+  const allWords = allBooks.reduce((sum, b) => sum + projectWordCount(b), 0);
+  const allScenes = allBooks.reduce((sum, b) => sum + projectSceneCount(b), 0);
+  const allChapters = allBooks.reduce((sum, b) => sum + (b.manuscript || []).length, 0);
+  setText("dashWords", allWords.toLocaleString());
+  setText("dashChapters", allChapters);
+  setText("dashScenes", allScenes);
+  setText("dashCharacters", (data.characters || []).filter(c => data.series.some(s=>s.id===c.seriesId && !s.deleted)).length);
+
+  const recent = [
+    ...allBooks.slice(-3).map(b => `Edited ${escapeHTML(b.title)}`),
+    ...(data.characters || []).slice(-2).map(c => `Added character: ${escapeHTML(c.name)}`),
+    ...(data.threads || []).slice(-2).map(t => `Created plot thread: ${escapeHTML(t.title)}`)
+  ].slice(-5).reverse();
+
+  setHTML("recentActivity", recent.length ? recent.map(r => `<p>${r}</p>`).join("") : "<p>No recent activity yet.</p>");
+  setVal("dashboardPinnedNote", data.pinnedNote || "");
+
+  const musicProjectId = getPreviewMusicProject();
+  const musicProject = data.series.find(s=>s.id===musicProjectId);
+  const music = musicProjectId ? (data.music?.[musicProjectId] || {}) : {};
+  const musicLinks = [
+    music.spotify ? `<a class="playlist-link" target="_blank" href="${escapeHTML(music.spotify)}">Spotify</a>` : "",
+    music.apple ? `<a class="playlist-link" target="_blank" href="${escapeHTML(music.apple)}">Apple Music</a>` : "",
+    music.youtube ? `<a class="playlist-link" target="_blank" href="${escapeHTML(music.youtube)}">YouTube Music</a>` : ""
+  ].filter(Boolean).join("");
+  setHTML("dashboardPlaylistPreview", musicLinks
+    ? `<p><strong>${escapeHTML(musicProject?.title || "Project Playlist")}</strong></p>${musicLinks}${detail("Notes", music.notes)}`
+    : "<p>No playlist linked yet. Add one inside a project.</p>");
+}
+
+/* Override opening functions to record Recently Opened */
+function openWorkspace(){
+  const seriesId = val("projectSeriesSelect");
+  const bookId = val("projectBookSelect");
+  if(!seriesId || !bookId){
+    setProjectMessage("Select both a project and a book first.");
+    return;
+  }
+  openProjectFromDashboard(seriesId, bookId);
+}
+function openProjectFromDashboard(seriesId, bookId){
+  if(!bookId){
+    setProjectMessage("This project has no books yet. Create a book first.");
+    showCreateProjectPanel();
+    return;
+  }
+  const book = normalizeBookForOpening(data.books.find(b => b.id === bookId));
+  if(!book){
+    setProjectMessage("Could not find that book. Try selecting it from Open Existing Story.");
+    return;
+  }
+  data.activeSeriesId = seriesId;
+  data.activeBookId = bookId;
+  data.lastOpened = { seriesId, bookId, openedAt: new Date().toISOString() };
+  data.activeChapterId = book.manuscript[0]?.id || null;
+  data.activeSceneId = book.manuscript[0]?.scenes?.[0]?.id || null;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data,null,2));
+  document.getElementById("projectScreen")?.classList.add("hidden");
+  document.getElementById("loginScreen")?.classList.add("hidden");
+  document.getElementById("appShell")?.classList.remove("hidden");
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.getElementById("overview")?.classList.add("active");
+  setText("viewTitle","Overview");
+  renderAll();
+  ensureSidebarVisible();
+  initializeCollapsibleSidebar();
+  syncToCloud(false);
+}
