@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PlotPals</title>
+  <title>Writer's Vault Author Studio - Version 9</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -13,8 +13,8 @@
       <div class="brand center">
         <div class="brand-mark">✦</div>
         <div>
-          <h1>PlotPals</h1>
-          <p>Login required to access your books.</p>
+          <h1>Writer's Vault</h1>
+          <p>Author Studio login required.</p>
         </div>
       </div>
       <div class="login-tabs">
@@ -38,7 +38,7 @@
           <div class="brand-mark">✦</div>
           <div>
             <h1>Select Your Project</h1>
-            <p>Choose or create a series and book before opening the workspace.</p>
+            <p>Choose/create a standalone book or series before opening the workspace.</p>
           </div>
         </div>
         <button onclick="signOut()" class="ghost-btn">Sign Out</button>
@@ -46,22 +46,28 @@
 
       <div class="project-grid">
         <div class="panel">
-          <h3>Create New</h3>
-          <label>Series Title</label>
-          <input id="newSeriesTitle" placeholder="Series title" />
-          <button onclick="createSeriesFromProject()">Create Series</button>
+          <h3>Create New Project</h3>
+          <label>Project Type</label>
+          <select id="newProjectType">
+            <option value="series">Series</option>
+            <option value="standalone">Standalone Book</option>
+          </select>
+          <label>Series / Project Title</label>
+          <input id="newSeriesTitle" placeholder="Series or standalone project title" />
+          <button onclick="createSeriesFromProject()">Create Project</button>
 
           <hr />
+          <h3>Add Book to Series</h3>
           <label>Book Title</label>
           <input id="newBookTitle" placeholder="Book title" />
-          <label>Add to Series</label>
+          <label>Add to Project</label>
           <select id="newBookSeriesSelect"></select>
           <button onclick="createBookFromProject()">Create Book</button>
         </div>
 
         <div class="panel">
           <h3>Select Existing</h3>
-          <label>Series</label>
+          <label>Project</label>
           <select id="projectSeriesSelect" onchange="projectSeriesChanged()"></select>
           <label>Book</label>
           <select id="projectBookSelect"></select>
@@ -77,7 +83,7 @@
       <div class="brand compact-brand">
         <div class="brand-mark">✦</div>
         <div class="brand-text">
-          <h1>PlotPals</h1>
+          <h1>Author Studio</h1>
           <p id="sidebarProjectName">Project</p>
         </div>
       </div>
@@ -118,10 +124,14 @@
       <section id="overview" class="view active">
         <div class="two-col">
           <div class="panel">
-            <h3>Series Bible</h3>
-            <input id="seriesTitleEdit" placeholder="Series title" />
+            <h3>Project Bible</h3>
+            <input id="seriesTitleEdit" placeholder="Project / Series title" />
+            <select id="seriesTypeEdit">
+              <option value="series">Series</option>
+              <option value="standalone">Standalone Book</option>
+            </select>
             <input id="seriesGenreEdit" placeholder="Genre / tone" />
-            <textarea id="seriesSynopsisEdit" placeholder="Series synopsis"></textarea>
+            <textarea id="seriesSynopsisEdit" placeholder="Series / project synopsis"></textarea>
             <textarea id="seriesThemeEdit" placeholder="Overall theme"></textarea>
             <textarea id="seriesMysteriesEdit" placeholder="Major mysteries"></textarea>
             <textarea id="seriesForeshadowingEdit" placeholder="Foreshadowing tracker"></textarea>
@@ -131,10 +141,7 @@
             <h3>Book Details</h3>
             <input id="bookTitleEdit" placeholder="Book title" />
             <select id="bookStatusEdit">
-              <option>Planning</option>
-              <option>Drafting</option>
-              <option>Revising</option>
-              <option>Finished</option>
+              <option>Planning</option><option>Drafting</option><option>Revising</option><option>Finished</option>
             </select>
             <textarea id="bookSummaryEdit" placeholder="Book summary"></textarea>
             <textarea id="bookThemeEdit" placeholder="Book theme"></textarea>
@@ -144,26 +151,36 @@
 
         <div class="grid stats-grid">
           <div class="stat-card"><span id="statWords">0</span><p>Words Written</p></div>
-          <div class="stat-card"><span id="statChapters">0</span><p>Manuscript Chapters</p></div>
+          <div class="stat-card"><span id="statChapters">0</span><p>Chapters</p></div>
+          <div class="stat-card"><span id="statScenes">0</span><p>Scenes</p></div>
           <div class="stat-card"><span id="statCharacters">0</span><p>Characters</p></div>
-          <div class="stat-card"><span id="statThreads">0</span><p>Open Threads</p></div>
         </div>
       </section>
 
       <section id="write" class="view">
         <div class="editor-layout">
           <aside class="chapter-sidebar panel">
-            <h3>Manuscript Chapters</h3>
-            <button onclick="addManuscriptChapter()">+ Add Chapter</button>
-            <button onclick="moveChapter(-1)">Move Up</button>
-            <button onclick="moveChapter(1)">Move Down</button>
+            <h3>Chapters & Scenes</h3>
+            <button onclick="addManuscriptChapter()">+ Chapter</button>
+            <button onclick="addSceneToActiveChapter()">+ Scene</button>
+            <button onclick="moveScene(-1)">Move Scene Up</button>
+            <button onclick="moveScene(1)">Move Scene Down</button>
             <div id="manuscriptChapterList"></div>
           </aside>
 
           <div id="manuscriptPanel" class="panel manuscript-panel">
             <div class="editor-top">
               <input id="currentChapterTitle" placeholder="Chapter title" />
-              <div class="word-pill"><span id="chapterWordCount">0</span> words</div>
+              <input id="currentSceneTitle" placeholder="Scene title" />
+              <div class="word-pill"><span id="sceneWordCount">0</span> words</div>
+            </div>
+
+            <div class="scene-meta">
+              <select id="scenePOV"><option value="">POV Character</option></select>
+              <select id="sceneLocation"><option value="">Location</option></select>
+              <input id="sceneDate" placeholder="Timeline date / placement" />
+              <input id="sceneMood" placeholder="Mood" />
+              <input id="scenePurpose" placeholder="Scene purpose" />
             </div>
 
             <div class="format-bar">
@@ -184,14 +201,34 @@
 
             <div class="editor-stats">
               <span>Book words: <strong id="bookWordCountInline">0</strong></span>
-              <span>Characters: <strong id="chapterCharCount">0</strong></span>
-              <span>Paragraphs: <strong id="chapterParagraphCount">0</strong></span>
+              <span>Scene chars: <strong id="sceneCharCount">0</strong></span>
+              <span>Paragraphs: <strong id="sceneParagraphCount">0</strong></span>
               <span>Auto-save: <strong id="autosaveStatus">Ready</strong></span>
             </div>
 
             <div id="richEditor" class="rich-editor" contenteditable="true" spellcheck="true"></div>
           </div>
         </div>
+      </section>
+
+      <section id="storyBoard" class="view">
+        <div class="form-panel">
+          <h3>Story Structure Board</h3>
+          <div class="form-grid">
+            <select id="structureTemplate">
+              <option>Three Act Structure</option>
+              <option>Save The Cat</option>
+              <option>Hero's Journey</option>
+              <option>Romance Beat Sheet</option>
+              <option>Custom</option>
+            </select>
+            <input id="structureBeatName" placeholder="Beat / section name" />
+            <textarea id="structureBeatNotes" placeholder="Beat notes"></textarea>
+          </div>
+          <button onclick="applyStructureTemplate()">Apply Template</button>
+          <button onclick="addStructureBeat()">Add Custom Beat</button>
+        </div>
+        <div id="storyBoardList" class="board-grid"></div>
       </section>
 
       <section id="chapters" class="view">
@@ -201,6 +238,7 @@
             <input id="chapterNumber" placeholder="Chapter number / title" />
             <input id="chapterPOV" placeholder="POV character" />
             <input id="chapterWordTarget" placeholder="Target word count" />
+            <select id="chapterStructureBeat"></select>
             <textarea id="chapterGoal" placeholder="Scene/chapter goal"></textarea>
             <textarea id="chapterConflict" placeholder="Conflict"></textarea>
             <textarea id="chapterOutcome" placeholder="Outcome"></textarea>
@@ -217,15 +255,8 @@
           <h3>Add Plot Thread</h3>
           <div class="form-grid">
             <input id="threadTitle" placeholder="Thread title / question" />
-            <select id="threadScope">
-              <option value="book">Attach to this book</option>
-              <option value="series">Attach to whole series</option>
-            </select>
-            <select id="threadStatus">
-              <option>Open</option>
-              <option>In Progress</option>
-              <option>Closed</option>
-            </select>
+            <select id="threadScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
+            <select id="threadStatus"><option>Open</option><option>In Progress</option><option>Closed</option></select>
             <textarea id="threadSetup" placeholder="Setup"></textarea>
             <textarea id="threadPayoff" placeholder="Payoff / resolution"></textarea>
           </div>
@@ -234,33 +265,67 @@
         <div id="threadList" class="card-grid"></div>
       </section>
 
+      <section id="mysteries" class="view">
+        <div class="form-panel">
+          <h3>Mystery Tracker</h3>
+          <div class="form-grid">
+            <input id="mysteryQuestion" placeholder="Mystery question" />
+            <input id="mysteryIntroduced" placeholder="Introduced in..." />
+            <input id="mysteryPayoff" placeholder="Payoff chapter / book" />
+            <select id="mysteryStatus"><option>Open</option><option>Hinted</option><option>Revealed</option><option>Resolved</option></select>
+            <textarea id="mysteryHints" placeholder="Hints / false leads"></textarea>
+            <textarea id="mysteryAnswer" placeholder="Answer / reveal"></textarea>
+          </div>
+          <button onclick="addMystery()">Add Mystery</button>
+        </div>
+        <div id="mysteryList" class="card-grid"></div>
+      </section>
+
+      <section id="foreshadowing" class="view">
+        <div class="form-panel">
+          <h3>Foreshadowing Tracker</h3>
+          <div class="form-grid">
+            <input id="foreshadowHint" placeholder="Hint / setup" />
+            <input id="foreshadowAppears" placeholder="Appears in..." />
+            <input id="foreshadowPayoff" placeholder="Payoff in..." />
+            <select id="foreshadowStatus"><option>Planted</option><option>Developing</option><option>Paid Off</option></select>
+            <textarea id="foreshadowNotes" placeholder="Notes"></textarea>
+          </div>
+          <button onclick="addForeshadowing()">Add Foreshadowing</button>
+        </div>
+        <div id="foreshadowingList" class="card-grid"></div>
+      </section>
+
+      <section id="plotBoard" class="view">
+        <div class="form-panel">
+          <h3>Plot Board</h3>
+          <div class="form-grid">
+            <input id="plotCardTitle" placeholder="Card title" />
+            <select id="plotCardStatus"><option>Ideas</option><option>Planned</option><option>Drafting</option><option>Finished</option></select>
+            <textarea id="plotCardNotes" placeholder="Notes"></textarea>
+          </div>
+          <button onclick="addPlotCard()">Add Plot Card</button>
+        </div>
+        <div id="plotBoardList" class="board-grid"></div>
+      </section>
+
       <section id="characters" class="view">
         <div class="form-panel">
           <h3>Add Character</h3>
           <div class="form-grid">
             <input id="charName" placeholder="Character name" />
-            <select id="charScope">
-              <option value="book">Attach to this book</option>
-              <option value="series">Attach to whole series</option>
-            </select>
-            <select id="charRole">
-              <option>Main</option>
-              <option>Side</option>
-              <option>Love Interest</option>
-              <option>Antagonist</option>
-              <option>Mentor</option>
-              <option>Other</option>
-            </select>
+            <select id="charScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
+            <select id="charRole"><option>Main</option><option>Side</option><option>Love Interest</option><option>Antagonist</option><option>Mentor</option><option>Other</option></select>
             <input id="charSpecies" placeholder="Species / identity" />
-            <label class="file-label inline-file">Upload Character Photo
-              <input id="charPhoto" type="file" accept="image/*" />
-            </label>
+            <label class="file-label inline-file">Upload Character Photo <input id="charPhoto" type="file" accept="image/*" /></label>
             <textarea id="charDescription" placeholder="Physical description"></textarea>
             <textarea id="charPersonality" placeholder="Personality"></textarea>
             <textarea id="charWound" placeholder="Core wound / fear / desire"></textarea>
             <textarea id="charArc" placeholder="Character arc"></textarea>
             <textarea id="charVoice" placeholder="Voice / speech patterns"></textarea>
-            <textarea id="charRelationships" placeholder="Important relationship notes"></textarea>
+            <textarea id="charBio" placeholder="Biography"></textarea>
+            <textarea id="charSecrets" placeholder="Secrets"></textarea>
+            <textarea id="charQuotes" placeholder="Quotes"></textarea>
           </div>
           <button onclick="addCharacter()">Add Character</button>
         </div>
@@ -277,12 +342,12 @@
           <div class="form-grid">
             <select id="relA"></select>
             <select id="relB"></select>
-            <select id="relScope">
-              <option value="book">Attach to this book</option>
-              <option value="series">Attach to whole series</option>
-            </select>
+            <select id="relScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
             <input id="relType" placeholder="Relationship type" />
-            <textarea id="relNotes" placeholder="Relationship notes, tension, history, changes"></textarea>
+            <input id="relStatus" placeholder="Current status" />
+            <textarea id="relHistory" placeholder="History"></textarea>
+            <textarea id="relMoments" placeholder="Important moments"></textarea>
+            <textarea id="relArc" placeholder="Relationship arc / future changes"></textarea>
           </div>
           <button onclick="addRelationship()">Add Relationship</button>
         </div>
@@ -290,21 +355,56 @@
         <div id="relationshipList" class="card-grid"></div>
       </section>
 
-      <section id="scenes" class="view">
+      <section id="locations" class="view">
         <div class="form-panel">
-          <h3>Add Scene</h3>
+          <h3>Locations</h3>
           <div class="form-grid">
-            <input id="sceneName" placeholder="Scene name" />
-            <select id="sceneScope">
-              <option value="book">Attach to this book</option>
-              <option value="series">Attach to whole series</option>
-            </select>
-            <input id="sceneLocation" placeholder="Location" />
-            <textarea id="sceneSummary" placeholder="Scene summary"></textarea>
-            <textarea id="scenePurpose" placeholder="Purpose, mood, characters present"></textarea>
+            <input id="locationName" placeholder="Location name" />
+            <select id="locationScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
+            <input id="locationPopulation" placeholder="Population" />
+            <input id="locationCulture" placeholder="Culture" />
+            <label class="file-label inline-file">Upload Location Image <input id="locationImage" type="file" accept="image/*" /></label>
+            <textarea id="locationDescription" placeholder="Description"></textarea>
+            <textarea id="locationHistory" placeholder="History"></textarea>
+            <textarea id="locationNotes" placeholder="Notes"></textarea>
           </div>
-          <button onclick="addScene()">Add Scene</button>
+          <button onclick="addLocation()">Add Location</button>
         </div>
+        <div id="locationList" class="card-grid"></div>
+      </section>
+
+      <section id="magic" class="view">
+        <div class="form-panel">
+          <h3>Magic / Power System</h3>
+          <div class="form-grid">
+            <input id="magicName" placeholder="Magic system name" />
+            <input id="magicSource" placeholder="Source" />
+            <textarea id="magicRules" placeholder="Rules"></textarea>
+            <textarea id="magicLimits" placeholder="Limitations"></textarea>
+            <textarea id="magicCosts" placeholder="Costs"></textarea>
+            <textarea id="magicExamples" placeholder="Examples / users"></textarea>
+          </div>
+          <button onclick="addMagic()">Add Magic System</button>
+        </div>
+        <div id="magicList" class="card-grid"></div>
+      </section>
+
+      <section id="organizations" class="view">
+        <div class="form-panel">
+          <h3>Organizations</h3>
+          <div class="form-grid">
+            <input id="orgName" placeholder="Organization name" />
+            <input id="orgType" placeholder="Type: guild, religion, kingdom..." />
+            <textarea id="orgDescription" placeholder="Description"></textarea>
+            <textarea id="orgMembers" placeholder="Members"></textarea>
+            <textarea id="orgHistory" placeholder="History / influence"></textarea>
+          </div>
+          <button onclick="addOrganization()">Add Organization</button>
+        </div>
+        <div id="organizationList" class="card-grid"></div>
+      </section>
+
+      <section id="scenes" class="view">
         <div id="sceneList" class="card-grid"></div>
       </section>
 
@@ -313,10 +413,7 @@
           <h3>Add Timeline Event</h3>
           <div class="form-grid">
             <input id="timeWhen" placeholder="When? e.g. 300 years ago, Book 1 Ch. 3" />
-            <select id="timeScope">
-              <option value="book">Attach to this book</option>
-              <option value="series">Attach to whole series</option>
-            </select>
+            <select id="timeScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
             <textarea id="timeEvent" placeholder="What happens?"></textarea>
             <textarea id="timeImpact" placeholder="Why it matters / consequences"></textarea>
           </div>
@@ -327,29 +424,33 @@
 
       <section id="world" class="view">
         <div class="form-panel">
-          <h3>Add Worldbuilding Entry</h3>
+          <h3>General Worldbuilding Notes</h3>
           <div class="form-grid">
             <input id="worldName" placeholder="Entry name" />
-            <select id="worldScope">
-              <option value="book">Attach to this book</option>
-              <option value="series">Attach to whole series</option>
-            </select>
-            <select id="worldCategory">
-              <option>Location</option>
-              <option>Magic / Power System</option>
-              <option>Organization</option>
-              <option>Species</option>
-              <option>History</option>
-              <option>Artifact / Object</option>
-              <option>Culture</option>
-              <option>Other</option>
-            </select>
+            <select id="worldScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
+            <select id="worldCategory"><option>Culture</option><option>Species</option><option>Artifact / Object</option><option>History</option><option>Other</option></select>
             <textarea id="worldDescription" placeholder="Description"></textarea>
             <textarea id="worldRules" placeholder="Rules, limits, history, or notes"></textarea>
           </div>
           <button onclick="addWorld()">Add World Entry</button>
         </div>
         <div id="worldList" class="card-grid"></div>
+      </section>
+
+      <section id="seriesTools" class="view">
+        <div class="series-only-warning" id="seriesOnlyWarning"></div>
+        <div id="seriesToolsContent">
+          <div class="grid stats-grid">
+            <div class="stat-card"><span id="seriesBookCount">0</span><p>Books in Series</p></div>
+            <div class="stat-card"><span id="seriesTotalWords">0</span><p>Series Words</p></div>
+            <div class="stat-card"><span id="seriesTimelineCount">0</span><p>Timeline Events</p></div>
+            <div class="stat-card"><span id="seriesThreadCount">0</span><p>Series Threads</p></div>
+          </div>
+          <div class="two-col">
+            <div class="panel"><h3>Cross-Book Character Arcs</h3><div id="crossBookArcs"></div></div>
+            <div class="panel"><h3>Series Continuity Tracker</h3><div id="seriesContinuity"></div></div>
+          </div>
+        </div>
       </section>
 
       <section id="stats" class="view">
@@ -359,9 +460,9 @@
           <div class="stat-card"><span id="statsLongestChapter">0</span><p>Longest Chapter Words</p></div>
           <div class="stat-card"><span id="statsBibleItems">0</span><p>Bible Entries</p></div>
         </div>
-        <div class="panel">
-          <h3>Chapter Word Counts</h3>
-          <div id="chapterStatsList"></div>
+        <div class="two-col">
+          <div class="panel"><h3>Chapter Word Counts</h3><div id="chapterStatsList"></div></div>
+          <div class="panel"><h3>POV Distribution</h3><div id="povStatsList"></div></div>
         </div>
       </section>
 
@@ -373,8 +474,8 @@
             <button onclick="exportFullManuscriptTxt()">Full Manuscript TXT</button>
             <button onclick="exportFullManuscriptDocx()">Full Manuscript DOCX</button>
             <button onclick="exportFullManuscriptPDF()">Full Manuscript PDF</button>
-            <button onclick="exportSeriesBibleDocx()">Series Bible DOCX</button>
-            <button onclick="exportSeriesBiblePDF()">Series Bible PDF</button>
+            <button onclick="exportSeriesBibleDocx()">Project Bible DOCX</button>
+            <button onclick="exportSeriesBiblePDF()">Project Bible PDF</button>
           </div>
           <div id="printArea" class="print-area"></div>
         </div>
@@ -385,9 +486,7 @@
           <h3>Backup & Restore</h3>
           <div class="backup-row">
             <button onclick="exportData()">Export Backup JSON</button>
-            <label class="file-label">Import Backup
-              <input type="file" id="importFile" accept="application/json" onchange="importData(event)" />
-            </label>
+            <label class="file-label">Import Backup <input type="file" id="importFile" accept="application/json" onchange="importData(event)" /></label>
             <button class="danger" onclick="resetAll()">Delete Local Data</button>
           </div>
           <textarea id="rawData" readonly></textarea>
@@ -398,10 +497,7 @@
 
   <template id="cardTemplate">
     <article class="item-card">
-      <div class="card-header">
-        <h3></h3>
-        <button class="delete-btn">Delete</button>
-      </div>
+      <div class="card-header"><h3></h3><button class="delete-btn">Delete</button></div>
       <div class="card-body"></div>
     </article>
   </template>
