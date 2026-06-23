@@ -506,7 +506,8 @@
       </section>
 
       <section id="characters" class="view">
-        <div class="form-panel">
+        <button type="button" class="wide" onclick="toggleAddForm('characterAddForm')">+ Add Character</button>
+        <div id="characterAddForm" class="form-panel hidden">
           <h3>Add Character</h3>
           <div class="form-grid">
             <input id="charName" placeholder="Character name" />
@@ -540,7 +541,8 @@
       </section>
 
       <section id="relationships" class="view">
-        <div class="form-panel">
+        <button type="button" class="wide" onclick="toggleAddForm('relationshipAddForm')">+ Add Relationship</button>
+        <div id="relationshipAddForm" class="form-panel hidden">
           <h3>Add Relationship</h3>
           <div class="form-grid">
             <select id="relA" onchange="updateRelationshipViewLabels()"></select>
@@ -563,14 +565,34 @@
       </section>
 
       <section id="locations" class="view">
-        <div class="form-panel">
-          <h3>Locations</h3>
+        <div class="category-page-header panel">
+          <div>
+            <h2>📍 Locations <span id="locationCategoryCount" class="muted"></span></h2>
+            <p class="muted">Create places, regions, landmarks, kingdoms, cities, and important story settings.</p>
+          </div>
+          <div class="category-tools">
+            <input id="locationSearch" placeholder="Search Locations..." oninput="renderEntityList('location')" />
+            <select id="locationSort" onchange="renderEntityList('location')">
+              <option value="az">A–Z</option>
+              <option value="za">Z–A</option>
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+            </select>
+          </div>
+        </div>
+        <button type="button" class="wide" onclick="toggleAddForm('locationAddForm')">+ Add Location</button>
+        <div id="locationAddForm" class="form-panel hidden">
+          <h3>Add Location</h3>
           <div class="form-grid">
             <input id="locationName" placeholder="Location name" />
             <select id="locationScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
             <input id="locationPopulation" placeholder="Population" />
             <input id="locationCulture" placeholder="Culture" />
-            <label class="file-label inline-file">Upload Location Image <input id="locationImage" type="file" accept="image/*" /></label>
+            <div class="upload-control">
+              <button type="button" class="file-label inline-file" onclick="triggerOverviewImageUpload('locationImage', event)">Upload Location Image</button>
+              <input id="locationImage" type="file" accept="image/*" class="hidden" onchange="previewOverviewImage('locationImage','locationImagePreview')" />
+              <div id="locationImagePreview" class="upload-preview muted">No image selected.</div>
+            </div>
             <textarea id="locationDescription" placeholder="Description"></textarea>
             <textarea id="locationHistory" placeholder="History"></textarea>
             <textarea id="locationNotes" placeholder="Notes"></textarea>
@@ -581,12 +603,32 @@
       </section>
 
       <section id="magic" class="view">
-        <div class="form-panel">
-          <h3>Magic / Power System</h3>
+        <div class="category-page-header panel">
+          <div>
+            <h2>✨ Magic Systems <span id="magicCategoryCount" class="muted"></span></h2>
+            <p class="muted">Create power systems, supernatural rules, magical sources, limitations, costs, and known users.</p>
+          </div>
+          <div class="category-tools">
+            <input id="magicSearch" placeholder="Search Magic Systems..." oninput="renderEntityList('magic')" />
+            <select id="magicSort" onchange="renderEntityList('magic')">
+              <option value="az">A–Z</option>
+              <option value="za">Z–A</option>
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+            </select>
+          </div>
+        </div>
+        <button type="button" class="wide" onclick="toggleAddForm('magicAddForm')">+ Add Magic System</button>
+        <div id="magicAddForm" class="form-panel hidden">
+          <h3>Add Magic / Power System</h3>
           <div class="form-grid">
             <input id="magicName" placeholder="Magic system name" />
             <input id="magicSource" placeholder="Source" />
-            <label class="file-label inline-file">Upload Magic/System Image <input id="magicImage" type="file" accept="image/*" /></label>
+            <div class="upload-control">
+              <button type="button" class="file-label inline-file" onclick="triggerOverviewImageUpload('magicImage', event)">Upload Magic/System Image</button>
+              <input id="magicImage" type="file" accept="image/*" class="hidden" onchange="previewOverviewImage('magicImage','magicImagePreview')" />
+              <div id="magicImagePreview" class="upload-preview muted">No image selected.</div>
+            </div>
             <textarea id="magicRules" placeholder="Rules"></textarea>
             <textarea id="magicLimits" placeholder="Limitations"></textarea>
             <textarea id="magicCosts" placeholder="Costs"></textarea>
@@ -598,12 +640,32 @@
       </section>
 
       <section id="organizations" class="view">
-        <div class="form-panel">
-          <h3>Organizations</h3>
+        <div class="category-page-header panel">
+          <div>
+            <h2>⚜️ Organizations <span id="organizationCategoryCount" class="muted"></span></h2>
+            <p class="muted">Create guilds, factions, councils, kingdoms, companies, orders, clubs, and power groups.</p>
+          </div>
+          <div class="category-tools">
+            <input id="organizationSearch" placeholder="Search Organizations..." oninput="renderEntityList('organization')" />
+            <select id="organizationSort" onchange="renderEntityList('organization')">
+              <option value="az">A–Z</option>
+              <option value="za">Z–A</option>
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+            </select>
+          </div>
+        </div>
+        <button type="button" class="wide" onclick="toggleAddForm('organizationAddForm')">+ Add Organization</button>
+        <div id="organizationAddForm" class="form-panel hidden">
+          <h3>Add Organization</h3>
           <div class="form-grid">
             <input id="orgName" placeholder="Organization name" />
             <input id="orgType" placeholder="Type: guild, religion, kingdom..." />
-            <label class="file-label inline-file">Upload Organization Image <input id="orgImage" type="file" accept="image/*" /></label>
+            <div class="upload-control">
+              <button type="button" class="file-label inline-file" onclick="triggerOverviewImageUpload('orgImage', event)">Upload Organization Image</button>
+              <input id="orgImage" type="file" accept="image/*" class="hidden" onchange="previewOverviewImage('orgImage','orgImagePreview')" />
+              <div id="orgImagePreview" class="upload-preview muted">No image selected.</div>
+            </div>
             <textarea id="orgDescription" placeholder="Description"></textarea>
             <textarea id="orgMembers" placeholder="Members"></textarea>
             <textarea id="orgHistory" placeholder="History / influence"></textarea>
@@ -645,7 +707,8 @@
       </section>
 
       <section id="world" class="view">
-        <div class="form-panel">
+        <button type="button" class="wide" onclick="toggleAddForm('worldAddForm')">+ Add Worldbuilding Entry</button>
+        <div id="worldAddForm" class="form-panel hidden">
           <h3>Add Worldbuilding Entry</h3>
           <p class="muted">Each entry creates its own detail page, similar to Characters.</p>
           <div class="form-grid">
@@ -653,7 +716,11 @@
             <select id="worldScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
             <select id="worldCategory"></select>
             <input id="worldCustomCategory" placeholder="New custom category, optional" />
-            <label class="file-label inline-file">Upload Entry Image <input id="worldImage" type="file" accept="image/*" /></label>
+            <div class="upload-control">
+              <button type="button" class="file-label inline-file" onclick="triggerOverviewImageUpload('worldImage', event)">Upload Entry Image</button>
+              <input id="worldImage" type="file" accept="image/*" class="hidden" onchange="previewOverviewImage('worldImage','worldImagePreview')" />
+              <div id="worldImagePreview" class="upload-preview muted">No image selected.</div>
+            </div>
             <textarea id="worldBasicInfo" placeholder="Basic Information"></textarea>
             <textarea id="worldDescription" placeholder="Description"></textarea>
             <textarea id="worldHistory" placeholder="History"></textarea>
@@ -674,6 +741,10 @@
 
       <section id="worldDetail" class="view">
         <div id="worldDetailContent"></div>
+      </section>
+
+      <section id="worldCategoryView" class="view">
+        <div id="worldCategoryContent"></div>
       </section>
 
       <section id="seriesTools" class="view">
