@@ -451,7 +451,7 @@
           <h3>Chapter Planner</h3>
           <div class="form-grid">
             <input id="chapterNumber" placeholder="Chapter number / title" />
-            <input id="chapterPOV" placeholder="POV character" />
+            <select id="chapterPOV"><option value="">POV Character</option></select>
             <input id="chapterWordTarget" placeholder="Target word count" />
             <select id="chapterStructureBeat"></select>
             <textarea id="chapterGoal" placeholder="Scene/chapter goal"></textarea>
@@ -513,20 +513,28 @@
 
       <section id="plotBoard" class="view">
         <div class="form-panel">
-          <h3>Plot Board</h3>
+          <h3>Plot Board 2.0</h3>
+          <div class="form-grid">
+            <input id="plotArcName" placeholder="New arc name, e.g. Main Plot, Romance Arc" />
+            <input id="plotArcColor" type="color" value="#9d4edd" />
+            <textarea id="plotArcDescription" placeholder="Arc description"></textarea>
+          </div>
+          <button onclick="addPlotArc()">Add Arc</button>
+          <hr />
           <div class="form-grid">
             <input id="plotCardTitle" placeholder="Card title" />
+            <select id="plotCardArc"></select>
             <select id="plotCardStatus"><option>Ideas</option><option>Planned</option><option>Drafting</option><option>Finished</option></select>
             <textarea id="plotCardNotes" placeholder="Notes"></textarea>
           </div>
           <button onclick="addPlotCard()">Add Plot Card</button>
         </div>
-        <div id="plotBoardList" class="board-grid"></div>
+        <div id="plotBoardList" class="arc-board-grid"></div>
       </section>
 
       <section id="characters" class="view">
         <div class="form-panel">
-          <h3>Add Character</h3>
+          <h3>Add Character</h3><p class="muted">Long character fields support rich formatting after saving through the Character Wiki page.</p>
           <div class="form-grid">
             <input id="charName" placeholder="Character name" />
             <select id="charScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
@@ -905,6 +913,28 @@
           </div>
           <button onclick="saveAuthorSettings()">Save Settings</button>
         </div>
+      </section>
+
+
+      <section id="mediaLibrary" class="view">
+        <div class="form-panel">
+          <h3>Media Library</h3>
+          <p>Upload images once and reuse them for characters, locations, covers, banners, timeline events, and worldbuilding.</p>
+          <div class="form-grid">
+            <input id="mediaTitle" placeholder="Image title" />
+            <select id="mediaCategory">
+              <option>Character</option><option>Location</option><option>Cover</option><option>Banner</option><option>Timeline</option><option>Worldbuilding</option><option>Other</option>
+            </select>
+            <label class="file-label inline-file">Upload Image <input id="mediaUpload" type="file" accept="image/*" /></label>
+            <textarea id="mediaNotes" placeholder="Image notes"></textarea>
+          </div>
+          <button onclick="addMediaItem()">Save Image</button>
+        </div>
+        <div id="mediaLibraryList" class="card-grid"></div>
+      </section>
+
+      <section id="characterWiki" class="view">
+        <div id="characterWikiContent"></div>
       </section>
 
       <section id="stats" class="view">

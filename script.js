@@ -5,7 +5,7 @@ const defaultData = {
   activeSeriesId: null, activeBookId: null, activeChapterId: null, activeSceneId: null, selectedCharacterId: null,
   user: null, series: [], books: [], characters: [], relationships: [], timeline: [], chapterPlans: [], threads: [],
   scenes: [], world: [], locations: [], magicSystems: [], organizations: [], mysteries: [], foreshadowing: [], plotCards: [],
-  structureBeats: [], music: {}, theme: 'dark', pinnedNote: '', libraryView: 'all', lastOpened: null, authorSettings: {}, sprint: {}, goals: {}, writingSessions: [], research: [], maps: [], snapshots: [], music: {}, theme: 'dark', pinnedNote: '', libraryView: 'all', lastOpened: null, authorSettings: {}, sprint: {}, goals: {}, writingSessions: [], research: [], maps: [], snapshots: []
+  structureBeats: [], plotArcs: [], mediaLibrary: [], music: {}, theme: 'dark', pinnedNote: '', libraryView: 'all', lastOpened: null, authorSettings: {}, sprint: {}, goals: {}, writingSessions: [], research: [], maps: [], snapshots: [], music: {}, theme: 'dark', pinnedNote: '', libraryView: 'all', lastOpened: null, authorSettings: {}, sprint: {}, goals: {}, writingSessions: [], research: [], maps: [], snapshots: []
 };
 
 let supabaseClient = null;
@@ -1502,4 +1502,553 @@ function renderMusicEmbeds(){
   const html = embeds.map(e => `<article class="item-card"><h3>${e.name} Player</h3><iframe class="music-player" src="${escapeHTML(e.url)}" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></article>`).join("");
   const existing = document.getElementById("musicEmbeds");
   if(existing) existing.innerHTML = html || "<p>No embeddable playlist links yet.</p>";
+}
+
+
+/* PlotPals V16.1 Overview + Story System Refinement */
+
+const uiState = { chapters:{}, roles:{}, sections:{}, arcs:{} };
+
+function mediaIdToImage(id){
+  return (data.mediaLibrary || []).find(m => m.id === id)?.data || "";
+}
+function mediaOptions(selected=""){
+  const items = (data.mediaLibrary || []).filter(item => item.seriesId === data.activeSeriesId);
+  return `<option value="">No media / keep uploaded image</option>` + items.map(item => `<option value="${item.id}" ${item.id===selected?"selected":""}>${escapeHTML(item.title || item.category || "Image")}</option>`).join("");
+}
+function readImageFile(inputId){
+  return new Promise(resolve => {
+    const file = document.getElementById(inputId)?.files?.[0];
+    if(!file) return resolve("");
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+function addMediaItem(){
+  readImageFile("mediaUpload").then(dataUrl => {
+    if(!dataUrl) return alert("Choose an image first.");
+    data.mediaLibrary.push({
+      id: uid(),
+      seriesId: data.activeSeriesId,
+      bookId: data.activeBookId,
+      title: val("mediaTitle") || "Untitled Image",
+      category: val("mediaCategory") || "Other",
+      notes: val("mediaNotes"),
+      data: dataUrl,
+      created: new Date().toISOString()
+    });
+    clearFields(["mediaTitle","mediaNotes"]);
+    const input = document.getElementById("mediaUpload");
+    if(input) input.value = "";
+    saveData();
+  });
+}
+function renderMediaLibrary(){
+  const el = document.getElementById("mediaLibraryList");
+  if(!el) return;
+  const items = (data.mediaLibrary || []).filter(m => m.seriesId === data.activeSeriesId);
+  el.innerHTML = items.length ? items.map(item => `
+    <article class="item-card">
+      <div class="card-header"><h3>${escapeHTML(item.title)}</h3><button class="delete-btn" onclick="deleteItem('mediaLibrary','${item.id}')">Delete</button></div>
+      <img class="media-thumb" src="${item.data}" alt="${escapeHTML(item.title)}">
+      <div class="card-body">
+        <span class="tag">${escapeHTML(item.category)}</span>
+        ${detail("Notes", item.notes)}
+      </div>
+    </article>
+  `).join("") : "<p>No images in the media library yet.</p>";
+}
+
+function toggleSidebarGroup(key){
+  uiState.sections[key] = !uiState.sections[key];
+  renderNestedNav();
+}
+function toggleChapterNav(id, event){
+  if(event) event.stopPropagation();
+  uiState.chapters[id] = !uiState.chapters[id];
+  renderNestedNav();
+}
+function toggleRoleNav(role, event){
+  if(event) event.stopPropagation();
+  uiState.roles[role] = !uiState.roles[role];
+  renderNestedNav();
+}
+function toggleArcNav(id, event){
+  if(event) event.stopPropagation();
+  uiState.arcs[id] = !uiState.arcs[id];
+  renderNestedNav();
+}
+function isOpen(map, key){ return map[key] !== false; }
+function roleLabel(role){
+  const map = {Main:"Main Character", Side:"Side Character", "Love Interest":"Love Interest", Antagonist:"Antagonist", Mentor:"Mentor", Other:"Other"};
+  return map[role] || role || "Other";
+}
+
+/* Full V16.1 collapsible Overview sidebar */
+function renderNestedNav(){
+  const nav = document.getElementById("nestedNav");
+  if(!nav) return;
+  const book = activeBook();
+  const chapters = book?.manuscript || [];
+  const plans = data.chapterPlans.filter(visibleByScope);
+  const threads = data.threads.filter(visibleByScope);
+  const roles = ["Main","Side","Love Interest","Antagonist","Mentor","Other"];
+  const charsByRole = role => data.characters.filter(c => visibleByScope(c) && (c.role || "Other") === role);
+  const seriesOnly = isSeriesProject();
+  const arcs = (data.plotArcs || []).filter(visibleByScope);
+  const mediaCount = (data.mediaLibrary || []).filter(m => m.seriesId === data.activeSeriesId).length;
+
+  nav.innerHTML = `
+    <div class="nav-section">
+      <button class="nav-parent" onclick="setView('overview')"><span class="nav-label">Overview</span><span>⌂</span></button>
+    </div>
+
+    <div class="nav-section">
+      <button class="nav-parent" onclick="toggleSidebarGroup('manuscript')"><span class="nav-label">📘 Manuscript</span><span>${isOpen(uiState.sections,'manuscript')?'▾':'›'}</span></button>
+      <div class="nav-children ${isOpen(uiState.sections,'manuscript')?'':'hidden'}">
+        <button class="nav-child" onclick="setView('write')">Manuscript Editor</button>
+        ${chapters.map((c,i)=>`
+          <button class="nav-child chapter-nav-line" onclick="setView('write','${c.id}')">
+            <span onclick="toggleChapterNav('${c.id}', event)">${isOpen(uiState.chapters,c.id)?'▾':'›'}</span>
+            <span>${i+1}. ${escapeHTML(c.title || "Untitled Chapter")}</span>
+            <span class="nav-count">${(c.scenes||[]).length}</span>
+          </button>
+          <div class="${isOpen(uiState.chapters,c.id)?'':'hidden'}">
+            ${(c.scenes||[]).map((s,j)=>`
+              <button class="nav-grandchild" onclick="setView('write','${c.id}','${s.id}')">${j+1}. ${escapeHTML(s.title || "Scene")}</button>
+            `).join("")}
+          </div>
+        `).join("")}
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <button class="nav-parent" onclick="toggleSidebarGroup('plot')"><span class="nav-label">🧭 Plot</span><span>${isOpen(uiState.sections,'plot')?'▾':'›'}</span></button>
+      <div class="nav-children ${isOpen(uiState.sections,'plot')?'':'hidden'}">
+        <button class="nav-child" onclick="setView('storyBoard')">Story Structure</button>
+        <button class="nav-child" onclick="setView('chapters')"><span>Chapter Planner</span><span class="nav-count">${plans.length}</span></button>
+        ${plans.map(p=>`<button class="nav-grandchild" onclick="setView('chapters')">${escapeHTML(p.number || "Untitled Chapter Plan")}</button>`).join("")}
+        <button class="nav-child" onclick="setView('threads')"><span>Plot Threads</span><span class="nav-count">${threads.length}</span></button>
+        ${threads.map(t=>`<button class="nav-grandchild" onclick="setView('threads')">${escapeHTML(t.title || "Untitled Thread")}</button>`).join("")}
+        <button class="nav-child" onclick="setView('mysteries')">Mystery Tracker</button>
+        <button class="nav-child" onclick="setView('foreshadowing')">Foreshadowing</button>
+        <button class="nav-child" onclick="setView('plotBoard')"><span>Plot Board</span><span class="nav-count">${arcs.length}</span></button>
+        ${arcs.map(arc=>`
+          <button class="nav-grandchild" onclick="setView('plotBoard')">
+            <span onclick="toggleArcNav('${arc.id}', event)">${isOpen(uiState.arcs,arc.id)?'▾':'›'}</span>
+            ${escapeHTML(arc.name || "Untitled Arc")}
+          </button>
+          <div class="${isOpen(uiState.arcs,arc.id)?'':'hidden'}">
+            ${data.plotCards.filter(visibleByScope).filter(card => card.arcId === arc.id).map(card => `<button class="nav-grandchild nav-deep" onclick="setView('plotBoard')">${escapeHTML(card.title || "Card")}</button>`).join("")}
+          </div>
+        `).join("")}
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <button class="nav-parent" onclick="toggleSidebarGroup('characters')"><span class="nav-label">👥 Characters</span><span>${isOpen(uiState.sections,'characters')?'▾':'›'}</span></button>
+      <div class="nav-children ${isOpen(uiState.sections,'characters')?'':'hidden'}">
+        <button class="nav-child" onclick="setView('characters')">All Characters</button>
+        ${roles.map(role=>`
+          <button class="nav-child role-nav-line" onclick="setView('characters')">
+            <span onclick="toggleRoleNav('${role}', event)">${isOpen(uiState.roles,role)?'▾':'›'}</span>
+            <span>${roleLabel(role)}</span>
+            <span class="nav-count">${charsByRole(role).length}</span>
+          </button>
+          <div class="${isOpen(uiState.roles,role)?'':'hidden'}">
+            ${charsByRole(role).map(c=>`
+              <button class="nav-grandchild character-nav-item" onclick="setView('characterWiki','${c.id}')">
+                ${c.photo || mediaIdToImage(c.mediaId) ? `<img src="${c.photo || mediaIdToImage(c.mediaId)}" alt="">` : ""}
+                <span>${escapeHTML(c.name || "Unnamed")}</span>
+              </button>
+            `).join("")}
+          </div>
+        `).join("")}
+        <button class="nav-child" onclick="setView('relationships')">Relationships</button>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <button class="nav-parent" onclick="toggleSidebarGroup('world')"><span class="nav-label">🌍 Worldbuilding</span><span>${isOpen(uiState.sections,'world')?'▾':'›'}</span></button>
+      <div class="nav-children ${isOpen(uiState.sections,'world')?'':'hidden'}">
+        <button class="nav-child" onclick="setView('locations')">Locations</button>
+        <button class="nav-child" onclick="setView('magic')">Magic System</button>
+        <button class="nav-child" onclick="setView('organizations')">Organizations</button>
+        <button class="nav-child" onclick="setView('world')">Cultures / Species / Artifacts</button>
+        <button class="nav-child" onclick="setView('scenes')">Scene Database</button>
+        <button class="nav-child" onclick="setView('timeline')">Timeline</button>
+        <button class="nav-child" onclick="setView('mediaLibrary')"><span>Media Library</span><span class="nav-count">${mediaCount}</span></button>
+      </div>
+    </div>
+
+    ${seriesOnly?`<div class="nav-section"><button class="nav-parent" onclick="setView('seriesTools')"><span class="nav-label">Series Tools</span><span>★</span></button></div>`:""}
+
+    <div class="nav-section">
+      <button class="nav-parent" onclick="toggleSidebarGroup('storyNotes')"><span class="nav-label">📝 Story Notes</span><span>${isOpen(uiState.sections,'storyNotes')?'▾':'›'}</span></button>
+      <div class="nav-children ${isOpen(uiState.sections,'storyNotes')?'':'hidden'}">
+        <button class="nav-child" onclick="setView('music')">Project Playlist</button>
+        <button class="nav-child" onclick="setView('stats')">Writing Analytics</button>
+        <button class="nav-child" onclick="setView('exports')">Export</button>
+        <button class="nav-child" onclick="setView('backup')">Backup</button>
+      </div>
+    </div>
+  `;
+}
+
+/* Better setView so character wiki has individual pages */
+function setView(view,id=null,extra=null){
+  saveCurrentScene(false,false);
+  if(view==="write"){
+    if(id) data.activeChapterId=id;
+    if(extra) data.activeSceneId=extra;
+    if(!data.activeSceneId) data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null;
+  }
+  if((view==="characterDetail" || view==="characterWiki") && id) data.selectedCharacterId=id;
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  const target = document.getElementById(view);
+  if(target) target.classList.add("active");
+  const titles={overview:"Overview",write:"Scene-Based Writing",storyBoard:"Story Structure Board",chapters:"Chapter Planner",threads:"Plot Threads",mysteries:"Mystery Tracker",foreshadowing:"Foreshadowing Tracker",plotBoard:"Plot Board",characters:"Characters",characterDetail:"Character Detail",characterWiki:"Character Dashboard",relationships:"Relationship System",locations:"Locations",magic:"Magic System",organizations:"Organizations",scenes:"Scene Database",timeline:"Timeline",world:"Worldbuilding Notes",seriesTools:"Series-Level Tools",music:"Project Playlist",mediaLibrary:"Media Library",stats:"Writing Analytics",exports:"Export",backup:"Backup"};
+  setText("viewTitle",titles[view]||"Workspace");
+  renderAll();
+}
+
+/* Chapter planner POV dropdown */
+function renderSelects(){
+  const chars=data.characters.filter(visibleByScope);
+  const charOptions=`<option value="">Select character</option>`+chars.map(c=>`<option value="${c.id}">${escapeHTML(c.name)}</option>`).join("");
+  ["scenePOV","relA","relB","chapterPOV"].forEach(id=>setHTML(id,charOptions));
+  const locs=data.locations.filter(visibleByScope);
+  setHTML("sceneLocation",`<option value="">Select location</option>`+locs.map(l=>`<option value="${l.id}">${escapeHTML(l.name)}</option>`).join(""));
+  const beats=data.structureBeats.filter(visibleByScope);
+  setHTML("chapterStructureBeat",`<option value="">Structure beat</option>`+beats.map(b=>`<option value="${b.id}">${escapeHTML(b.name)}</option>`).join(""));
+  const arcs = (data.plotArcs || []).filter(visibleByScope);
+  setHTML("plotCardArc", `<option value="">Choose Arc</option>` + arcs.map(a=>`<option value="${a.id}">${escapeHTML(a.name)}</option>`).join(""));
+}
+
+/* Chapter planner now stores POV id */
+function addChapterPlan(){
+  data.chapterPlans.push({id:uid(),...scopedItem("book"),number:val("chapterNumber"),pov:val("chapterPOV"),wordTarget:val("chapterWordTarget"),structureBeat:val("chapterStructureBeat"),goal:val("chapterGoal"),conflict:val("chapterConflict"),outcome:val("chapterOutcome"),emotion:val("chapterEmotion"),foreshadowing:val("chapterForeshadowing"),created:new Date().toISOString()});
+  clearFields(["chapterNumber","chapterPOV","chapterWordTarget","chapterGoal","chapterConflict","chapterOutcome","chapterEmotion","chapterForeshadowing"]);
+  saveData();
+}
+
+/* Plot Board 2.0 */
+function addPlotArc(){
+  const name = val("plotArcName") || "Untitled Arc";
+  data.plotArcs.push({id:uid(),...scopedItem("book"),name,color:val("plotArcColor")||"#9d4edd",description:val("plotArcDescription"),order:data.plotArcs.filter(visibleByScope).length,created:new Date().toISOString()});
+  clearFields(["plotArcName","plotArcDescription"]);
+  saveData();
+}
+function addPlotCard(){
+  const arcId = val("plotCardArc");
+  if(!arcId) return alert("Create or choose a plot arc first.");
+  data.plotCards.push({id:uid(),...scopedItem("book"),arcId,title:val("plotCardTitle"),status:val("plotCardStatus"),notes:val("plotCardNotes"),order:data.plotCards.filter(c=>c.arcId===arcId).length,created:new Date().toISOString()});
+  clearFields(["plotCardTitle","plotCardNotes"]);
+  saveData();
+}
+function movePlotCard(cardId, direction){
+  const cards = data.plotCards.filter(visibleByScope);
+  const card = cards.find(c=>c.id===cardId);
+  if(!card) return;
+  const sameArc = data.plotCards.filter(c=>c.arcId===card.arcId).sort((a,b)=>(a.order||0)-(b.order||0));
+  const idx = sameArc.findIndex(c=>c.id===cardId);
+  const next = sameArc[idx+direction];
+  if(!next) return;
+  const temp = card.order||0;
+  card.order = next.order||0;
+  next.order = temp;
+  saveData();
+}
+function moveCardToArc(cardId, arcId){
+  const card = data.plotCards.find(c=>c.id===cardId);
+  if(!card) return;
+  card.arcId = arcId;
+  card.order = data.plotCards.filter(c=>c.arcId===arcId).length;
+  saveData();
+}
+function renderPlotBoard(){
+  const el=document.getElementById("plotBoardList");
+  if(!el)return;
+  const arcs=(data.plotArcs||[]).filter(visibleByScope).sort((a,b)=>(a.order||0)-(b.order||0));
+  const cards=data.plotCards.filter(visibleByScope);
+  el.innerHTML=arcs.length?arcs.map(arc=>`
+    <div class="arc-column" style="--arc-color:${escapeHTML(arc.color||"#9d4edd")}">
+      <div class="arc-header">
+        <h3>${escapeHTML(arc.name)}</h3>
+        <button class="delete-btn" onclick="deleteItem('plotArcs','${arc.id}')">Delete Arc</button>
+      </div>
+      <p>${escapeHTML(arc.description||"")}</p>
+      <div class="arc-drop-zone" ondragover="event.preventDefault()" ondrop="moveCardToArc(event.dataTransfer.getData('text/plain'),'${arc.id}')">
+        ${cards.filter(c=>c.arcId===arc.id).sort((a,b)=>(a.order||0)-(b.order||0)).map(card=>`
+          <div class="board-card draggable-card" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${card.id}')">
+            <strong>${escapeHTML(card.title)}</strong>
+            <span class="tag">${escapeHTML(card.status||"")}</span>
+            <p>${escapeHTML(card.notes||"")}</p>
+            <div class="mini-actions">
+              <button onclick="movePlotCard('${card.id}',-1)">↑</button>
+              <button onclick="movePlotCard('${card.id}',1)">↓</button>
+              <button class="delete-btn" onclick="deleteItem('plotCards','${card.id}')">Delete</button>
+            </div>
+          </div>
+        `).join("") || "<p class='muted'>Drop cards here.</p>"}
+      </div>
+    </div>
+  `).join(""):`<p class="muted">Create your first plot arc to begin.</p>`;
+}
+
+/* Rich text mini editors for character wiki */
+function richToolbar(targetId){
+  return `<div class="mini-rich-toolbar">
+    <button onclick="miniFormat('${targetId}','bold')"><b>B</b></button>
+    <button onclick="miniFormat('${targetId}','italic')"><i>I</i></button>
+    <button onclick="miniFormat('${targetId}','underline')"><u>U</u></button>
+    <button onclick="miniFormat('${targetId}','insertUnorderedList')">• List</button>
+    <button onclick="miniFormat('${targetId}','insertOrderedList')">1. List</button>
+  </div>`;
+}
+function miniFormat(targetId, command){
+  const el = document.getElementById(targetId);
+  if(!el) return;
+  el.focus();
+  document.execCommand(command,false,null);
+}
+function richField(id, label, value=""){
+  return `<label>${escapeHTML(label)}</label>${richToolbar(id)}<div id="${id}" class="mini-rich-editor" contenteditable="true">${value||""}</div>`;
+}
+function saveCharacterWiki(){
+  const c = data.characters.find(x=>x.id===data.selectedCharacterId);
+  if(!c) return;
+  ["bio","description","personality","wound","arc","voice","secrets","quotes","notes","appearance","psychology"].forEach(field=>{
+    const el=document.getElementById("wiki_"+field);
+    if(el) c[field]=el.innerHTML;
+  });
+  c.mediaId = val("characterWikiMedia");
+  const img = mediaIdToImage(c.mediaId);
+  if(img) c.photo = img;
+  saveData();
+}
+function renderCharacterWiki(){
+  const el=document.getElementById("characterWikiContent");
+  if(!el) return;
+  const c=data.characters.find(x=>x.id===data.selectedCharacterId);
+  if(!c){el.innerHTML=`<div class="panel"><p>Select a character from the sidebar.</p></div>`;return;}
+  const rels=characterRelationships(c.id);
+  const apps=characterAppearances(c.id);
+  el.innerHTML=`
+    <div class="character-wiki-layout">
+      <aside class="panel wiki-profile-card">
+        ${c.photo || mediaIdToImage(c.mediaId) ? `<img class="character-photo" src="${c.photo || mediaIdToImage(c.mediaId)}">` : `<div class="empty-photo">No Photo</div>`}
+        <h3>${escapeHTML(c.name)}</h3>
+        <span class="tag">${escapeHTML(roleLabel(c.role))}</span>
+        <span class="tag">${escapeHTML(c.species||"")}</span>
+        <label>Use Media Library Image</label>
+        <select id="characterWikiMedia">${mediaOptions(c.mediaId||"")}</select>
+        <button onclick="saveCharacterWiki()">Save Character Page</button>
+      </aside>
+      <div class="panel">
+        <div class="wiki-tabs">
+          <button onclick="showWikiTab('overview')">Overview</button>
+          <button onclick="showWikiTab('bio')">Biography</button>
+          <button onclick="showWikiTab('appearance')">Appearance</button>
+          <button onclick="showWikiTab('psychology')">Psychology</button>
+          <button onclick="showWikiTab('relationshipsTab')">Relationships</button>
+          <button onclick="showWikiTab('timelineTab')">Timeline</button>
+          <button onclick="showWikiTab('arcTab')">Arc</button>
+          <button onclick="showWikiTab('notesTab')">Notes</button>
+        </div>
+        <div id="wiki_overview" class="wiki-tab active">${richField("wiki_description","Overview / Description",c.description||"")}${richField("wiki_personality","Personality",c.personality||"")}${richField("wiki_voice","Voice / Speech",c.voice||"")}</div>
+        <div id="wiki_bio" class="wiki-tab">${richField("wiki_bio","Biography",c.bio||"")}</div>
+        <div id="wiki_appearance" class="wiki-tab">${richField("wiki_appearance","Appearance",c.appearance||c.description||"")}</div>
+        <div id="wiki_psychology" class="wiki-tab">${richField("wiki_psychology","Psychology",c.psychology||c.wound||"")}${richField("wiki_wound","Core Wound / Fear / Desire",c.wound||"")}</div>
+        <div id="wiki_relationshipsTab" class="wiki-tab"><h3>Relationships</h3>${rels.length?rels.map(r=>`<p><strong>${escapeHTML(characterName(r.a))} + ${escapeHTML(characterName(r.b))}</strong><br>${escapeHTML(r.type||"")} — ${escapeHTML(r.status||"")}</p>`).join(""):"<p>No relationships yet.</p>"}</div>
+        <div id="wiki_timelineTab" class="wiki-tab"><h3>Scenes Appeared In</h3>${apps.length?apps.map(a=>`<p>${escapeHTML(a)}</p>`).join(""):"<p>No appearances detected yet.</p>"}</div>
+        <div id="wiki_arcTab" class="wiki-tab">${richField("wiki_arc","Character Arc",c.arc||"")}</div>
+        <div id="wiki_notesTab" class="wiki-tab">${richField("wiki_notes","Notes",c.notes||"")}${richField("wiki_secrets","Secrets",c.secrets||"")}${richField("wiki_quotes","Quotes",c.quotes||"")}</div>
+        <button onclick="saveCharacterWiki()">Save Character Page</button>
+      </div>
+    </div>
+  `;
+}
+function showWikiTab(name){
+  document.querySelectorAll(".wiki-tab").forEach(tab=>tab.classList.remove("active"));
+  const el = document.getElementById("wiki_"+name);
+  if(el) el.classList.add("active");
+}
+
+/* Character dashboard opens own pages */
+function renderCharacterDetail(){ renderCharacterWiki(); }
+
+/* Images are saved to records and reusable media library */
+function addCharacter(){
+  const file=document.getElementById("charPhoto").files[0];
+  const finish=photo=>{
+    const character = {id:uid(),...scopedItem(val("charScope")),name:val("charName"),role:val("charRole"),species:val("charSpecies"),photo,description:val("charDescription"),personality:val("charPersonality"),wound:val("charWound"),arc:val("charArc"),voice:val("charVoice"),bio:val("charBio"),secrets:val("charSecrets"),quotes:val("charQuotes"),created:new Date().toISOString()};
+    data.characters.push(character);
+    if(photo){
+      const media={id:uid(),seriesId:data.activeSeriesId,bookId:data.activeBookId,title:`${character.name} Portrait`,category:"Character",notes:"Saved from character upload.",data:photo,created:new Date().toISOString()};
+      data.mediaLibrary.push(media);
+      character.mediaId=media.id;
+    }
+    clearFields(["charName","charSpecies","charDescription","charPersonality","charWound","charArc","charVoice","charBio","charSecrets","charQuotes"]);
+    document.getElementById("charPhoto").value="";
+    saveData();
+  };
+  if(!file)return finish("");
+  const reader=new FileReader();
+  reader.onload=()=>finish(reader.result);
+  reader.readAsDataURL(file);
+}
+function addLocation(){
+  const file=document.getElementById("locationImage").files[0];
+  const finish=image=>{
+    const loc={id:uid(),...scopedItem(val("locationScope")),name:val("locationName"),population:val("locationPopulation"),culture:val("locationCulture"),image,description:val("locationDescription"),history:val("locationHistory"),notes:val("locationNotes"),created:new Date().toISOString()};
+    data.locations.push(loc);
+    if(image){
+      const media={id:uid(),seriesId:data.activeSeriesId,bookId:data.activeBookId,title:`${loc.name} Image`,category:"Location",notes:"Saved from location upload.",data:image,created:new Date().toISOString()};
+      data.mediaLibrary.push(media);
+      loc.mediaId=media.id;
+    }
+    clearFields(["locationName","locationPopulation","locationCulture","locationDescription","locationHistory","locationNotes"]);
+    document.getElementById("locationImage").value="";
+    saveData();
+  };
+  if(!file)return finish("");
+  const reader=new FileReader();
+  reader.onload=()=>finish(reader.result);
+  reader.readAsDataURL(file);
+}
+
+/* Render chapter planner with readable POV name */
+function renderAllLists(){
+  renderStoryBoard(); renderPlotBoard(); renderCharactersByRole(); renderCharacterWiki(); renderRelationships(); renderSeriesTools(); renderWritingStats(); renderMediaLibrary();
+  renderCardList("chapterPlans","chapterPlanList","number",item=>`<span class="tag">Book</span>${detail("POV",characterName(item.pov))}${detail("Structure Beat",data.structureBeats.find(b=>b.id===item.structureBeat)?.name||"")}${detail("Target Words",item.wordTarget)}${detail("Goal",item.goal)}${detail("Conflict",item.conflict)}${detail("Outcome",item.outcome)}${detail("Emotional Beat",item.emotion)}${detail("Foreshadowing",item.foreshadowing)}`);
+  renderCardList("threads","threadList","title",item=>`<span class="tag">${escapeHTML(item.scope)}</span><span class="tag">${escapeHTML(item.status)}</span>${detail("Setup",item.setup)}${detail("Payoff",item.payoff)}`);
+  renderCardList("mysteries","mysteryList","question",item=>`<span class="tag">${escapeHTML(item.status)}</span>${detail("Introduced",item.introduced)}${detail("Hints / False Leads",item.hints)}${detail("Answer",item.answer)}${detail("Payoff",item.payoff)}`,seriesScope);
+  renderCardList("foreshadowing","foreshadowingList","hint",item=>`<span class="tag">${escapeHTML(item.status)}</span>${detail("Appears",item.appears)}${detail("Payoff",item.payoff)}${detail("Notes",item.notes)}`,seriesScope);
+  renderCardList("world","worldList","name",item=>`<span class="tag">${escapeHTML(item.category)}</span>${detail("Description",item.description)}${detail("Rules / Notes",item.rules)}`);
+  renderCardList("locations","locationList","name",item=>`${item.image?`<img class="location-photo" src="${item.image}">`:""}${detail("Population",item.population)}${detail("Culture",item.culture)}${detail("Description",item.description)}${detail("History",item.history)}${detail("Notes",item.notes)}`);
+  renderCardList("magicSystems","magicList","name",item=>`${detail("Source",item.source)}${detail("Rules",item.rules)}${detail("Limitations",item.limits)}${detail("Costs",item.costs)}${detail("Examples / Users",item.examples)}`,seriesScope);
+  renderCardList("organizations","organizationList","name",item=>`${detail("Type",item.type)}${detail("Description",item.description)}${detail("Members",item.members)}${detail("History",item.history)}`,seriesScope);
+  renderSceneDatabase(); renderTimeline();
+}
+
+
+/* PlotPals V16.3 HTML Sidebar Hierarchy Fix */
+function toggleHtmlSidebarSection(id){
+  const section = document.getElementById(id);
+  if(!section) return;
+  section.classList.toggle("open");
+  const btn = section.querySelector("button");
+  if(btn){
+    btn.innerHTML = btn.innerHTML.replace(section.classList.contains("open") ? "▶" : "▼", section.classList.contains("open") ? "▼" : "▶");
+  }
+}
+function htmlSidebarRoleLabel(role){
+  const labels = {
+    Main: "Main Character",
+    Side: "Side Character",
+    "Love Interest": "Love Interest",
+    Antagonist: "Antagonist",
+    Mentor: "Mentor",
+    Other: "Other"
+  };
+  return labels[role] || role || "Other";
+}
+function htmlSidebarMediaImage(id){
+  return (data.mediaLibrary || []).find(m => m.id === id)?.data || "";
+}
+function renderNestedNav(){
+  renderHtmlSidebarHierarchy();
+}
+function renderHtmlSidebarHierarchy(){
+  const book = activeBook();
+  const chapters = book?.manuscript || [];
+  const manuscriptTree = document.getElementById("htmlManuscriptTree");
+  const chapterCount = document.getElementById("sidebarChapterCount");
+  if(chapterCount) chapterCount.textContent = chapters.length;
+
+  if(manuscriptTree){
+    manuscriptTree.innerHTML = chapters.length ? chapters.map((chapter, chapterIndex) => `
+      <div class="html-nav-subsection open" id="htmlChapter_${chapter.id}">
+        <button class="html-nav-parent" onclick="toggleHtmlSidebarSection('htmlChapter_${chapter.id}')">
+          ▼ Chapter ${chapterIndex + 1}: ${escapeHTML(chapter.title || "Untitled")}
+          <span class="nav-count">${(chapter.scenes || []).length}</span>
+        </button>
+        <div class="html-nav-children">
+          ${(chapter.scenes || []).map((scene, sceneIndex) => `
+            <button class="html-nav-scene" onclick="setView('write','${chapter.id}','${scene.id}')">
+              Scene ${sceneIndex + 1}: ${escapeHTML(scene.title || "Untitled Scene")}
+            </button>
+          `).join("") || `<button class="html-nav-scene" onclick="setView('write','${chapter.id}')">No scenes yet</button>`}
+        </div>
+      </div>
+    `).join("") : `<p class="muted sidebar-empty">No chapters yet.</p>`;
+  }
+
+  const plans = (data.chapterPlans || []).filter(visibleByScope);
+  const plannerTree = document.getElementById("htmlChapterPlannerTree");
+  if(plannerTree){
+    plannerTree.innerHTML = plans.length ? plans.map(plan => `
+      <button class="html-nav-scene" onclick="setView('chapters')">${escapeHTML(plan.number || "Untitled Chapter Plan")}</button>
+    `).join("") : `<p class="muted sidebar-empty">No chapter plans yet.</p>`;
+  }
+
+  const threads = (data.threads || []).filter(visibleByScope);
+  const threadTree = document.getElementById("htmlPlotThreadsTree");
+  if(threadTree){
+    threadTree.innerHTML = threads.length ? threads.map(thread => `
+      <button class="html-nav-scene" onclick="setView('threads')">${escapeHTML(thread.title || "Untitled Thread")}</button>
+    `).join("") : `<p class="muted sidebar-empty">No plot threads yet.</p>`;
+  }
+
+  const arcs = (data.plotArcs || []).filter(visibleByScope);
+  const cards = (data.plotCards || []).filter(visibleByScope);
+  const plotBoardTree = document.getElementById("htmlPlotBoardTree");
+  if(plotBoardTree){
+    plotBoardTree.innerHTML = arcs.length ? arcs.map(arc => `
+      <div class="html-nav-subsection open" id="htmlArc_${arc.id}">
+        <button class="html-nav-parent" onclick="toggleHtmlSidebarSection('htmlArc_${arc.id}')">
+          ▼ ${escapeHTML(arc.name || "Untitled Arc")}
+          <span class="nav-count">${cards.filter(card => card.arcId === arc.id).length}</span>
+        </button>
+        <div class="html-nav-children">
+          ${cards.filter(card => card.arcId === arc.id).map(card => `
+            <button class="html-nav-scene html-nav-deep" onclick="setView('plotBoard')">${escapeHTML(card.title || "Untitled Card")}</button>
+          `).join("") || `<button class="html-nav-scene html-nav-deep" onclick="setView('plotBoard')">No cards yet</button>`}
+        </div>
+      </div>
+    `).join("") : `<p class="muted sidebar-empty">No plot arcs yet.</p>`;
+  }
+
+  const roles = ["Main","Side","Love Interest","Antagonist","Mentor","Other"];
+  const characters = (data.characters || []).filter(visibleByScope);
+  const characterTree = document.getElementById("htmlCharacterTree");
+  const characterCount = document.getElementById("sidebarCharacterCount");
+  if(characterCount) characterCount.textContent = characters.length;
+
+  if(characterTree){
+    characterTree.innerHTML = roles.map(role => {
+      const roleChars = characters.filter(c => (c.role || "Other") === role);
+      return `
+        <div class="html-nav-subsection open" id="htmlRole_${role.replaceAll(" ","_")}">
+          <button class="html-nav-parent" onclick="toggleHtmlSidebarSection('htmlRole_${role.replaceAll(" ","_")}')">
+            ▼ ${htmlSidebarRoleLabel(role)}
+            <span class="nav-count">${roleChars.length}</span>
+          </button>
+          <div class="html-nav-children">
+            ${roleChars.length ? roleChars.map(character => {
+              const img = character.photo || htmlSidebarMediaImage(character.mediaId);
+              return `
+                <button class="html-nav-character" onclick="setView('characterWiki','${character.id}')">
+                  ${img ? `<img src="${img}" alt="">` : `<span class="character-dot"></span>`}
+                  <span>${escapeHTML(character.name || "Unnamed Character")}</span>
+                </button>
+              `;
+            }).join("") : `<button class="html-nav-scene" onclick="setView('characters')">No ${htmlSidebarRoleLabel(role)} characters yet</button>`}
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
 }
