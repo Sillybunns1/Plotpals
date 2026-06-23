@@ -456,3 +456,56 @@ body.light-mode .workspace-sidebar .nav-child:hover,
 body.light-mode .workspace-sidebar .nav-grandchild:hover {
   background: rgba(139,61,125,.1);
 }
+
+
+/* PlotPals V14 collapsible workspace menus */
+.menu-section {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+}
+.menu-heading {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: .78rem;
+  color: #c68cff;
+  background: transparent;
+  border-color: transparent;
+  padding: 10px 8px;
+}
+.menu-heading:hover {
+  background: linear-gradient(90deg, rgba(103,43,173,.45), rgba(61,28,98,.16));
+  border-color: rgba(166,97,255,.25);
+}
+.menu-section .menu-content {
+  display: none;
+  padding-top: 4px;
+}
+.menu-section.open .menu-content {
+  display: block;
+}
+.workspace-sidebar .story-nav,
+.workspace-sidebar .nav-parent,
+.workspace-sidebar .nav-child,
+.workspace-sidebar .nav-grandchild {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.workspace-sidebar .nav-child {
+  padding-left: 24px;
+}
+.workspace-sidebar .nav-grandchild {
+  padding-left: 44px;
+  opacity: .92;
+}
+.app-shell.collapsed .menu-heading span:first-child,
+.app-shell.collapsed .menu-section .menu-content {
+  display: none;
+}
+.app-shell.collapsed .menu-heading {
+  justify-content: center;
+}

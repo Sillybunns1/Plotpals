@@ -14,6 +14,31 @@ let cloudSaveTimer = null;
 let authMode = "login";
 let isRendering = false;
 
+const menuState = {
+  library: true,
+  manuscript: true,
+  plot: true,
+  characters: true,
+  worldbuilding: true,
+  series: true,
+  storynotes: true,
+  cloud: false
+};
+
+function toggleMenuSection(section){
+  menuState[section] = !menuState[section];
+  renderNestedNav();
+}
+
+function sectionClass(section){
+  return menuState[section] ? "menu-section open" : "menu-section";
+}
+
+function sectionArrow(section){
+  return menuState[section] ? "▾" : "›";
+}
+
+
 function initSupabase() {
   if (!window.supabase) { setLoginMessage("Supabase could not load. Check your internet connection."); return; }
   supabaseClient = window.supabase.createClient(window.WRITERS_VAULT_SUPABASE_URL, window.WRITERS_VAULT_SUPABASE_KEY);
@@ -270,67 +295,190 @@ function renderNestedNav(){
   const chapters=book?.manuscript||[];
   const plans=data.chapterPlans.filter(visibleByScope);
   const threads=data.threads.filter(visibleByScope);
+  const mysteries=(data.mysteries||[]).filter(seriesScope);
+  const foreshadowing=(data.foreshadowing||[]).filter(seriesScope);
+  const plotCards=(data.plotCards||[]).filter(visibleByScope);
+  const locations=(data.locations||[]).filter(visibleByScope);
+  const orgs=(data.organizations||[]).filter(seriesScope);
+  const magic=(data.magicSystems||[]).filter(seriesScope);
+  const worldNotes=(data.world||[]).filter(visibleByScope);
+  const timeline=(data.timeline||[]).filter(visibleByScope);
+  const rels=(data.relationships||[]).filter(visibleByScope);
   const roles=["Main","Side","Love Interest","Antagonist","Mentor","Other"];
   const charsByRole=role=>data.characters.filter(c=>visibleByScope(c)&&(c.role||"Other")===role);
   const seriesOnly=isSeriesProject();
 
   nav.innerHTML=`
-    <div class="story-nav-group">
-      <h4>Manuscript</h4>
-      <button class="story-nav nav-parent" onclick="setView('write')"><span class="nav-label">📘 Manuscript Editor</span><span class="nav-count">${chapters.length}</span></button>
-      <div class="nav-children">
+    <div class="${sectionClass('library')}">
+      <button class="menu-heading" onclick="toggleMenuSection('library')">
+        <span>Library</span><span>${sectionArrow('library')}</span>
+      </button>
+      <div class="menu-content">
+        <button class="story-nav" onclick="backToProjects()">📖 My Stories</button>
+        <button class="story-nav" onclick="setView('overview')">🏠 Project Overview</button>
+        <button class="story-nav" onclick="setView('stats')">📈 Writing Stats</button>
+        <button class="story-nav" onclick="setView('music')">♫ Project Playlist</button>
+      </div>
+    </div>
+
+    <div class="${sectionClass('manuscript')}">
+      <button class="menu-heading" onclick="toggleMenuSection('manuscript')">
+        <span>Manuscript</span><span>${sectionArrow('manuscript')}</span>
+      </button>
+      <div class="menu-content">
+        <button class="story-nav nav-parent" onclick="setView('write')">
+          <span>📘 Manuscript Editor</span><span class="nav-count">${chapters.length}</span>
+        </button>
         ${chapters.map((c,i)=>`
-          <button class="story-nav nav-child" onclick="setView('write','${c.id}')"><span>${i+1}. ${escapeHTML(c.title||"Untitled")}</span><span class="nav-count">${(c.scenes||[]).length}</span></button>
-          ${(c.scenes||[]).map((s,j)=>`<button class="story-nav nav-grandchild" onclick="setView('write','${c.id}','${s.id}')">${j+1}. ${escapeHTML(s.title||"Scene")}</button>`).join("")}
+          <button class="story-nav nav-child" onclick="setView('write','${c.id}')">
+            <span>${i+1}. ${escapeHTML(c.title||"Untitled")}</span><span class="nav-count">${(c.scenes||[]).length}</span>
+          </button>
+          ${(c.scenes||[]).map((s,j)=>`
+            <button class="story-nav nav-grandchild" onclick="setView('write','${c.id}','${s.id}')">
+              ${j+1}. ${escapeHTML(s.title||"Scene")}
+            </button>
+          `).join("")}
         `).join("")}
       </div>
     </div>
 
-    <div class="story-nav-group">
-      <h4>Plot</h4>
-      <button class="story-nav nav-parent" onclick="setView('storyBoard')">🧭 Story Structure</button>
-      <button class="story-nav nav-parent" onclick="setView('chapters')"><span>📄 Chapter Planner</span><span class="nav-count">${plans.length}</span></button>
-      <div class="nav-children">${plans.map(p=>`<button class="story-nav nav-grandchild" onclick="setView('chapters')">${escapeHTML(p.number||"Untitled")}</button>`).join("")}</div>
-      <button class="story-nav nav-parent" onclick="setView('threads')"><span>🧵 Plot Threads</span><span class="nav-count">${threads.length}</span></button>
-      <div class="nav-children">${threads.map(t=>`<button class="story-nav nav-grandchild" onclick="setView('threads')">${escapeHTML(t.title||"Untitled")}</button>`).join("")}</div>
-      <button class="story-nav nav-parent" onclick="setView('mysteries')">🔎 Mystery Tracker</button>
-      <button class="story-nav nav-parent" onclick="setView('foreshadowing')">🕯️ Foreshadowing</button>
-      <button class="story-nav nav-parent" onclick="setView('plotBoard')">🗂️ Plot Board</button>
+    <div class="${sectionClass('plot')}">
+      <button class="menu-heading" onclick="toggleMenuSection('plot')">
+        <span>Plot</span><span>${sectionArrow('plot')}</span>
+      </button>
+      <div class="menu-content">
+        <button class="story-nav nav-parent" onclick="setView('storyBoard')">🧭 Story Structure</button>
+
+        <button class="story-nav nav-parent" onclick="setView('chapters')">
+          <span>📄 Chapter Planner</span><span class="nav-count">${plans.length}</span>
+        </button>
+        ${plans.map(p=>`
+          <button class="story-nav nav-grandchild" onclick="setView('chapters')">${escapeHTML(p.number||"Untitled Chapter")}</button>
+        `).join("")}
+
+        <button class="story-nav nav-parent" onclick="setView('threads')">
+          <span>🧵 Plot Threads</span><span class="nav-count">${threads.length}</span>
+        </button>
+        ${threads.map(t=>`
+          <button class="story-nav nav-grandchild" onclick="setView('threads')">${escapeHTML(t.title||"Untitled Thread")}</button>
+        `).join("")}
+
+        <button class="story-nav nav-parent" onclick="setView('mysteries')">
+          <span>🔎 Mystery Tracker</span><span class="nav-count">${mysteries.length}</span>
+        </button>
+        ${mysteries.map(m=>`
+          <button class="story-nav nav-grandchild" onclick="setView('mysteries')">${escapeHTML(m.question||"Mystery")}</button>
+        `).join("")}
+
+        <button class="story-nav nav-parent" onclick="setView('foreshadowing')">
+          <span>🕯️ Foreshadowing</span><span class="nav-count">${foreshadowing.length}</span>
+        </button>
+        ${foreshadowing.map(f=>`
+          <button class="story-nav nav-grandchild" onclick="setView('foreshadowing')">${escapeHTML(f.hint||"Foreshadowing")}</button>
+        `).join("")}
+
+        <button class="story-nav nav-parent" onclick="setView('plotBoard')">
+          <span>🗂️ Plot Board</span><span class="nav-count">${plotCards.length}</span>
+        </button>
+      </div>
     </div>
 
-    <div class="story-nav-group">
-      <h4>Characters</h4>
-      <button class="story-nav nav-parent" onclick="setView('characters')"><span>👥 All Characters</span><span class="nav-count">${data.characters.filter(visibleByScope).length}</span></button>
-      <div class="nav-children">
+    <div class="${sectionClass('characters')}">
+      <button class="menu-heading" onclick="toggleMenuSection('characters')">
+        <span>Characters</span><span>${sectionArrow('characters')}</span>
+      </button>
+      <div class="menu-content">
+        <button class="story-nav nav-parent" onclick="setView('characters')">
+          <span>👥 All Characters</span><span class="nav-count">${data.characters.filter(visibleByScope).length}</span>
+        </button>
         ${roles.map(role=>`
-          <button class="story-nav nav-child" onclick="setView('characters')"><span>${role}</span><span class="nav-count">${charsByRole(role).length}</span></button>
-          ${charsByRole(role).map(c=>`<button class="story-nav nav-grandchild" onclick="setView('characterDetail','${c.id}')">${escapeHTML(c.name||"Unnamed")}</button>`).join("")}
+          <button class="story-nav nav-child" onclick="setView('characters')">
+            <span>${role}</span><span class="nav-count">${charsByRole(role).length}</span>
+          </button>
+          ${charsByRole(role).map(c=>`
+            <button class="story-nav nav-grandchild" onclick="setView('characterDetail','${c.id}')">${escapeHTML(c.name||"Unnamed")}</button>
+          `).join("")}
         `).join("")}
+        <button class="story-nav nav-parent" onclick="setView('relationships')">
+          <span>💞 Relationships</span><span class="nav-count">${rels.length}</span>
+        </button>
       </div>
-      <button class="story-nav nav-parent" onclick="setView('relationships')">💞 Relationships</button>
     </div>
 
-    <div class="story-nav-group">
-      <h4>World Building</h4>
-      <button class="story-nav nav-parent" onclick="setView('locations')">📍 Locations</button>
-      <button class="story-nav nav-parent" onclick="setView('organizations')">⚜️ Organizations</button>
-      <button class="story-nav nav-parent" onclick="setView('magic')">✨ Magic / Systems</button>
-      <button class="story-nav nav-parent" onclick="setView('world')">🏺 Items / Artifacts</button>
-      <button class="story-nav nav-parent" onclick="setView('scenes')">🎬 Scene Database</button>
-      <button class="story-nav nav-parent" onclick="setView('timeline')">⏳ Timeline</button>
+    <div class="${sectionClass('worldbuilding')}">
+      <button class="menu-heading" onclick="toggleMenuSection('worldbuilding')">
+        <span>World Building</span><span>${sectionArrow('worldbuilding')}</span>
+      </button>
+      <div class="menu-content">
+        <button class="story-nav nav-parent" onclick="setView('locations')">
+          <span>📍 Locations</span><span class="nav-count">${locations.length}</span>
+        </button>
+        ${locations.map(l=>`
+          <button class="story-nav nav-grandchild" onclick="setView('locations')">${escapeHTML(l.name||"Location")}</button>
+        `).join("")}
+
+        <button class="story-nav nav-parent" onclick="setView('organizations')">
+          <span>⚜️ Organizations</span><span class="nav-count">${orgs.length}</span>
+        </button>
+        ${orgs.map(o=>`
+          <button class="story-nav nav-grandchild" onclick="setView('organizations')">${escapeHTML(o.name||"Organization")}</button>
+        `).join("")}
+
+        <button class="story-nav nav-parent" onclick="setView('magic')">
+          <span>✨ Magic / Systems</span><span class="nav-count">${magic.length}</span>
+        </button>
+        ${magic.map(m=>`
+          <button class="story-nav nav-grandchild" onclick="setView('magic')">${escapeHTML(m.name||"Magic System")}</button>
+        `).join("")}
+
+        <button class="story-nav nav-parent" onclick="setView('world')">
+          <span>🏺 Items / Artifacts</span><span class="nav-count">${worldNotes.length}</span>
+        </button>
+        ${worldNotes.map(w=>`
+          <button class="story-nav nav-grandchild" onclick="setView('world')">${escapeHTML(w.name||"World Note")}</button>
+        `).join("")}
+
+        <button class="story-nav nav-parent" onclick="setView('scenes')">🎬 Scene Database</button>
+
+        <button class="story-nav nav-parent" onclick="setView('timeline')">
+          <span>⏳ Timeline</span><span class="nav-count">${timeline.length}</span>
+        </button>
+        ${timeline.map(t=>`
+          <button class="story-nav nav-grandchild" onclick="setView('timeline')">${escapeHTML(t.when||"Timeline Event")}</button>
+        `).join("")}
+      </div>
     </div>
 
     ${seriesOnly?`
-      <div class="story-nav-group">
-        <h4>Series</h4>
-        <button class="story-nav nav-parent" onclick="setView('seriesTools')">★ Series-Level Tools</button>
+      <div class="${sectionClass('series')}">
+        <button class="menu-heading" onclick="toggleMenuSection('series')">
+          <span>Series</span><span>${sectionArrow('series')}</span>
+        </button>
+        <div class="menu-content">
+          <button class="story-nav nav-parent" onclick="setView('seriesTools')">★ Series-Level Tools</button>
+        </div>
       </div>
     `:""}
 
-    <div class="story-nav-group">
-      <h4>Story Notes</h4>
-      <button class="story-nav nav-parent" onclick="setView('exports')">⇩ Export</button>
-      <button class="story-nav nav-parent" onclick="setView('backup')">☁ Backup</button>
+    <div class="${sectionClass('storynotes')}">
+      <button class="menu-heading" onclick="toggleMenuSection('storynotes')">
+        <span>Story Notes</span><span>${sectionArrow('storynotes')}</span>
+      </button>
+      <div class="menu-content">
+        <button class="story-nav nav-parent" onclick="setView('exports')">⇩ Export</button>
+        <button class="story-nav nav-parent" onclick="setView('backup')">☁ Backup</button>
+      </div>
+    </div>
+
+    <div class="${sectionClass('cloud')}">
+      <button class="menu-heading" onclick="toggleMenuSection('cloud')">
+        <span>Cloud</span><span>${sectionArrow('cloud')}</span>
+      </button>
+      <div class="menu-content">
+        <button class="story-nav" onclick="syncToCloud()">☁️ Sync Now</button>
+        <button class="story-nav" onclick="loadFromCloud()">⇩ Load Cloud</button>
+        <button class="story-nav" onclick="signOut()">🚪 Sign Out</button>
+      </div>
     </div>
   `;
 }
