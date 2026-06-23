@@ -51,10 +51,10 @@
 
         <div class="story-nav-group">
           <h4>Library</h4>
-          <button id="navMyStories" class="story-nav active" onclick="setLibraryView('all')">📖 My Stories</button>
-          <button id="navFavorites" class="story-nav" onclick="setLibraryView('favorites')">⭐ Favorites</button>
-          <button id="navRecent" class="story-nav" onclick="openRecentlyOpened()">🕘 Recently Opened</button>
-          <button id="navTrash" class="story-nav" onclick="setLibraryView('trash')">🗑️ Trash</button>
+          <button class="story-nav active" data-library="stories" onclick="setLibraryView('stories')">📖 My Stories</button>
+          <button class="story-nav" data-library="favorites" onclick="setLibraryView('favorites')">⭐ Favorites</button>
+          <button class="story-nav" data-library="recent" onclick="setLibraryView('recent')">🕘 Recently Opened</button>
+          <button class="story-nav" data-library="trash" onclick="setLibraryView('trash')">🗑️ Trash</button>
         </div>
 
         <div class="story-nav-group">
@@ -97,58 +97,32 @@
           <div class="project-grid compact">
             <div>
               <label>Project Type</label>
-              <select id="newProjectType" onchange="updateProjectCreateFields()">
+              <select id="newProjectType" onchange="projectTypeChanged()">
                 <option value="series">Series</option>
                 <option value="standalone">Standalone Book</option>
               </select>
-              <label id="projectTitleLabel">Series / Project Title</label>
-              <input id="newSeriesTitle" placeholder="Only needed for a series" />
-              <p id="standaloneHint" class="muted">For Standalone Book, the Book Title is enough.</p>
-              <label>Theme Color</label>
-              <input id="newProjectColor" type="color" value="#9d4edd" />
-              <label class="file-label inline-file">Cover Image <input id="newProjectCover" type="file" accept="image/*" /></label>
-              <label class="file-label inline-file">Banner Image <input id="newProjectBanner" type="file" accept="image/*" /></label>
+              <label id="seriesTitleLabel">Series / Project Title</label>
+              <input id="newSeriesTitle" placeholder="Series title" />
               <button onclick="createSeriesFromProject()">Create Project</button>
             </div>
             <div>
               <label>Book Title</label>
               <input id="newBookTitle" placeholder="Book title" />
-              <p class="muted">Required for standalone books.</p>
               <label>Add to Project</label>
               <select id="newBookSeriesSelect"></select>
               <button onclick="createBookFromProject()">Create Book</button>
               
             </div>
           </div>
-          <p id="createProjectMessage"></p>
-        </section>
-
-        <section class="dashboard-panel open-existing-panel">
-          <h3>Open Existing Story</h3>
-          <div class="project-grid compact">
-            <div>
-              <label>Project / Series</label>
-              <select id="projectSeriesSelect" onchange="projectSeriesChanged()"></select>
-            </div>
-            <div>
-              <label>Book</label>
-              <select id="projectBookSelect"></select>
-            </div>
-          </div>
-          <div class="backup-row">
-            <button class="glow" onclick="openWorkspace()">Open Overview</button>
-            
-          </div>
           <p id="projectMessage"></p>
         </section>
 
         <section class="dashboard-section">
           <div class="section-title">
-            <h2 id="libraryTitle">My Stories</h2>
+            <h2 id="dashboardLibraryTitle">My Stories</h2>
             <button onclick="showCreateProjectPanel()">View / Create →</button>
           </div>
           <div id="dashboardStoryCards" class="story-card-grid"></div>
-          <p id="trashActionsInfo" class="muted"></p>
         </section>
 
         <section class="dashboard-widgets">
@@ -219,85 +193,7 @@
 
       <button class="wide glow" onclick="backToProjects()">← Main Page</button>
 
-      <div id="nestedNav" class="nested-nav">
-
-        <div class="story-nav-group static-sidebar-fallback">
-          <h4>Library</h4>
-          <button class="story-nav" onclick="backToProjects()">📖 My Stories</button>
-          <button class="story-nav" onclick="setView('overview')">🏠 Project Overview</button>
-          <button class="story-nav" onclick="setView('stats')">📈 Writing Stats</button>
-          <button class="story-nav" onclick="setView('music')">♫ Project Playlist</button>
-        </div>
-
-        <div class="story-nav-group static-sidebar-fallback">
-          <h4>Manuscript</h4>
-          <button class="story-nav nav-parent" onclick="setView('write')">📘 Manuscript Editor</button>
-          <button class="story-nav nav-child" onclick="setView('write')">Chapters</button>
-          <button class="story-nav nav-child" onclick="setView('sceneCards')">Scene Cards</button>
-        </div>
-
-        <div class="story-nav-group static-sidebar-fallback">
-          <h4>Plot</h4>
-          <button class="story-nav nav-parent" onclick="setView('storyBoard')">🧭 Story Structure</button>
-          <button class="story-nav nav-parent" onclick="setView('chapters')">📄 Chapter Planner</button>
-          <button class="story-nav nav-parent" onclick="setView('threads')">🧵 Plot Threads</button>
-          <button class="story-nav nav-parent" onclick="setView('mysteries')">🔎 Mystery Tracker</button>
-          <button class="story-nav nav-parent" onclick="setView('foreshadowing')">🕯️ Foreshadowing</button>
-          <button class="story-nav nav-parent" onclick="setView('plotBoard')">🗂️ Plot Board</button>
-        </div>
-
-        <div class="story-nav-group static-sidebar-fallback">
-          <h4>Characters</h4>
-          <button class="story-nav nav-parent" onclick="setView('characters')">👥 All Characters</button>
-          <button class="story-nav nav-parent" onclick="setView('characterDashboard')">👤 Character Dashboard</button>
-          <button class="story-nav nav-parent" onclick="setView('relationships')">💞 Relationships</button>
-        </div>
-
-        <div class="story-nav-group static-sidebar-fallback">
-          <h4>World Building</h4>
-          <button class="story-nav nav-parent" onclick="setView('locations')">📍 Locations</button>
-          <button class="story-nav nav-parent" onclick="setView('organizations')">⚜️ Organizations</button>
-          <button class="story-nav nav-parent" onclick="setView('magic')">✨ Magic / Systems</button>
-          <button class="story-nav nav-parent" onclick="setView('world')">🏺 Items / Artifacts</button>
-          <button class="story-nav nav-parent" onclick="setView('scenes')">🎬 Scene Database</button>
-          <button class="story-nav nav-parent" onclick="setView('timeline')">⏳ Timeline</button>
-          <button class="story-nav nav-parent" onclick="setView('visualTimeline')">🧭 Visual Timeline</button>
-          <button class="story-nav nav-parent" onclick="setView('maps')">🗺️ Maps</button>
-        </div>
-
-        <div class="story-nav-group static-sidebar-fallback">
-          <h4>Series</h4>
-          <button class="story-nav nav-parent" onclick="setView('seriesTools')">★ Series-Level Tools</button>
-        </div>
-
-        <div class="story-nav-group static-sidebar-fallback">
-          <h4>Story Notes</h4>
-          <button class="story-nav nav-parent" onclick="setView('connections')">🕸️ Connected Story Web</button>
-          <button class="story-nav nav-parent" onclick="setView('relationshipVisualizer')">🧩 Relationship Visualizer</button>
-          <button class="story-nav nav-parent" onclick="setView('threadTracker')">🧵 Thread Tracker</button>
-          <button class="story-nav nav-parent" onclick="setView('arcTracker')">📈 Character Arc Tracker</button>
-          <button class="story-nav nav-parent" onclick="setView('locationLinks')">📍 Location Linking</button>
-          <button class="story-nav nav-parent" onclick="setView('smartSearch')">🔍 Smart Search</button>
-          <button class="story-nav nav-parent" onclick="setView('seriesContinuity')">🧭 Series Continuity</button>
-          <button class="story-nav nav-parent" onclick="setView('sprintMode')">⏱️ Sprint Mode</button>
-          <button class="story-nav nav-parent" onclick="setView('authorSettings')">⚙️ Author Settings</button>
-          <button class="story-nav nav-parent" onclick="setView('goals')">🎯 Writing Goals</button>
-          <button class="story-nav nav-parent" onclick="setView('covers')">🖼️ Covers & Artwork</button>
-          <button class="story-nav nav-parent" onclick="setView('encyclopedia')">📚 Encyclopedia</button>
-          <button class="story-nav nav-parent" onclick="setView('research')">🔖 Research Vault</button>
-          <button class="story-nav nav-parent" onclick="setView('versionHistory')">🕰️ Version History</button>
-          <button class="story-nav nav-parent" onclick="setView('exports')">⇩ Export</button>
-          <button class="story-nav nav-parent" onclick="setView('backup')">☁ Backup</button>
-        </div>
-
-        <div class="story-nav-group static-sidebar-fallback">
-          <h4>Cloud</h4>
-          <button class="story-nav" onclick="syncToCloud()">☁️ Sync Now</button>
-          <button class="story-nav" onclick="loadFromCloud()">⇩ Load Cloud</button>
-          <button class="story-nav" onclick="signOut()">🚪 Sign Out</button>
-        </div>
-
-      </div>
+      <div id="nestedNav" class="nested-nav"></div>
 
       <div class="account-card">
         <strong id="accountStatus">Signed in</strong>
@@ -316,7 +212,6 @@
           <p id="projectPath">No project selected.</p>
         </div>
         <div class="top-actions">
-          <button onclick="backToProjects()" class="ghost-btn top-main-back">← Main Page</button>
           <button onclick="toggleTheme()" class="ghost-btn">Theme</button>
           <button onclick="syncToCloud()" class="ghost-btn">Sync Now</button>
           <button onclick="loadFromCloud()" class="ghost-btn">Load Cloud</button>
@@ -369,11 +264,16 @@
       <section id="write" class="view">
         <div class="editor-layout">
           <aside class="chapter-sidebar panel">
-            <h3>Chapters & Scenes</h3>
-            <button onclick="addManuscriptChapter()">+ Chapter</button>
-            <button onclick="addSceneToActiveChapter()">+ Scene</button>
-            <button onclick="moveScene(-1)">Move Scene Up</button>
-            <button onclick="moveScene(1)">Move Scene Down</button>
+            <div class="chapter-sidebar-header">
+              <h3>Chapters & Scenes</h3>
+              <button type="button" class="collapse-editor-sidebar-btn" onclick="toggleManuscriptSidebar()" title="Collapse chapter/scene list">⇤</button>
+            </div>
+            <div class="chapter-sidebar-actions">
+              <button onclick="addManuscriptChapter()">+ Chapter</button>
+              <button onclick="addSceneToActiveChapter()">+ Scene</button>
+              <button onclick="moveScene(-1)">Move Scene Up</button>
+              <button onclick="moveScene(1)">Move Scene Down</button>
+            </div>
             <div id="manuscriptChapterList"></div>
           </aside>
 
@@ -387,16 +287,13 @@
             <div class="scene-meta">
               <select id="scenePOV"><option value="">POV Character</option></select>
               <select id="sceneLocation"><option value="">Location</option></select>
+              <select id="scenePlotPoint"><option value="">Plot Board Point</option></select>
               <input id="sceneDate" placeholder="Timeline date / placement" />
               <input id="sceneMood" placeholder="Mood" />
               <input id="scenePurpose" placeholder="Scene purpose" />
             </div>
-            <div class="scene-link-panel">
-              <label>Characters Present</label>
-              <div id="sceneCharactersPresent" class="checkbox-grid"></div>
-              <label>Plot Threads In This Scene</label>
-              <div id="sceneThreadsPresent" class="checkbox-grid"></div>
-            </div>
+
+            <div id="sceneTrackingTop" class="scene-tracking-block"></div>
 
             <div class="format-bar">
               <button onclick="formatDoc('bold')"><b>B</b></button>
@@ -422,6 +319,8 @@
             </div>
 
             <div id="richEditor" class="rich-editor" contenteditable="true" spellcheck="true"></div>
+
+            <div id="sceneTrackingBottom" class="scene-tracking-block scene-tracking-bottom"></div>
           </div>
         </div>
       </section>
@@ -451,7 +350,7 @@
           <h3>Chapter Planner</h3>
           <div class="form-grid">
             <input id="chapterNumber" placeholder="Chapter number / title" />
-            <select id="chapterPOV"><option value="">POV Character</option></select>
+            <input id="chapterPOV" placeholder="POV character" />
             <input id="chapterWordTarget" placeholder="Target word count" />
             <select id="chapterStructureBeat"></select>
             <textarea id="chapterGoal" placeholder="Scene/chapter goal"></textarea>
@@ -513,42 +412,46 @@
 
       <section id="plotBoard" class="view">
         <div class="form-panel">
-          <h3>Plot Board 2.0</h3>
+          <h3>Plot Board</h3>
           <div class="form-grid">
-            <input id="plotArcName" placeholder="New arc name, e.g. Main Plot, Romance Arc" />
-            <input id="plotArcColor" type="color" value="#9d4edd" />
-            <textarea id="plotArcDescription" placeholder="Arc description"></textarea>
+            <input id="plotArcTitle" placeholder="New arc title, ex. Act 1, Romance Arc, Betrayal Arc" />
+            <button type="button" onclick="addPlotArc()">Add Plot Arc</button>
           </div>
-          <button onclick="addPlotArc()">Add Arc</button>
           <hr />
           <div class="form-grid">
-            <input id="plotCardTitle" placeholder="Card title" />
+            <input id="plotCardTitle" placeholder="Plot point title" />
             <select id="plotCardArc"></select>
-            <select id="plotCardStatus"><option>Ideas</option><option>Planned</option><option>Drafting</option><option>Finished</option></select>
             <textarea id="plotCardNotes" placeholder="Notes"></textarea>
           </div>
-          <button onclick="addPlotCard()">Add Plot Card</button>
+          <button onclick="addPlotCard()">Add Plot Point</button>
         </div>
-        <div id="plotBoardList" class="arc-board-grid"></div>
+        <div id="plotBoardList" class="board-grid"></div>
       </section>
 
       <section id="characters" class="view">
         <div class="form-panel">
-          <h3>Add Character</h3><button onclick="setView('characterDashboard')" class="wide glow">Open Character Dashboard</button><p class="muted">Long character fields support rich formatting after saving through the Character Wiki page.</p>
+          <h3>Add Character</h3>
           <div class="form-grid">
             <input id="charName" placeholder="Character name" />
             <select id="charScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
             <select id="charRole"><option>Main</option><option>Side</option><option>Love Interest</option><option>Antagonist</option><option>Mentor</option><option>Other</option></select>
             <input id="charSpecies" placeholder="Species / identity" />
             <label class="file-label inline-file">Upload Character Photo <input id="charPhoto" type="file" accept="image/*" /></label>
-            <textarea id="charDescription" placeholder="Physical description"></textarea>
+            <textarea id="charBasicInfo" placeholder="Basic Information"></textarea>
+            <textarea id="charDescription" placeholder="Physical Appearance"></textarea>
             <textarea id="charPersonality" placeholder="Personality"></textarea>
-            <textarea id="charWound" placeholder="Core wound / fear / desire"></textarea>
-            <textarea id="charArc" placeholder="Character arc"></textarea>
+            <textarea id="charBackstory" placeholder="Backstory"></textarea>
+            <textarea id="charWound" placeholder="Psychology: Core Wound, Core Fear, Core Desire, Fatal Flaw"></textarea>
+            <textarea id="charArc" placeholder="Character Arc"></textarea>
             <textarea id="charVoice" placeholder="Voice / speech patterns"></textarea>
-            <textarea id="charBio" placeholder="Biography"></textarea>
             <textarea id="charSecrets" placeholder="Secrets"></textarea>
             <textarea id="charQuotes" placeholder="Quotes"></textarea>
+            <div class="custom-section-builder">
+              <input id="charCustomTitle" placeholder="Additional section title" />
+              <textarea id="charCustomText" placeholder="Additional section notes"></textarea>
+              <button type="button" onclick="addCharacterCustomSectionDraft()">Add Section to Character</button>
+              <div id="charCustomDraftList" class="custom-section-list"></div>
+            </div>
           </div>
           <button onclick="addCharacter()">Add Character</button>
         </div>
@@ -563,14 +466,18 @@
         <div class="form-panel">
           <h3>Add Relationship</h3>
           <div class="form-grid">
-            <select id="relA"></select>
-            <select id="relB"></select>
+            <select id="relA" onchange="updateRelationshipViewLabels()"></select>
+            <select id="relB" onchange="updateRelationshipViewLabels()"></select>
             <select id="relScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
             <input id="relType" placeholder="Relationship type" />
             <input id="relStatus" placeholder="Current status" />
             <textarea id="relHistory" placeholder="History"></textarea>
             <textarea id="relMoments" placeholder="Important moments"></textarea>
             <textarea id="relArc" placeholder="Relationship arc / future changes"></textarea>
+            <label class="field-label" id="relAViewLabel" for="relAView">Character 1's View</label>
+            <textarea id="relAView" placeholder="How Character 1 sees this relationship"></textarea>
+            <label class="field-label" id="relBViewLabel" for="relBView">Character 2's View</label>
+            <textarea id="relBView" placeholder="How Character 2 sees this relationship"></textarea>
           </div>
           <button onclick="addRelationship()">Add Relationship</button>
         </div>
@@ -602,6 +509,7 @@
           <div class="form-grid">
             <input id="magicName" placeholder="Magic system name" />
             <input id="magicSource" placeholder="Source" />
+            <label class="file-label inline-file">Upload Magic/System Image <input id="magicImage" type="file" accept="image/*" /></label>
             <textarea id="magicRules" placeholder="Rules"></textarea>
             <textarea id="magicLimits" placeholder="Limitations"></textarea>
             <textarea id="magicCosts" placeholder="Costs"></textarea>
@@ -618,6 +526,7 @@
           <div class="form-grid">
             <input id="orgName" placeholder="Organization name" />
             <input id="orgType" placeholder="Type: guild, religion, kingdom..." />
+            <label class="file-label inline-file">Upload Organization Image <input id="orgImage" type="file" accept="image/*" /></label>
             <textarea id="orgDescription" placeholder="Description"></textarea>
             <textarea id="orgMembers" placeholder="Members"></textarea>
             <textarea id="orgHistory" placeholder="History / influence"></textarea>
@@ -626,6 +535,19 @@
         </div>
         <div id="organizationList" class="card-grid"></div>
       </section>
+
+      <section id="locationDetail" class="view">
+        <div id="locationDetailContent"></div>
+      </section>
+
+      <section id="magicDetail" class="view">
+        <div id="magicDetailContent"></div>
+      </section>
+
+      <section id="organizationDetail" class="view">
+        <div id="organizationDetailContent"></div>
+      </section>
+
 
       <section id="scenes" class="view">
         <div id="sceneList" class="card-grid"></div>
@@ -647,17 +569,34 @@
 
       <section id="world" class="view">
         <div class="form-panel">
-          <h3>General Worldbuilding Notes</h3>
+          <h3>Add Worldbuilding Entry</h3>
+          <p class="muted">Each entry creates its own detail page, similar to Characters.</p>
           <div class="form-grid">
             <input id="worldName" placeholder="Entry name" />
             <select id="worldScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
-            <select id="worldCategory"><option>Culture</option><option>Species</option><option>Artifact / Object</option><option>History</option><option>Other</option></select>
+            <select id="worldCategory"></select>
+            <input id="worldCustomCategory" placeholder="New custom category, optional" />
+            <label class="file-label inline-file">Upload Entry Image <input id="worldImage" type="file" accept="image/*" /></label>
+            <textarea id="worldBasicInfo" placeholder="Basic Information"></textarea>
             <textarea id="worldDescription" placeholder="Description"></textarea>
-            <textarea id="worldRules" placeholder="Rules, limits, history, or notes"></textarea>
+            <textarea id="worldHistory" placeholder="History"></textarea>
+            <textarea id="worldCulture" placeholder="Culture / Society"></textarea>
+            <textarea id="worldRules" placeholder="Rules, limits, powers, or important notes"></textarea>
+            <textarea id="worldPlotRelevance" placeholder="Plot Relevance"></textarea>
+            <div class="custom-section-builder">
+              <input id="worldCustomTitle" placeholder="Additional section title" />
+              <textarea id="worldCustomText" placeholder="Additional section notes"></textarea>
+              <button type="button" onclick="addWorldCustomSectionDraft()">Add Section to Entry</button>
+              <div id="worldCustomDraftList" class="custom-section-list"></div>
+            </div>
           </div>
-          <button onclick="addWorld()">Add World Entry</button>
+          <button onclick="addWorld()">Add Worldbuilding Entry</button>
         </div>
-        <div id="worldList" class="card-grid"></div>
+        <div id="worldCategoryGroups"></div>
+      </section>
+
+      <section id="worldDetail" class="view">
+        <div id="worldDetailContent"></div>
       </section>
 
       <section id="seriesTools" class="view">
@@ -680,299 +619,14 @@
       <section id="music" class="view">
         <div class="panel">
           <h3>Project Playlist</h3>
-          <p>Add playlist links for the music that fits this story. True account syncing requires Spotify/Apple/YouTube developer OAuth, so this version stores safe playlist links with your project.</p>
+          <p>Paste one playlist, album, video, or song link for the music that fits this story. Supported embeds include Spotify, YouTube, YouTube Music, and Apple Music when the link allows embedding.</p>
           <div class="form-grid">
-            <input id="musicSpotify" placeholder="Spotify playlist link" />
-            <input id="musicApple" placeholder="Apple Music playlist link" />
-            <input id="musicYoutube" placeholder="YouTube Music playlist link" />
+            <input id="musicLink" placeholder="Paste playlist / song link" />
             <textarea id="musicNotes" placeholder="Playlist notes, mood, character themes, chapter songs..."></textarea>
           </div>
-          <button onclick="saveMusicLinks()">Save Playlist Links</button>
+          <button onclick="saveMusicLinks()">Save Playlist Link</button>
         </div>
         <div id="musicLinks" class="card-grid"></div>
-        <div id="musicEmbeds" class="card-grid music-embeds"></div>
-      </section>
-
-
-
-
-      <section id="characterDashboard" class="view">
-        <div class="panel">
-          <div class="card-header">
-            <div>
-              <h3>Character Dashboard</h3>
-              <p>Every character you create appears here. Click a character to open their wiki page.</p>
-            </div>
-            <button class="glow" onclick="toggleCharacterCreator()">+ Add Character</button>
-          </div>
-        </div>
-
-        <div id="characterCreatorPanel" class="form-panel hidden">
-          <div class="card-header">
-            <h3>Create Character</h3>
-            <button class="delete-btn" onclick="toggleCharacterCreator(false)">Close</button>
-          </div>
-          <div class="form-grid">
-            <input id="dashCharName" placeholder="Character name" />
-            <select id="dashCharScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
-            <select id="dashCharRole"><option>Main</option><option>Side</option><option>Love Interest</option><option>Antagonist</option><option>Mentor</option><option>Other</option></select>
-            <input id="dashCharSpecies" placeholder="Species / identity" />
-            <label class="file-label inline-file">Upload Character Photo <input id="dashCharPhoto" type="file" accept="image/*" /></label>
-            <textarea id="dashCharDescription" placeholder="Physical description"></textarea>
-            <textarea id="dashCharPersonality" placeholder="Personality"></textarea>
-            <textarea id="dashCharWound" placeholder="Core wound / fear / desire"></textarea>
-            <textarea id="dashCharArc" placeholder="Character arc"></textarea>
-            <textarea id="dashCharVoice" placeholder="Voice / speech patterns"></textarea>
-            <textarea id="dashCharBio" placeholder="Biography"></textarea>
-            <textarea id="dashCharSecrets" placeholder="Secrets"></textarea>
-            <textarea id="dashCharQuotes" placeholder="Quotes"></textarea>
-          </div>
-          <button class="glow" onclick="addCharacterFromDashboard()">Create Character</button>
-          <p id="characterCreatorMessage" class="muted"></p>
-        </div>
-
-        <div id="characterDashboardList" class="card-grid"></div>
-      </section>
-
-
-
-      <section id="sceneCards" class="view">
-        <div class="form-panel">
-          <h3>Scene Cards</h3>
-          <p>Review and organize your scenes by purpose, conflict, outcome, POV, and location.</p>
-        </div>
-        <div id="sceneCardBoard" class="card-grid"></div>
-      </section>
-
-      <section id="goals" class="view">
-        <div class="form-panel">
-          <h3>Writing Goals</h3>
-          <div class="form-grid">
-            <input id="dailyGoalWords" type="number" placeholder="Daily word goal" />
-            <input id="weeklyGoalWords" type="number" placeholder="Weekly word goal" />
-            <input id="goalSessionWords" type="number" placeholder="Words written this session" />
-            <textarea id="goalNotes" placeholder="Goal notes / motivation"></textarea>
-          </div>
-          <button onclick="saveWritingGoals()">Save Goals</button>
-          <button onclick="logWritingSession()">Log Session</button>
-        </div>
-        <div class="grid stats-grid">
-          <div class="stat-card"><span id="goalTodayWords">0</span><p>Logged Today</p></div>
-          <div class="stat-card"><span id="goalDailyTarget">0</span><p>Daily Goal</p></div>
-          <div class="stat-card"><span id="goalStreak">0</span><p>Writing Streak</p></div>
-          <div class="stat-card"><span id="goalBestDay">0</span><p>Best Day</p></div>
-        </div>
-        <div id="goalHistory" class="panel"></div>
-      </section>
-
-      <section id="covers" class="view">
-        <div class="form-panel">
-          <h3>Project Artwork</h3>
-          <div class="form-grid">
-            <label class="file-label inline-file">Upload Cover <input id="coverUpload" type="file" accept="image/*" /></label>
-            <label class="file-label inline-file">Upload Banner <input id="bannerUpload" type="file" accept="image/*" /></label>
-            <input id="projectThemeColor" type="color" value="#9d4edd" />
-            <textarea id="artworkNotes" placeholder="Artwork notes, cover ideas, visual theme..."></textarea>
-          </div>
-          <button onclick="saveProjectArtwork()">Save Artwork</button>
-        </div>
-        <div id="artworkPreview" class="card-grid"></div>
-      </section>
-
-      <section id="encyclopedia" class="view">
-        <div class="panel">
-          <h3>Encyclopedia Search</h3>
-          <input id="encyclopediaSearch" placeholder="Search characters, scenes, locations, plot threads, timeline, research..." oninput="renderEncyclopedia()" />
-        </div>
-        <div id="encyclopediaResults" class="card-grid"></div>
-      </section>
-
-      <section id="visualTimeline" class="view">
-        <div class="panel">
-          <h3>Visual Timeline</h3>
-          <p>Grouped timeline events, scene dates, and story moments.</p>
-        </div>
-        <div id="visualTimelineList" class="visual-timeline"></div>
-      </section>
-
-      <section id="research" class="view">
-        <div class="form-panel">
-          <h3>Research Vault</h3>
-          <div class="form-grid">
-            <input id="researchTitle" placeholder="Research title" />
-            <input id="researchLink" placeholder="Link / URL" />
-            <label class="file-label inline-file">Attach Image/File <input id="researchFile" type="file" /></label>
-            <select id="researchCategory">
-              <option>General</option><option>Historical</option><option>Visual Reference</option><option>Location</option><option>Character</option><option>Worldbuilding</option><option>Publishing</option>
-            </select>
-            <textarea id="researchNotes" placeholder="Research notes"></textarea>
-          </div>
-          <button onclick="addResearchItem()">Add Research</button>
-        </div>
-        <div id="researchList" class="card-grid"></div>
-      </section>
-
-      <section id="maps" class="view">
-        <div class="form-panel">
-          <h3>Map System</h3>
-          <div class="form-grid">
-            <input id="mapName" placeholder="Map name" />
-            <label class="file-label inline-file">Upload Map Image <input id="mapImage" type="file" accept="image/*" /></label>
-            <select id="mapLocationLink"></select>
-            <textarea id="mapNotes" placeholder="Map notes, linked scenes, travel routes..."></textarea>
-          </div>
-          <button onclick="addMap()">Add Map</button>
-        </div>
-        <div id="mapList" class="card-grid"></div>
-      </section>
-
-      <section id="versionHistory" class="view">
-        <div class="panel">
-          <h3>Version History</h3>
-          <p>Create restore points before major edits. Auto snapshots are created during saves.</p>
-          <button onclick="createManualSnapshot()">Create Restore Point</button>
-        </div>
-        <div id="snapshotList" class="card-grid"></div>
-      </section>
-
-
-      <section id="connections" class="view">
-        <div class="panel">
-          <h3>Connected Story Web</h3>
-          <p>Characters, scenes, locations, relationships, plot threads, and POV data connected together.</p>
-        </div>
-        <div class="grid stats-grid">
-          <div class="stat-card"><span id="connectCharacters">0</span><p>Characters</p></div>
-          <div class="stat-card"><span id="connectScenes">0</span><p>Scenes</p></div>
-          <div class="stat-card"><span id="connectThreads">0</span><p>Plot Threads</p></div>
-          <div class="stat-card"><span id="connectLocations">0</span><p>Locations</p></div>
-        </div>
-        <div class="two-col">
-          <div class="panel"><h3>POV Statistics</h3><div id="connectedPovStats"></div></div>
-          <div class="panel"><h3>Character Appearances</h3><div id="connectedAppearances"></div></div>
-        </div>
-      </section>
-
-      <section id="relationshipVisualizer" class="view">
-        <div class="panel">
-          <h3>Relationship Visualizer</h3>
-          <p>A visual relationship tree generated from your Relationship System.</p>
-        </div>
-        <div id="relationshipVisualizerContent" class="relationship-visualizer"></div>
-      </section>
-
-      <section id="threadTracker" class="view">
-        <div class="form-panel">
-          <h3>Plot Thread Tracker</h3>
-          <p>Attach plot threads to scenes and track unresolved threads.</p>
-          <div class="form-grid">
-            <select id="threadLinkThread"></select>
-            <select id="threadLinkScene"></select>
-          </div>
-          <button onclick="linkThreadToScene()">Attach Thread to Scene</button>
-        </div>
-        <div id="threadTrackerContent" class="card-grid"></div>
-      </section>
-
-      <section id="arcTracker" class="view">
-        <div class="form-panel">
-          <h3>Character Arc Tracker</h3>
-          <div class="form-grid">
-            <select id="arcCharacter"></select>
-            <textarea id="arcStart" placeholder="Starting state"></textarea>
-            <textarea id="arcMiddle" placeholder="Major turning points"></textarea>
-            <textarea id="arcEnd" placeholder="Ending state"></textarea>
-          </div>
-          <button onclick="saveCharacterArcTracker()">Save Arc</button>
-        </div>
-        <div id="arcTrackerContent" class="card-grid"></div>
-      </section>
-
-      <section id="locationLinks" class="view">
-        <div class="panel">
-          <h3>Location Linking</h3>
-          <p>Each location automatically shows connected scenes and characters.</p>
-        </div>
-        <div id="locationLinksContent" class="card-grid"></div>
-      </section>
-
-      <section id="smartSearch" class="view">
-        <div class="panel">
-          <h3>Smart Search</h3>
-          <input id="smartSearchInput" placeholder="Search across the entire project..." oninput="renderSmartSearch()" />
-        </div>
-        <div id="smartSearchResults" class="card-grid"></div>
-      </section>
-
-      <section id="seriesContinuity" class="view">
-        <div id="seriesContinuityGate"></div>
-        <div id="seriesContinuityContent"></div>
-      </section>
-
-      <section id="sprintMode" class="view">
-        <div class="panel">
-          <h3>Writing Sprint Mode</h3>
-          <div class="form-grid">
-            <input id="sprintMinutes" type="number" placeholder="Minutes" value="25" />
-            <input id="sprintGoalWords" type="number" placeholder="Word goal" value="1000" />
-          </div>
-          <div class="sprint-display">
-            <div><span id="sprintTimer">25:00</span><p>Timer</p></div>
-            <div><span id="sprintWords">0</span><p>Words This Sprint</p></div>
-          </div>
-          <div class="backup-row">
-            <button onclick="startSprint()">Start Sprint</button>
-            <button onclick="stopSprint()">Stop</button>
-            <button onclick="finishSprint()">Finish & Log</button>
-          </div>
-        </div>
-      </section>
-
-      <section id="authorSettings" class="view">
-        <div class="form-panel">
-          <h3>Author Settings</h3>
-          <div class="form-grid">
-            <select id="settingTheme">
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
-            </select>
-            <input id="settingAccent" type="color" value="#9d4edd" />
-            <select id="settingEditorFont">
-              <option value="Georgia, serif">Georgia</option>
-              <option value="'Times New Roman', serif">Times New Roman</option>
-              <option value="Arial, sans-serif">Arial</option>
-              <option value="'Courier New', monospace">Courier New</option>
-            </select>
-            <select id="settingEditorWidth">
-              <option value="normal">Normal Editor</option>
-              <option value="wide">Wide Editor</option>
-              <option value="focused">Focused Editor</option>
-            </select>
-          </div>
-          <button onclick="saveAuthorSettings()">Save Settings</button>
-        </div>
-      </section>
-
-
-      <section id="mediaLibrary" class="view">
-        <div class="form-panel">
-          <h3>Media Library</h3>
-          <p>Upload images once and reuse them for characters, locations, covers, banners, timeline events, and worldbuilding.</p>
-          <div class="form-grid">
-            <input id="mediaTitle" placeholder="Image title" />
-            <select id="mediaCategory">
-              <option>Character</option><option>Location</option><option>Cover</option><option>Banner</option><option>Timeline</option><option>Worldbuilding</option><option>Other</option>
-            </select>
-            <label class="file-label inline-file">Upload Image <input id="mediaUpload" type="file" accept="image/*" /></label>
-            <textarea id="mediaNotes" placeholder="Image notes"></textarea>
-          </div>
-          <button onclick="addMediaItem()">Save Image</button>
-        </div>
-        <div id="mediaLibraryList" class="card-grid"></div>
-      </section>
-
-      <section id="characterWiki" class="view">
-        <div id="characterWikiContent"></div>
       </section>
 
       <section id="stats" class="view">
