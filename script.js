@@ -1,5 +1,5 @@
-const STORAGE_KEY = "writersVaultV5";
-const SETTINGS_KEY = "writersVaultV5Settings";
+const STORAGE_KEY = "writersVaultV6";
+const CLOUD_TABLE = "writer_vaults";
 
 const defaultData = {
   activeSeriesId: null,
@@ -16,16 +16,20 @@ const defaultData = {
   world: []
 };
 
-const defaultSettings = {
-  email: "",
-  supabaseUrl: "",
-  supabaseAnonKey: "",
-  openaiApiKey: "",
-  openaiModel: "gpt-4.1-mini"
-};
-
+let supabaseClient = null;
 let data = loadData();
-let settings = loadSettings();
+let cloudSaveTimer = null;
+
+function initSupabase() {
+  if (!window.supabase) {
+    console.warn("Supabase library did not load. Local mode only.");
+    return;
+  }
+  supabaseClient = window.supabase.createClient(
+    window.WRITERS_VAULT_SUPABASE_URL,
+    window.WRITERS_VAULT_SUPABASE_KEY
+  );
+}
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function loadData() {
@@ -34,19 +38,10 @@ function loadData() {
   try { return { ...structuredClone(defaultData), ...JSON.parse(saved) }; }
   catch { return structuredClone(defaultData); }
 }
-function loadSettings() {
-  const saved = localStorage.getItem(SETTINGS_KEY);
-  if (!saved) return structuredClone(defaultSettings);
-  try { return { ...structuredClone(defaultSettings), ...JSON.parse(saved) }; }
-  catch { return structuredClone(defaultSettings); }
-}
-function saveData(render = true) {
+function saveData(render = true, scheduleCloud = true) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data, null, 2));
   if (render) renderAll();
-}
-function saveSettings() {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings, null, 2));
-  renderAccount();
+  if (scheduleCloud) scheduleCloudSave();
 }
 function val(id) { return document.getElementById(id).value.trim(); }
 function setVal(id, value) { const el = document.getElementById(id); if (el) el.value = value || ""; }
@@ -78,12 +73,147 @@ function ensureProject() {
   }
 }
 
+async function refreshSession() {
+  if (!supabaseClient) return;
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const user = sessionData?.session?.user || null;
+  data.user = user ? { id: user.id, email: user.email } : null;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data, null, 2));
+  renderAccount();
+}
+async function signUp() {
+  if (!supabaseClient) return setAuthMessage("Supabase could not load. Check internet connection.");
+  const email = val("authEmail");
+  const password = val("authPassword");
+  const { data: result, error } = await supabaseClient.auth.signUp({ email, password });
+  if (error) return setAuthMessage(error.message);
+  setAuthMessage("Sign up successful. Check your email if confirmation is required.");
+  await refreshSession();
+}
+async function signIn() {
+  if (!supabaseClient) return setAuthMessage("Supabase could not load. Check internet connection.");
+  const email = val("authEmail");
+  const password = val("authPassword");
+  const { data: result, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) return setAuthMessage(error.message);
+  data.user = { id: result.user.id, email: result.user.email };
+  saveData(true, false);
+  setAuthMessage("Signed in.");
+  closeModal("authModal");
+  await loadFromCloud(false);
+}
+async function signOut() {
+  if (supabaseClient) await supabaseClient.auth.signOut();
+  data.user = null;
+  saveData(true, false);
+  setAuthMessage("Signed out.");
+}
+async function sendPasswordReset() {
+  if (!supabaseClient) return setAuthMessage("Supabase could not load.");
+  const email = val("authEmail");
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
+  setAuthMessage(error ? error.message : "Password reset email sent.");
+}
+function setAuthMessage(message) {
+  const el = document.getElementById("authMessage");
+  if (el) el.textContent = message;
+}
+function renderAccount() {
+  const status = document.getElementById("accountStatus");
+  const sync = document.getElementById("syncStatus");
+  if (!status || !sync) return;
+  if (data.user?.email) {
+    status.textContent = data.user.email;
+    sync.textContent = "Signed in. Cloud sync available.";
+  } else {
+    status.textContent = "Local Mode";
+    sync.textContent = "Sign in to sync across devices.";
+  }
+}
+
+function scheduleCloudSave() {
+  if (!data.user?.id || !supabaseClient) return;
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(() => syncToCloud(false), 1500);
+}
+
+async function syncToCloud(showAlert = true) {
+  if (!supabaseClient) {
+    if (showAlert) alert("Supabase is not loaded. Check your internet connection.");
+    return;
+  }
+  await refreshSession();
+  if (!data.user?.id) {
+    if (showAlert) alert("Sign in first.");
+    return;
+  }
+
+  const payload = {
+    user_id: data.user.id,
+    user_email: data.user.email,
+    vault_data: data,
+    updated_at: new Date().toISOString()
+  };
+
+  const { error } = await supabaseClient
+    .from(CLOUD_TABLE)
+    .upsert(payload, { onConflict: "user_id" });
+
+  if (error) {
+    const msg = "Cloud sync failed. Make sure the writer_vaults table exists and RLS policies are set. " + error.message;
+    document.getElementById("syncStatus").textContent = "Sync failed.";
+    if (showAlert) alert(msg);
+    console.error(msg);
+    return;
+  }
+
+  document.getElementById("syncStatus").textContent = "Synced " + new Date().toLocaleTimeString();
+  if (showAlert) alert("Synced to Supabase.");
+}
+
+async function loadFromCloud(showAlert = true) {
+  if (!supabaseClient) {
+    if (showAlert) alert("Supabase is not loaded. Check your internet connection.");
+    return;
+  }
+  await refreshSession();
+  if (!data.user?.id) {
+    if (showAlert) alert("Sign in first.");
+    return;
+  }
+
+  const { data: rows, error } = await supabaseClient
+    .from(CLOUD_TABLE)
+    .select("vault_data, updated_at")
+    .eq("user_id", data.user.id)
+    .limit(1);
+
+  if (error) {
+    const msg = "Could not load cloud data. Make sure the writer_vaults table exists and RLS policies are set. " + error.message;
+    if (showAlert) alert(msg);
+    console.error(msg);
+    return;
+  }
+
+  if (!rows || !rows.length || !rows[0].vault_data) {
+    if (showAlert) alert("No cloud vault found yet. Use Sync Now to create one.");
+    return;
+  }
+
+  const currentUser = data.user;
+  data = { ...structuredClone(defaultData), ...rows[0].vault_data, user: currentUser };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data, null, 2));
+  renderAll();
+  document.getElementById("syncStatus").textContent = "Loaded cloud save.";
+  if (showAlert) alert("Loaded from Supabase.");
+}
+
 function createSeries(title = null, shouldRender = true) {
   const name = title || prompt("Series title?") || "Untitled Series";
   const series = { id: uid(), title: name, genre: "", synopsis: "", theme: "", mysteries: "", foreshadowing: "", created: new Date().toISOString() };
   data.series.push(series);
   data.activeSeriesId = series.id;
-  if (shouldRender) saveData(); else saveData(false);
+  if (shouldRender) saveData(); else saveData(false, false);
 }
 function createBook(title = null, shouldRender = true) {
   if (!data.activeSeriesId && !data.series.length) createSeries("Untitled Series", false);
@@ -96,7 +226,7 @@ function createBook(title = null, shouldRender = true) {
   data.books.push(book);
   data.activeBookId = book.id;
   data.activeChapterId = book.manuscript[0].id;
-  if (shouldRender) saveData(); else saveData(false);
+  if (shouldRender) saveData(); else saveData(false, false);
 }
 function setActiveSeries(id) {
   data.activeSeriesId = id;
@@ -177,6 +307,9 @@ function insertText(text) {
   editor.focus();
   editor.selectionStart = editor.selectionEnd = start + text.length;
   saveCurrentManuscriptChapter(false);
+}
+function toggleFullscreen() {
+  document.querySelector(".manuscript-panel").classList.toggle("fullscreen");
 }
 
 function addChapterPlan() {
@@ -342,25 +475,9 @@ function renderAllLists() {
     list.appendChild(makeCard(`${item.a} + ${item.b}`, `<span class="tag">${escapeHTML(item.scope)}</span>${detail("Type", item.type)}${detail("Notes", item.notes)}`, () => deleteItem("relationships", item.id)));
   });
 }
-function renderAICharacterSelect() {
-  const select = document.getElementById("aiCharacterSelect");
-  if (!select) return;
-  const chars = data.characters.filter(visibleByScope);
-  select.innerHTML = chars.length ? chars.map(c => `<option value="${c.id}">${escapeHTML(c.name)}</option>`).join("") : `<option>No characters yet</option>`;
-}
 function renderRawData() {
   const raw = document.getElementById("rawData");
   if (raw) raw.value = JSON.stringify(data, null, 2);
-}
-function renderAccount() {
-  const hasCloud = settings.supabaseUrl && settings.supabaseAnonKey;
-  document.getElementById("accountStatus").textContent = data.user?.email || settings.email || "Local Mode";
-  document.getElementById("syncStatus").textContent = hasCloud ? "Cloud-ready settings saved." : "Saved in this browser.";
-  setVal("userEmail", settings.email);
-  setVal("supabaseUrl", settings.supabaseUrl);
-  setVal("supabaseAnonKey", settings.supabaseAnonKey);
-  setVal("openaiApiKey", settings.openaiApiKey);
-  setVal("openaiModel", settings.openaiModel);
 }
 function renderAll() {
   ensureProject();
@@ -368,7 +485,6 @@ function renderAll() {
   renderOverview();
   renderManuscript();
   renderAllLists();
-  renderAICharacterSelect();
   renderRawData();
   renderAccount();
   runSearch();
@@ -382,7 +498,7 @@ function setView(view) {
   const titles = {
     overview: "Overview", write: "Manuscript Editor", chapters: "Chapter Planner", characters: "Characters",
     plot: "Plot Threads", timeline: "Timeline", world: "Worldbuilding", relationships: "Relationships",
-    ai: "AI Tools", exports: "Export", backup: "Backup"
+    exports: "Export", backup: "Backup"
   };
   document.getElementById("viewTitle").textContent = titles[view];
 }
@@ -424,6 +540,25 @@ function exportManuscriptDoc() {
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHTML(book.title)}</title></head><body><h1>${escapeHTML(book.title)}</h1>${(book.manuscript || []).map(ch => `<h2>${escapeHTML(ch.title)}</h2><p>${escapeHTML(ch.content).replaceAll("\n\n","</p><p>").replaceAll("\n","<br>")}</p>`).join("")}</body></html>`;
   downloadFile(`${safeFile(book.title)}.doc`, html, "application/msword");
 }
+function exportSeriesBibleDoc() {
+  const s = activeSeries();
+  const b = activeBook();
+  if (!s) return alert("No series selected.");
+  const chars = data.characters.filter(visibleByScope);
+  const threads = data.threads.filter(visibleByScope);
+  const world = data.world.filter(visibleByScope);
+  const timeline = data.timeline.filter(visibleByScope);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHTML(s.title)} Bible</title></head><body>
+  <h1>${escapeHTML(s.title)} Bible</h1>
+  <h2>Series</h2><p>${escapeHTML(s.synopsis || "")}</p><p><strong>Theme:</strong> ${escapeHTML(s.theme || "")}</p>
+  <h2>Book</h2><h3>${escapeHTML(b?.title || "")}</h3><p>${escapeHTML(b?.summary || "")}</p>
+  <h2>Characters</h2>${chars.map(c => `<h3>${escapeHTML(c.name)}</h3><p>${escapeHTML(c.personality || "")}</p><p>${escapeHTML(c.arc || "")}</p>`).join("")}
+  <h2>Timeline</h2>${timeline.map(t => `<p><strong>${escapeHTML(t.when || "")}</strong>: ${escapeHTML(t.event || "")}</p>`).join("")}
+  <h2>Plot Threads</h2>${threads.map(t => `<h3>${escapeHTML(t.title)}</h3><p>${escapeHTML(t.setup || "")}</p><p>${escapeHTML(t.payoff || "")}</p>`).join("")}
+  <h2>Worldbuilding</h2>${world.map(w => `<h3>${escapeHTML(w.name)}</h3><p>${escapeHTML(w.description || "")}</p>`).join("")}
+  </body></html>`;
+  downloadFile(`${safeFile(s.title)}-series-bible.doc`, html, "application/msword");
+}
 function exportManuscriptPDF() {
   const book = activeBook();
   if (!book) return alert("No book selected.");
@@ -432,7 +567,7 @@ function exportManuscriptPDF() {
   window.print();
 }
 function exportData() {
-  downloadFile("writers-vault-v5-backup.json", JSON.stringify(data, null, 2), "application/json");
+  downloadFile("writers-vault-v6-backup.json", JSON.stringify(data, null, 2), "application/json");
 }
 function downloadFile(filename, content, type) {
   const blob = new Blob([content], { type });
@@ -454,178 +589,13 @@ function importData(event) {
   reader.readAsText(file);
 }
 function resetAll() {
-  if (!confirm("Delete all saved writing data from this browser?")) return;
+  if (!confirm("Delete all local writing data from this browser? This does not delete cloud data.")) return;
   data = structuredClone(defaultData);
-  saveData();
+  saveData(true, false);
 }
 
 function openModal(id) { document.getElementById(id).classList.remove("hidden"); }
 function closeModal(id) { document.getElementById(id).classList.add("hidden"); }
-function saveCloudSettings() {
-  settings.email = val("userEmail");
-  settings.supabaseUrl = val("supabaseUrl");
-  settings.supabaseAnonKey = val("supabaseAnonKey");
-  saveSettings();
-  alert("Cloud settings saved. This build includes the UI/scaffold; connect the Supabase table using README instructions.");
-}
-function saveAISettings() {
-  settings.openaiApiKey = val("openaiApiKey");
-  settings.openaiModel = val("openaiModel") || "gpt-4.1-mini";
-  saveSettings();
-  alert("AI settings saved.");
-}
-function signInDemo() {
-  settings.email = val("userEmail") || "writer@example.com";
-  data.user = { email: settings.email, mode: "demo" };
-  saveSettings();
-  saveData();
-}
-function signOut() {
-  data.user = null;
-  saveData();
-}
-function syncToCloud() {
-  if (!settings.supabaseUrl || !settings.supabaseAnonKey) {
-    alert("Cloud settings are not configured yet. Open Settings and add Supabase details.");
-    return;
-  }
-  localStorage.setItem("writersVaultV5LastCloudPayload", JSON.stringify({ email: settings.email, data }, null, 2));
-  document.getElementById("syncStatus").textContent = "Cloud payload prepared locally.";
-  alert("Cloud sync scaffold is ready. To make it live, connect the Supabase table from README.");
-}
-
-function localChapterAnalysis(ch) {
-  const text = ch?.content || "";
-  const words = countWords(text);
-  const hasDialogue = /["“”]/.test(text);
-  const hasSceneBreak = /---|\*\s?\*\s?\*/.test(text);
-  const paragraphs = text.split(/\n\s*\n/).filter(Boolean).length;
-  return `LOCAL CHAPTER ANALYSIS
-
-Chapter: ${ch?.title || "Untitled"}
-Word Count: ${words}
-Paragraphs: ${paragraphs}
-
-Pacing:
-- ${words < 500 ? "This chapter is very short. It may read more like a scene or fragment." : "Length is workable for a draft chapter/scene."}
-- ${paragraphs < 4 ? "Consider breaking action and emotion into more paragraphs for readability." : "Paragraphing has enough shape to review."}
-
-Dialogue:
-- ${hasDialogue ? "Dialogue appears to be present." : "No clear dialogue detected. If this is meant to be an emotional/interpersonal chapter, consider adding spoken tension."}
-
-Scene Structure:
-- Check that the chapter has a goal, conflict, turning point, and consequence.
-- Make sure the ending leaves either a question, emotional shift, or decision.
-
-Continuity:
-- Compare this chapter against your Characters, Timeline, and Plot Threads tabs.
-- Add any important new detail to the bible so it does not get lost.`;
-}
-function localCharacterAnalysis(char) {
-  const ch = activeManuscriptChapter();
-  const chapterText = ch?.content || "";
-  const mentioned = char?.name && chapterText.toLowerCase().includes(char.name.toLowerCase());
-  return `LOCAL CHARACTER CONSISTENCY CHECK
-
-Character: ${char?.name || "None selected"}
-
-Profile Summary:
-Role: ${char?.role || ""}
-Species/Identity: ${char?.species || ""}
-Personality: ${char?.personality || ""}
-Core Wound/Fear/Desire: ${char?.wound || ""}
-Arc: ${char?.arc || ""}
-Voice: ${char?.voice || ""}
-
-Current Chapter Mention:
-- ${mentioned ? "This character is mentioned in the current chapter." : "This character name was not detected in the current chapter."}
-
-Checklist:
-- Does the character speak in their established voice?
-- Are their actions connected to their wound, fear, desire, or arc?
-- Are they reacting based on what they know, not what the author knows?
-- Did this chapter change them, reveal them, or pressure them?
-- If something changed, update the character profile.`;
-}
-function localTimelineAnalysis() {
-  const events = data.timeline.filter(visibleByScope);
-  return `LOCAL TIMELINE CONSISTENCY CHECK
-
-Events Found: ${events.length}
-
-Timeline Notes:
-${events.map((e, i) => `${i + 1}. ${e.when || "Unplaced"} — ${e.event || "No event description"}`).join("\n") || "No timeline events yet."}
-
-Checklist:
-- Add exact or relative dates whenever possible.
-- Mark whether each event belongs to the whole series or only this book.
-- Check character ages against major events.
-- Check cause/effect order.
-- Add missing events from manuscript chapters after drafting.`;
-}
-
-async function callOpenAI(prompt) {
-  if (!settings.openaiApiKey) return null;
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${settings.openaiApiKey}`
-    },
-    body: JSON.stringify({
-      model: settings.openaiModel || "gpt-4.1-mini",
-      input: prompt
-    })
-  });
-  if (!response.ok) throw new Error("AI request failed.");
-  const result = await response.json();
-  return result.output_text || JSON.stringify(result, null, 2);
-}
-async function analyzeCurrentChapter() {
-  const ch = activeManuscriptChapter();
-  const context = JSON.stringify({
-    series: activeSeries(),
-    book: activeBook(),
-    characters: data.characters.filter(visibleByScope),
-    timeline: data.timeline.filter(visibleByScope),
-    threads: data.threads.filter(visibleByScope)
-  }, null, 2);
-  const prompt = `Analyze this book chapter for pacing, emotional beat, conflict, clarity, continuity, and character consistency. Give practical revision notes.\n\nPROJECT CONTEXT:\n${context}\n\nCHAPTER:\n${ch?.title}\n\n${ch?.content}`;
-  const out = document.getElementById("aiResults");
-  out.value = "Analyzing...";
-  try {
-    const live = await callOpenAI(prompt);
-    out.value = live || localChapterAnalysis(ch);
-  } catch (err) {
-    out.value = localChapterAnalysis(ch) + "\n\nLive AI failed, so local checklist mode was used.";
-  }
-  setView("ai");
-}
-async function runCharacterChecker() {
-  const id = val("aiCharacterSelect");
-  const char = data.characters.find(c => c.id === id);
-  const ch = activeManuscriptChapter();
-  const prompt = `Check this character for consistency against the current chapter. Focus on voice, personality, arc, relationships, and contradictions.\n\nCHARACTER:\n${JSON.stringify(char, null, 2)}\n\nCURRENT CHAPTER:\n${ch?.title}\n\n${ch?.content}`;
-  const out = document.getElementById("aiResults");
-  out.value = "Checking character...";
-  try {
-    const live = await callOpenAI(prompt);
-    out.value = live || localCharacterAnalysis(char);
-  } catch (err) {
-    out.value = localCharacterAnalysis(char) + "\n\nLive AI failed, so local checklist mode was used.";
-  }
-}
-async function runTimelineChecker() {
-  const prompt = `Check this story timeline for contradictions, unclear order, missing cause/effect, and age/time issues.\n\nSERIES:\n${JSON.stringify(activeSeries(), null, 2)}\n\nBOOK:\n${JSON.stringify(activeBook(), null, 2)}\n\nTIMELINE:\n${JSON.stringify(data.timeline.filter(visibleByScope), null, 2)}\n\nCHAPTER PLANS:\n${JSON.stringify(data.chapterPlans.filter(visibleByScope), null, 2)}`;
-  const out = document.getElementById("aiResults");
-  out.value = "Checking timeline...";
-  try {
-    const live = await callOpenAI(prompt);
-    out.value = live || localTimelineAnalysis();
-  } catch (err) {
-    out.value = localTimelineAnalysis() + "\n\nLive AI failed, so local checklist mode was used.";
-  }
-}
 
 document.querySelectorAll(".nav-btn").forEach(btn => btn.addEventListener("click", () => setView(btn.dataset.view)));
 document.getElementById("globalSearch").addEventListener("input", runSearch);
@@ -637,4 +607,5 @@ document.getElementById("clearSearch").addEventListener("click", () => { setVal(
 document.getElementById("currentChapterTitle").addEventListener("input", () => saveCurrentManuscriptChapter(true));
 document.getElementById("manuscriptEditor").addEventListener("input", () => saveCurrentManuscriptChapter(false));
 
-renderAll();
+initSupabase();
+refreshSession().then(renderAll);

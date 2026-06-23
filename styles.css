@@ -49,7 +49,7 @@ button, input, textarea, select { font: inherit; }
   background: rgba(255,255,255,.05);
 }
 .selector-block { margin: 14px 0; }
-.selector-block label { display:block; color: var(--gold); font-size: .85rem; margin-bottom: 6px; }
+.selector-block label, label { display:block; color: var(--gold); font-size: .85rem; margin-bottom: 6px; }
 nav { display: grid; gap: 8px; margin-top: 16px; }
 .nav-btn, button, .file-label {
   border: 1px solid var(--border);
@@ -89,7 +89,6 @@ main { padding: 28px; overflow: hidden; }
 .view.active { display: block; }
 .grid, .card-grid { display: grid; gap: 18px; }
 .stats-grid { grid-template-columns: repeat(4, minmax(120px, 1fr)); margin-top: 18px; }
-.ai-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-bottom: 18px; }
 .stat-card, .panel, .form-panel, .item-card, .search-results {
   background: rgba(31,16,33,0.82);
   border: 1px solid var(--border);
@@ -120,6 +119,9 @@ main { padding: 28px; overflow: hidden; }
 }
 .chapter-button.active { border-color: var(--gold); background: rgba(244,201,93,.12); }
 .manuscript-panel { min-height: calc(100vh - 150px); display: flex; flex-direction: column; }
+.manuscript-panel.fullscreen {
+  position: fixed; inset: 16px; z-index: 60; background: #1f1021;
+}
 .editor-top { display: grid; grid-template-columns: 1fr 120px; gap: 12px; align-items: center; }
 .word-pill { border: 1px solid var(--border); border-radius: 999px; padding: 9px 12px; text-align: center; color: var(--gold); }
 .format-bar { display:flex; flex-wrap:wrap; gap:8px; margin: 0 0 10px; }
@@ -138,13 +140,13 @@ main { padding: 28px; overflow: hidden; }
 .backup-row { display: flex; flex-wrap: wrap; gap: 12px; margin: 14px 0; }
 .file-label input { display: none; }
 .danger { color: var(--danger); }
-#rawData, #aiResults { min-height: 300px; font-family: Consolas, monospace; font-size: 0.9rem; }
+#rawData { min-height: 300px; font-family: Consolas, monospace; font-size: 0.85rem; }
 .hidden { display: none !important; }
 .search-results { margin-bottom: 24px; }
 .search-results h3 { margin-top: 0; }
 .modal {
   position: fixed; inset: 0; background: rgba(0,0,0,.68);
-  display: grid; place-items: center; padding: 20px; z-index: 50;
+  display: grid; place-items: center; padding: 20px; z-index: 80;
 }
 .modal-card {
   width: min(720px, 100%);
@@ -152,6 +154,7 @@ main { padding: 28px; overflow: hidden; }
   background: #1f1021; border: 1px solid var(--border);
   border-radius: 24px; box-shadow: var(--shadow); padding: 22px;
 }
+hr { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
 .print-area { display:none; }
 @media print {
   body { background: white; color: black; }

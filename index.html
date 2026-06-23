@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PlotPals</title>
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -13,14 +14,14 @@
         <div class="brand-mark">✦</div>
         <div>
           <h1>PlotPals</h1>
-          <p>Books, bible, manuscript, cloud & AI</p>
+          <p>Books, bible, manuscript & cloud sync</p>
         </div>
       </div>
 
       <div class="account-card">
-        <strong id="accountStatus">Local Mode</strong>
-        <p id="syncStatus">Saved in this browser.</p>
-        <button onclick="openModal('settingsModal')" class="wide">Settings</button>
+        <strong id="accountStatus">Checking account...</strong>
+        <p id="syncStatus">Cloud sync ready.</p>
+        <button onclick="openModal('authModal')" class="wide">Account</button>
       </div>
 
       <button class="wide" onclick="createSeries()">+ New Series</button>
@@ -45,14 +46,13 @@
         <button class="nav-btn" data-view="timeline">Timeline</button>
         <button class="nav-btn" data-view="world">Worldbuilding</button>
         <button class="nav-btn" data-view="relationships">Relationships</button>
-        <button class="nav-btn" data-view="ai">AI Tools</button>
         <button class="nav-btn" data-view="exports">Export</button>
         <button class="nav-btn" data-view="backup">Backup</button>
       </nav>
 
       <div class="sidebar-footer">
         <input id="globalSearch" placeholder="Search active project..." />
-        <p>Use Backup often.</p>
+        <p>Local + cloud backup when signed in.</p>
       </div>
     </aside>
 
@@ -63,7 +63,8 @@
           <p id="projectPath">No project selected.</p>
         </div>
         <div class="top-actions">
-          <button onclick="syncToCloud()" class="ghost-btn">Sync</button>
+          <button onclick="syncToCloud()" class="ghost-btn">Sync Now</button>
+          <button onclick="loadFromCloud()" class="ghost-btn">Load Cloud</button>
           <button id="clearSearch" class="ghost-btn">Clear Search</button>
         </div>
       </header>
@@ -122,7 +123,7 @@
               <button onclick="wrapSelection('**','**')">Bold</button>
               <button onclick="wrapSelection('*','*')">Italic</button>
               <button onclick="insertText('\n\n---\n\n')">Scene Break</button>
-              <button onclick="analyzeCurrentChapter()">Analyze Chapter</button>
+              <button onclick="toggleFullscreen()">Full Screen</button>
             </div>
             <textarea id="manuscriptEditor" class="manuscript-editor" placeholder="Start writing your chapter here..."></textarea>
           </div>
@@ -262,34 +263,6 @@
         <div id="relationshipList" class="card-grid"></div>
       </section>
 
-      <section id="ai" class="view">
-        <div class="grid ai-grid">
-          <div class="panel">
-            <h3>Character Consistency Checker</h3>
-            <p>Checks whether a selected character matches their profile, voice, arc, and relationships.</p>
-            <select id="aiCharacterSelect"></select>
-            <button onclick="runCharacterChecker()">Check Character</button>
-          </div>
-
-          <div class="panel">
-            <h3>Timeline Consistency Checker</h3>
-            <p>Looks for timeline order issues, age problems, repeated events, and unclear cause/effect.</p>
-            <button onclick="runTimelineChecker()">Check Timeline</button>
-          </div>
-
-          <div class="panel">
-            <h3>Chapter Analyzer</h3>
-            <p>Reviews the current chapter for pacing, emotion, conflict, clarity, and continuity.</p>
-            <button onclick="analyzeCurrentChapter()">Analyze Current Chapter</button>
-          </div>
-        </div>
-
-        <div class="panel">
-          <h3>AI Results</h3>
-          <textarea id="aiResults" readonly placeholder="AI analysis will appear here. Add your OpenAI API key in Settings to use live AI, or use the built-in local checklist mode."></textarea>
-        </div>
-      </section>
-
       <section id="exports" class="view">
         <div class="panel">
           <h3>Export Manuscript</h3>
@@ -297,6 +270,7 @@
             <button onclick="exportManuscriptTxt()">Export TXT</button>
             <button onclick="exportManuscriptDoc()">Export Word-Compatible DOC</button>
             <button onclick="exportManuscriptPDF()">Export PDF</button>
+            <button onclick="exportSeriesBibleDoc()">Export Series Bible DOC</button>
           </div>
           <p>PDF export uses your browser print dialog. Choose “Save as PDF.”</p>
           <div id="printArea" class="print-area"></div>
@@ -312,7 +286,7 @@
             <label class="file-label">Import Backup
               <input type="file" id="importFile" accept="application/json" onchange="importData(event)" />
             </label>
-            <button class="danger" onclick="resetAll()">Delete All Data</button>
+            <button class="danger" onclick="resetAll()">Delete Local Data</button>
           </div>
           <textarea id="rawData" readonly></textarea>
         </div>
@@ -320,27 +294,31 @@
     </main>
   </div>
 
-  <div id="settingsModal" class="modal hidden">
+  <div id="authModal" class="modal hidden">
     <div class="modal-card">
       <div class="card-header">
-        <h3>Settings</h3>
-        <button onclick="closeModal('settingsModal')" class="delete-btn">Close</button>
+        <h3>Account & Cloud Sync</h3>
+        <button onclick="closeModal('authModal')" class="delete-btn">Close</button>
       </div>
 
-      <h4>User Accounts & Cloud Sync</h4>
-      <p>This version includes a Supabase-ready setup. Add your Supabase URL and anon key to enable login/cloud sync.</p>
-      <input id="userEmail" placeholder="Email" />
-      <input id="supabaseUrl" placeholder="Supabase project URL" />
-      <input id="supabaseAnonKey" placeholder="Supabase anon/public key" />
-      <button onclick="saveCloudSettings()">Save Cloud Settings</button>
-      <button onclick="signInDemo()">Demo Sign In</button>
-      <button onclick="signOut()">Sign Out</button>
+      <p>Use your Supabase account to save and load your vault across devices.</p>
 
-      <h4>AI Settings</h4>
-      <p>Add an OpenAI API key to use live AI. Without it, the app uses local checklist analysis.</p>
-      <input id="openaiApiKey" placeholder="OpenAI API key" />
-      <input id="openaiModel" placeholder="Model, e.g. gpt-4.1-mini" />
-      <button onclick="saveAISettings()">Save AI Settings</button>
+      <label>Email</label>
+      <input id="authEmail" type="email" placeholder="you@example.com" />
+
+      <label>Password</label>
+      <input id="authPassword" type="password" placeholder="Password" />
+
+      <div class="backup-row">
+        <button onclick="signUp()">Sign Up</button>
+        <button onclick="signIn()">Sign In</button>
+        <button onclick="signOut()">Sign Out</button>
+        <button onclick="sendPasswordReset()">Reset Password</button>
+      </div>
+
+      <hr />
+      <p><strong>Cloud Sync:</strong> after signing in, use “Sync Now” to upload your current vault, or “Load Cloud” to pull your saved vault.</p>
+      <p id="authMessage"></p>
     </div>
   </div>
 
@@ -354,6 +332,10 @@
     </article>
   </template>
 
+  <script>
+    window.WRITERS_VAULT_SUPABASE_URL = "https://eygiasbppwcijzvfoxwp.supabase.co";
+    window.WRITERS_VAULT_SUPABASE_KEY = "sb_publishable_-iKq8JUH2VBrG2u3WCpGxg_Uq5Fq845";
+  </script>
   <script src="script.js"></script>
 </body>
 </html>

@@ -1,64 +1,81 @@
-# Writer's Vault Pro - Version 5
+# Writer's Vault Cloud - Version 6
 
-This version adds the requested professional features while still running as a simple local website.
+This version removes AI and adds Supabase account/cloud sync wiring.
 
-## Added in Version 5
+## Included
 
-- User account UI
-- Cloud sync scaffold
+- Supabase project URL and anon/public key already added
+- Sign up
+- Sign in
+- Sign out
+- Password reset
+- Manual cloud sync
+- Load cloud save
 - Multiple series
-- AI-powered character consistency checker
-- AI timeline consistency checker
-- AI chapter analyzer
-- Export to TXT
-- Export to Word-compatible .doc
-- Export to PDF using browser print/save as PDF
-- Improved manuscript editor
-- Formatting buttons
-- Chapter word counts
-- Search active project
-- Local fallback AI checklist mode
+- Book-first project structure
+- Manuscript editor
+- Chapter planner
+- Characters
+- Plot threads
+- Timeline
+- Worldbuilding
+- Relationships
+- Export TXT
+- Export Word-compatible DOC
+- Export PDF through browser print
+- Export Series Bible DOC
+- JSON backup/restore
 
-## Important
+## Supabase project used
 
-This is still a front-end website. It works immediately in local browser storage.
+Project URL:
+https://eygiasbppwcijzvfoxwp.supabase.co
 
-Cloud sync and live AI need external keys:
+Anon/Public Key:
+sb_publishable_-iKq8JUH2VBrG2u3WCpGxg_Uq5Fq845
 
-### Cloud Sync
+## Required Supabase table
 
-This build includes a Settings screen for Supabase URL and anon key.
+In Supabase, open SQL Editor and run this:
 
-To make cloud sync fully live, create a Supabase project and add a table like:
+```sql
+create table if not exists public.writer_vaults (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  user_email text,
+  vault_data jsonb not null,
+  updated_at timestamp with time zone default now()
+);
 
-Table: writer_vaults
+alter table public.writer_vaults enable row level security;
 
-Columns:
-- id uuid primary key default gen_random_uuid()
-- user_email text
-- vault_data jsonb
-- updated_at timestamp with time zone default now()
+create policy "Users can read their own vault"
+on public.writer_vaults
+for select
+using (auth.uid() = user_id);
 
-Then connect the `syncToCloud()` function inside `script.js` to Supabase's REST API or Supabase JS SDK.
+create policy "Users can insert their own vault"
+on public.writer_vaults
+for insert
+with check (auth.uid() = user_id);
 
-### AI
-
-Add an OpenAI API key in Settings.
-
-The app calls:
-
-https://api.openai.com/v1/responses
-
-If no key is added, the AI tools still work in local checklist mode.
-
-For a real public website, do not expose API keys in browser code. Use a backend/serverless function.
+create policy "Users can update their own vault"
+on public.writer_vaults
+for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+```
 
 ## How to use
 
 1. Unzip this folder.
 2. Open `index.html`.
-3. Create a series.
-4. Create a book.
-5. Draft in Manuscript Editor.
-6. Track bible items attached to either the book or whole series.
-7. Export backup often.
+3. Click Account.
+4. Sign up or sign in.
+5. Create your series/book.
+6. Use Sync Now to save to cloud.
+7. Use Load Cloud on another device after signing in.
+
+## Notes
+
+This is a browser-based version. It uses localStorage plus Supabase cloud sync.
+The anon/public key is safe to use in frontend apps, but never add a Supabase service role key to frontend code.
