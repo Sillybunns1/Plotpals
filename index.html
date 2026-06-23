@@ -17,71 +17,86 @@
           <p>Login required to access your books.</p>
         </div>
       </div>
-
       <div class="login-tabs">
         <button id="loginTab" class="active" onclick="switchAuthMode('login')">Login</button>
         <button id="signupTab" onclick="switchAuthMode('signup')">Sign Up</button>
       </div>
-
       <label>Email</label>
       <input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="email" />
-
       <label>Password</label>
       <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" />
-
       <button id="authSubmitBtn" class="wide glow" onclick="submitAuth()">Login</button>
       <button class="wide ghost-btn" onclick="sendPasswordResetFromLogin()">Reset Password</button>
-
       <p id="loginMessage"></p>
     </div>
   </section>
 
-  <div id="appShell" class="app-shell hidden">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">✦</div>
-        <div>
-          <h1>PlotPals</h1>
-          <p>Books, bible, manuscript & cloud sync</p>
+  <section id="projectScreen" class="project-screen hidden">
+    <div class="project-card">
+      <div class="top-row">
+        <div class="brand">
+          <div class="brand-mark">✦</div>
+          <div>
+            <h1>Select Your Project</h1>
+            <p>Choose or create a series and book before opening the workspace.</p>
+          </div>
         </div>
+        <button onclick="signOut()" class="ghost-btn">Sign Out</button>
+      </div>
+
+      <div class="project-grid">
+        <div class="panel">
+          <h3>Create New</h3>
+          <label>Series Title</label>
+          <input id="newSeriesTitle" placeholder="Series title" />
+          <button onclick="createSeriesFromProject()">Create Series</button>
+
+          <hr />
+          <label>Book Title</label>
+          <input id="newBookTitle" placeholder="Book title" />
+          <label>Add to Series</label>
+          <select id="newBookSeriesSelect"></select>
+          <button onclick="createBookFromProject()">Create Book</button>
+        </div>
+
+        <div class="panel">
+          <h3>Select Existing</h3>
+          <label>Series</label>
+          <select id="projectSeriesSelect" onchange="projectSeriesChanged()"></select>
+          <label>Book</label>
+          <select id="projectBookSelect"></select>
+          <button class="wide glow" onclick="openWorkspace()">Open Workspace</button>
+          <p id="projectMessage"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="appShell" class="app-shell hidden">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand compact-brand">
+        <div class="brand-mark">✦</div>
+        <div class="brand-text">
+          <h1>PlotPals</h1>
+          <p id="sidebarProjectName">Project</p>
+        </div>
+      </div>
+
+      <div class="sidebar-actions">
+        <button onclick="toggleSidebar()" title="Collapse menu">☰</button>
+        <button onclick="backToProjects()" title="Change book">Books</button>
+        <button onclick="signOut()" title="Sign out">Exit</button>
       </div>
 
       <div class="account-card">
         <strong id="accountStatus">Signed in</strong>
         <p id="syncStatus">Cloud sync ready.</p>
-        <button onclick="signOut()" class="wide">Sign Out</button>
       </div>
 
-      <button class="wide" onclick="createSeries()">+ New Series</button>
-      <button class="wide" onclick="createBook()">+ New Book</button>
-
-      <div class="selector-block">
-        <label>Active Series</label>
-        <select id="activeSeries" onchange="setActiveSeries(this.value)"></select>
-      </div>
-
-      <div class="selector-block">
-        <label>Active Book</label>
-        <select id="activeBook" onchange="setActiveBook(this.value)"></select>
-      </div>
-
-      <nav>
-        <button class="nav-btn active" data-view="overview">Overview</button>
-        <button class="nav-btn" data-view="write">Manuscript Editor</button>
-        <button class="nav-btn" data-view="chapters">Chapter Planner</button>
-        <button class="nav-btn" data-view="characters">Characters</button>
-        <button class="nav-btn" data-view="plot">Plot Threads</button>
-        <button class="nav-btn" data-view="timeline">Timeline</button>
-        <button class="nav-btn" data-view="world">Worldbuilding</button>
-        <button class="nav-btn" data-view="relationships">Relationships</button>
-        <button class="nav-btn" data-view="stats">Writing Stats</button>
-        <button class="nav-btn" data-view="exports">Export</button>
-        <button class="nav-btn" data-view="backup">Backup</button>
-      </nav>
+      <nav id="nestedNav" class="nested-nav"></nav>
 
       <div class="sidebar-footer">
-        <input id="globalSearch" placeholder="Search active project..." />
-        <p>Auto-save: local + cloud.</p>
+        <input id="globalSearch" placeholder="Search project..." />
       </div>
     </aside>
 
@@ -138,7 +153,7 @@
       <section id="write" class="view">
         <div class="editor-layout">
           <aside class="chapter-sidebar panel">
-            <h3>Chapter Navigation</h3>
+            <h3>Manuscript Chapters</h3>
             <button onclick="addManuscriptChapter()">+ Add Chapter</button>
             <button onclick="moveChapter(-1)">Move Up</button>
             <button onclick="moveChapter(1)">Move Down</button>
@@ -197,37 +212,7 @@
         <div id="chapterPlanList" class="card-grid"></div>
       </section>
 
-      <section id="characters" class="view">
-        <div class="form-panel">
-          <h3>Add Character</h3>
-          <div class="form-grid">
-            <input id="charName" placeholder="Character name" />
-            <select id="charScope">
-              <option value="book">Attach to this book</option>
-              <option value="series">Attach to whole series</option>
-            </select>
-            <select id="charRole">
-              <option>Main</option>
-              <option>Side</option>
-              <option>Love Interest</option>
-              <option>Antagonist</option>
-              <option>Mentor</option>
-              <option>Other</option>
-            </select>
-            <input id="charSpecies" placeholder="Species / identity" />
-            <textarea id="charDescription" placeholder="Physical description"></textarea>
-            <textarea id="charPersonality" placeholder="Personality"></textarea>
-            <textarea id="charWound" placeholder="Core wound / fear / desire"></textarea>
-            <textarea id="charArc" placeholder="Character arc"></textarea>
-            <textarea id="charVoice" placeholder="Voice / speech patterns"></textarea>
-            <textarea id="charRelationships" placeholder="Important relationships"></textarea>
-          </div>
-          <button onclick="addCharacter()">Add Character</button>
-        </div>
-        <div id="characterList" class="card-grid"></div>
-      </section>
-
-      <section id="plot" class="view">
+      <section id="threads" class="view">
         <div class="form-panel">
           <h3>Add Plot Thread</h3>
           <div class="form-grid">
@@ -247,6 +232,80 @@
           <button onclick="addThread()">Add Thread</button>
         </div>
         <div id="threadList" class="card-grid"></div>
+      </section>
+
+      <section id="characters" class="view">
+        <div class="form-panel">
+          <h3>Add Character</h3>
+          <div class="form-grid">
+            <input id="charName" placeholder="Character name" />
+            <select id="charScope">
+              <option value="book">Attach to this book</option>
+              <option value="series">Attach to whole series</option>
+            </select>
+            <select id="charRole">
+              <option>Main</option>
+              <option>Side</option>
+              <option>Love Interest</option>
+              <option>Antagonist</option>
+              <option>Mentor</option>
+              <option>Other</option>
+            </select>
+            <input id="charSpecies" placeholder="Species / identity" />
+            <label class="file-label inline-file">Upload Character Photo
+              <input id="charPhoto" type="file" accept="image/*" />
+            </label>
+            <textarea id="charDescription" placeholder="Physical description"></textarea>
+            <textarea id="charPersonality" placeholder="Personality"></textarea>
+            <textarea id="charWound" placeholder="Core wound / fear / desire"></textarea>
+            <textarea id="charArc" placeholder="Character arc"></textarea>
+            <textarea id="charVoice" placeholder="Voice / speech patterns"></textarea>
+            <textarea id="charRelationships" placeholder="Important relationship notes"></textarea>
+          </div>
+          <button onclick="addCharacter()">Add Character</button>
+        </div>
+        <div id="characterRoleGroups"></div>
+      </section>
+
+      <section id="characterDetail" class="view">
+        <div id="characterDetailContent"></div>
+      </section>
+
+      <section id="relationships" class="view">
+        <div class="form-panel">
+          <h3>Add Relationship</h3>
+          <div class="form-grid">
+            <select id="relA"></select>
+            <select id="relB"></select>
+            <select id="relScope">
+              <option value="book">Attach to this book</option>
+              <option value="series">Attach to whole series</option>
+            </select>
+            <input id="relType" placeholder="Relationship type" />
+            <textarea id="relNotes" placeholder="Relationship notes, tension, history, changes"></textarea>
+          </div>
+          <button onclick="addRelationship()">Add Relationship</button>
+        </div>
+        <div id="relationshipMap" class="relationship-map"></div>
+        <div id="relationshipList" class="card-grid"></div>
+      </section>
+
+      <section id="scenes" class="view">
+        <div class="form-panel">
+          <h3>Add Scene</h3>
+          <div class="form-grid">
+            <input id="sceneName" placeholder="Scene name" />
+            <select id="sceneScope">
+              <option value="book">Attach to this book</option>
+              <option value="series">Attach to whole series</option>
+            </select>
+            <input id="sceneLocation" placeholder="Location" />
+            <textarea id="sceneSummary" placeholder="Scene summary"></textarea>
+            <textarea id="scenePurpose" placeholder="Purpose, mood, characters present"></textarea>
+          </div>
+          <button onclick="addScene()">Add Scene</button>
+        </div>
+        <div id="sceneList" class="card-grid"></div>
       </section>
 
       <section id="timeline" class="view">
@@ -293,25 +352,6 @@
         <div id="worldList" class="card-grid"></div>
       </section>
 
-      <section id="relationships" class="view">
-        <div class="form-panel">
-          <h3>Add Relationship</h3>
-          <div class="form-grid">
-            <input id="relA" placeholder="Character A" />
-            <input id="relB" placeholder="Character B" />
-            <select id="relScope">
-              <option value="book">Attach to this book</option>
-              <option value="series">Attach to whole series</option>
-            </select>
-            <input id="relType" placeholder="Relationship type" />
-            <textarea id="relNotes" placeholder="Relationship notes, tension, history, changes"></textarea>
-          </div>
-          <button onclick="addRelationship()">Add Relationship</button>
-        </div>
-        <div id="relationshipMap" class="relationship-map"></div>
-        <div id="relationshipList" class="card-grid"></div>
-      </section>
-
       <section id="stats" class="view">
         <div class="grid stats-grid">
           <div class="stat-card"><span id="statsTotalWords">0</span><p>Total Book Words</p></div>
@@ -327,8 +367,8 @@
 
       <section id="exports" class="view">
         <div class="panel">
-          <h3>Export Improvements</h3>
-          <p>Export your full manuscript or series bible. DOCX is Word-compatible and PDF uses the browser print/save dialog.</p>
+          <h3>Export</h3>
+          <p>Export your full manuscript or series bible.</p>
           <div class="backup-row">
             <button onclick="exportFullManuscriptTxt()">Full Manuscript TXT</button>
             <button onclick="exportFullManuscriptDocx()">Full Manuscript DOCX</button>
@@ -343,7 +383,6 @@
       <section id="backup" class="view">
         <div class="panel">
           <h3>Backup & Restore</h3>
-          <p>Export your full writing vault as JSON or import a backup.</p>
           <div class="backup-row">
             <button onclick="exportData()">Export Backup JSON</button>
             <label class="file-label">Import Backup

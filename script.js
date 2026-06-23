@@ -1,10 +1,11 @@
-const STORAGE_KEY = "writersVaultV7";
+const STORAGE_KEY = "writersVaultV8";
 const CLOUD_TABLE = "writer_vaults";
 
 const defaultData = {
   activeSeriesId: null,
   activeBookId: null,
   activeChapterId: null,
+  selectedCharacterId: null,
   user: null,
   series: [],
   books: [],
@@ -13,6 +14,7 @@ const defaultData = {
   timeline: [],
   chapterPlans: [],
   threads: [],
+  scenes: [],
   world: []
 };
 
@@ -45,7 +47,7 @@ function saveData(render = true, scheduleCloud = true) {
   if (render) renderAll();
   if (scheduleCloud) scheduleCloudSave();
 }
-function val(id) { return document.getElementById(id).value.trim(); }
+function val(id) { return document.getElementById(id)?.value.trim() || ""; }
 function setVal(id, value) { const el = document.getElementById(id); if (el) el.value = value || ""; }
 function clearFields(ids) { ids.forEach(id => setVal(id, "")); }
 function escapeHTML(str = "") {
@@ -69,10 +71,14 @@ function activeManuscriptChapter() {
   return (book.manuscript || []).find(c => c.id === data.activeChapterId) || null;
 }
 function ensureProject() {
-  if (!data.series.length) createSeries("Untitled Series", false);
-  if (!data.books.length) createBook("Untitled Book", false);
-  if (!data.activeSeriesId) data.activeSeriesId = data.series[0]?.id || null;
-  if (!data.activeBookId) data.activeBookId = data.books.find(b => b.seriesId === data.activeSeriesId)?.id || data.books[0]?.id || null;
+  if (!data.series) data.series = [];
+  if (!data.books) data.books = [];
+  if (!data.scenes) data.scenes = [];
+  if (!data.activeSeriesId && data.series[0]) data.activeSeriesId = data.series[0].id;
+  if (!data.activeBookId && data.activeSeriesId) {
+    const firstBook = data.books.find(b => b.seriesId === data.activeSeriesId);
+    data.activeBookId = firstBook?.id || null;
+  }
   const book = activeBook();
   if (book && (!book.manuscript || !book.manuscript.length)) {
     book.manuscript = [{ id: uid(), title: "Chapter One", content: "", created: new Date().toISOString() }];
@@ -87,12 +93,13 @@ function switchAuthMode(mode) {
   document.getElementById("authSubmitBtn").textContent = mode === "login" ? "Login" : "Create Account";
   setLoginMessage("");
 }
-async function submitAuth() {
-  if (authMode === "login") return signIn();
-  return signUp();
-}
+async function submitAuth() { return authMode === "login" ? signIn() : signUp(); }
 function setLoginMessage(message) {
   const el = document.getElementById("loginMessage");
+  if (el) el.textContent = message || "";
+}
+function setProjectMessage(message) {
+  const el = document.getElementById("projectMessage");
   if (el) el.textContent = message || "";
 }
 async function refreshSession() {
@@ -105,9 +112,12 @@ async function refreshSession() {
 }
 function updateAuthGate() {
   const loggedIn = !!data.user?.id;
+  const hasProject = !!(data.activeSeriesId && data.activeBookId);
   document.getElementById("loginScreen").classList.toggle("hidden", loggedIn);
-  document.getElementById("appShell").classList.toggle("hidden", !loggedIn);
+  document.getElementById("projectScreen").classList.toggle("hidden", !loggedIn || hasProject);
+  document.getElementById("appShell").classList.toggle("hidden", !loggedIn || !hasProject);
   renderAccount();
+  if (loggedIn && !hasProject) renderProjectScreen();
 }
 async function signUp() {
   if (!supabaseClient) return setLoginMessage("Supabase could not load. Check your internet connection.");
@@ -125,13 +135,16 @@ async function signIn() {
   if (error) return setLoginMessage(error.message);
   data.user = { id: result.user.id, email: result.user.email };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data, null, 2));
-  updateAuthGate();
   await loadFromCloud(false);
-  renderAll();
+  data.activeSeriesId = null;
+  data.activeBookId = null;
+  updateAuthGate();
 }
 async function signOut() {
   if (supabaseClient) await supabaseClient.auth.signOut();
   data.user = null;
+  data.activeSeriesId = null;
+  data.activeBookId = null;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data, null, 2));
   updateAuthGate();
 }
@@ -150,6 +163,71 @@ function renderAccount() {
   sync.textContent = data.user?.id ? "Signed in. Auto-save enabled." : "Login required.";
 }
 
+function renderProjectScreen() {
+  const seriesOptions = data.series.length
+    ? data.series.map(s => `<option value="${s.id}">${escapeHTML(s.title)}</option>`).join("")
+    : `<option value="">No series yet</option>`;
+  const projectSeries = document.getElementById("projectSeriesSelect");
+  const newBookSeries = document.getElementById("newBookSeriesSelect");
+  if (projectSeries) projectSeries.innerHTML = seriesOptions;
+  if (newBookSeries) newBookSeries.innerHTML = seriesOptions;
+  projectSeriesChanged();
+}
+function projectSeriesChanged() {
+  const seriesId = val("projectSeriesSelect");
+  const books = data.books.filter(b => b.seriesId === seriesId);
+  const bookSelect = document.getElementById("projectBookSelect");
+  if (bookSelect) {
+    bookSelect.innerHTML = books.length
+      ? books.map(b => `<option value="${b.id}">${escapeHTML(b.title)}</option>`).join("")
+      : `<option value="">No books in this series</option>`;
+  }
+}
+function createSeriesFromProject() {
+  const name = val("newSeriesTitle") || "Untitled Series";
+  const series = { id: uid(), title: name, genre: "", synopsis: "", theme: "", mysteries: "", foreshadowing: "", created: new Date().toISOString() };
+  data.series.push(series);
+  data.activeSeriesId = null;
+  data.activeBookId = null;
+  setVal("newSeriesTitle", "");
+  saveData(false);
+  renderProjectScreen();
+  setProjectMessage("Series created. Now create or select a book.");
+}
+function createBookFromProject() {
+  const seriesId = val("newBookSeriesSelect");
+  if (!seriesId) return setProjectMessage("Create or select a series first.");
+  const name = val("newBookTitle") || "Untitled Book";
+  const book = {
+    id: uid(), seriesId, title: name, status: "Planning", summary: "", theme: "", notes: "",
+    manuscript: [{ id: uid(), title: "Chapter One", content: "", created: new Date().toISOString() }],
+    created: new Date().toISOString()
+  };
+  data.books.push(book);
+  setVal("newBookTitle", "");
+  saveData(false);
+  renderProjectScreen();
+  setProjectMessage("Book created. Select it and open workspace.");
+}
+function openWorkspace() {
+  const seriesId = val("projectSeriesSelect");
+  const bookId = val("projectBookSelect");
+  if (!seriesId || !bookId) return setProjectMessage("Select both a series and a book.");
+  data.activeSeriesId = seriesId;
+  data.activeBookId = bookId;
+  const book = activeBook();
+  data.activeChapterId = book?.manuscript?.[0]?.id || null;
+  saveData();
+  updateAuthGate();
+}
+function backToProjects() {
+  saveCurrentManuscriptChapter(false, false);
+  data.activeSeriesId = null;
+  data.activeBookId = null;
+  saveData(false, false);
+  updateAuthGate();
+}
+
 function scheduleCloudSave() {
   if (!data.user?.id || !supabaseClient) return;
   clearTimeout(cloudSaveTimer);
@@ -160,21 +238,17 @@ async function syncToCloud(showAlert = true) {
     if (showAlert) alert("Supabase is not loaded. Check your internet connection.");
     return;
   }
+  const currentProject = { seriesId: data.activeSeriesId, bookId: data.activeBookId, chapterId: data.activeChapterId };
   await refreshSession();
+  data.activeSeriesId = currentProject.seriesId;
+  data.activeBookId = currentProject.bookId;
+  data.activeChapterId = currentProject.chapterId;
   if (!data.user?.id) {
     if (showAlert) alert("Login first.");
     return;
   }
-  const payload = {
-    user_id: data.user.id,
-    user_email: data.user.email,
-    vault_data: data,
-    updated_at: new Date().toISOString()
-  };
-  const { error } = await supabaseClient
-    .from(CLOUD_TABLE)
-    .upsert(payload, { onConflict: "user_id" });
-
+  const payload = { user_id: data.user.id, user_email: data.user.email, vault_data: data, updated_at: new Date().toISOString() };
+  const { error } = await supabaseClient.from(CLOUD_TABLE).upsert(payload, { onConflict: "user_id" });
   if (error) {
     document.getElementById("syncStatus").textContent = "Sync failed.";
     if (showAlert) alert("Cloud sync failed. Check the Supabase table/RLS setup. " + error.message);
@@ -191,94 +265,113 @@ async function loadFromCloud(showAlert = true) {
     if (showAlert) alert("Supabase is not loaded. Check your internet connection.");
     return;
   }
-  await refreshSession();
-  if (!data.user?.id) {
+  const session = await supabaseClient.auth.getSession();
+  const user = session.data?.session?.user;
+  if (!user) {
     if (showAlert) alert("Login first.");
     return;
   }
-  const { data: rows, error } = await supabaseClient
-    .from(CLOUD_TABLE)
-    .select("vault_data, updated_at")
-    .eq("user_id", data.user.id)
-    .limit(1);
-
+  const { data: rows, error } = await supabaseClient.from(CLOUD_TABLE).select("vault_data, updated_at").eq("user_id", user.id).limit(1);
   if (error) {
     if (showAlert) alert("Could not load cloud data. Check the Supabase table/RLS setup. " + error.message);
     console.error(error);
     return;
   }
   if (!rows || !rows.length || !rows[0].vault_data) {
+    data.user = { id: user.id, email: user.email };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data, null, 2));
     if (showAlert) alert("No cloud vault found yet. Use Sync Now to create one.");
     return;
   }
-  const currentUser = data.user;
-  data = { ...structuredClone(defaultData), ...rows[0].vault_data, user: currentUser };
+  data = { ...structuredClone(defaultData), ...rows[0].vault_data, user: { id: user.id, email: user.email } };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data, null, 2));
-  renderAll();
-  document.getElementById("syncStatus").textContent = "Loaded cloud save.";
-  if (showAlert) alert("Loaded from Supabase.");
+  if (showAlert) {
+    renderAll();
+    alert("Loaded from Supabase.");
+  }
 }
 
-function createSeries(title = null, shouldRender = true) {
-  const name = title || prompt("Series title?") || "Untitled Series";
-  const series = { id: uid(), title: name, genre: "", synopsis: "", theme: "", mysteries: "", foreshadowing: "", created: new Date().toISOString() };
-  data.series.push(series);
-  data.activeSeriesId = series.id;
-  if (shouldRender) saveData(); else saveData(false, false);
+function toggleSidebar() {
+  document.getElementById("appShell").classList.toggle("collapsed");
 }
-function createBook(title = null, shouldRender = true) {
-  if (!data.activeSeriesId && !data.series.length) createSeries("Untitled Series", false);
-  const name = title || prompt("Book title?") || "Untitled Book";
-  const book = {
-    id: uid(), seriesId: data.activeSeriesId, title: name, status: "Planning", summary: "", theme: "", notes: "",
-    manuscript: [{ id: uid(), title: "Chapter One", content: "", created: new Date().toISOString() }],
-    created: new Date().toISOString()
+
+function setView(view, id = null) {
+  saveCurrentManuscriptChapter(false, false);
+  if (view === "write" && id) data.activeChapterId = id;
+  if (view === "characterDetail" && id) data.selectedCharacterId = id;
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.getElementById(view).classList.add("active");
+  const titles = {
+    overview: "Overview", write: "Manuscript Editor", chapters: "Chapter Planner", threads: "Plot Threads", characters: "Characters",
+    characterDetail: "Character Detail", scenes: "Scenes", timeline: "Timeline", world: "Worldbuilding", relationships: "Relationships",
+    stats: "Writing Statistics", exports: "Export", backup: "Backup"
   };
-  data.books.push(book);
-  data.activeBookId = book.id;
-  data.activeChapterId = book.manuscript[0].id;
-  if (shouldRender) saveData(); else saveData(false, false);
+  document.getElementById("viewTitle").textContent = titles[view] || "Workspace";
+  renderAll();
 }
-function setActiveSeries(id) {
-  saveCurrentManuscriptChapter(false, false);
-  data.activeSeriesId = id;
-  const firstBook = data.books.find(b => b.seriesId === id);
-  data.activeBookId = firstBook?.id || null;
-  data.activeChapterId = firstBook?.manuscript?.[0]?.id || null;
-  saveData();
-}
-function setActiveBook(id) {
-  saveCurrentManuscriptChapter(false, false);
-  data.activeBookId = id;
+function renderNestedNav() {
+  const nav = document.getElementById("nestedNav");
+  if (!nav) return;
   const book = activeBook();
-  data.activeChapterId = book?.manuscript?.[0]?.id || null;
-  saveData();
-}
-
-function makeCard(title, body, onDelete) {
-  const template = document.getElementById("cardTemplate");
-  const node = template.content.cloneNode(true);
-  node.querySelector("h3").textContent = title || "Untitled";
-  node.querySelector(".card-body").innerHTML = body;
-  node.querySelector(".delete-btn").onclick = onDelete;
-  return node;
-}
-function deleteItem(collection, id) {
-  data[collection] = data[collection].filter(item => item.id !== id);
-  saveData();
-}
-function scopedItem(scope) {
-  return scope === "series"
-    ? { scope, seriesId: data.activeSeriesId, bookId: null }
-    : { scope, seriesId: data.activeSeriesId, bookId: data.activeBookId };
-}
-function visibleByScope(item) {
-  return item.seriesId === data.activeSeriesId && (item.scope === "series" || item.bookId === data.activeBookId);
+  const chapters = book?.manuscript || [];
+  const plans = data.chapterPlans.filter(visibleByScope);
+  const threads = data.threads.filter(visibleByScope);
+  const scenes = data.scenes.filter(visibleByScope);
+  const timeline = data.timeline.filter(visibleByScope);
+  const rels = data.relationships.filter(visibleByScope);
+  const roles = ["Main", "Side", "Love Interest", "Antagonist", "Mentor", "Other"];
+  const charsByRole = role => data.characters.filter(c => visibleByScope(c) && (c.role || "Other") === role);
+  nav.innerHTML = `
+    <div class="nav-section">
+      <button class="nav-parent" onclick="setView('overview')"><span class="nav-label">Overview</span><span>⌂</span></button>
+    </div>
+    <div class="nav-section">
+      <button class="nav-parent" onclick="setView('write')"><span class="nav-label">Manuscript Editor</span><span class="nav-count">${chapters.length}</span></button>
+      <div class="nav-children">
+        ${chapters.map((c,i)=>`<button class="nav-child" onclick="setView('write','${c.id}')"><span>${i+1}. ${escapeHTML(c.title||"Untitled")}</span></button>`).join("")}
+      </div>
+    </div>
+    <div class="nav-section">
+      <button class="nav-parent"><span class="nav-label">Plot</span><span>▾</span></button>
+      <div class="nav-children">
+        <button class="nav-child" onclick="setView('chapters')"><span>Chapter Planner</span><span class="nav-count">${plans.length}</span></button>
+        ${plans.map(p=>`<button class="nav-grandchild" onclick="setView('chapters')">${escapeHTML(p.number||"Untitled")}</button>`).join("")}
+        <button class="nav-child" onclick="setView('threads')"><span>Plot Threads</span><span class="nav-count">${threads.length}</span></button>
+        ${threads.map(t=>`<button class="nav-grandchild" onclick="setView('threads')">${escapeHTML(t.title||"Untitled")}</button>`).join("")}
+      </div>
+    </div>
+    <div class="nav-section">
+      <button class="nav-parent" onclick="setView('characters')"><span class="nav-label">Characters</span><span class="nav-count">${data.characters.filter(visibleByScope).length}</span></button>
+      <div class="nav-children">
+        ${roles.map(role=>`
+          <button class="nav-child" onclick="setView('characters')"><span>${role}</span><span class="nav-count">${charsByRole(role).length}</span></button>
+          ${charsByRole(role).map(c=>`<button class="nav-grandchild" onclick="setView('characterDetail','${c.id}')">${escapeHTML(c.name||"Unnamed")}</button>`).join("")}
+        `).join("")}
+      </div>
+    </div>
+    <div class="nav-section">
+      <button class="nav-parent"><span class="nav-label">Worldbuilding</span><span>▾</span></button>
+      <div class="nav-children">
+        <button class="nav-child" onclick="setView('world')"><span>World Notes</span><span class="nav-count">${data.world.filter(visibleByScope).length}</span></button>
+        <button class="nav-child" onclick="setView('scenes')"><span>Scenes</span><span class="nav-count">${scenes.length}</span></button>
+        ${scenes.map(s=>`<button class="nav-grandchild" onclick="setView('scenes')">${escapeHTML(s.name||"Untitled")}</button>`).join("")}
+        <button class="nav-child" onclick="setView('relationships')"><span>Relationships</span><span class="nav-count">${rels.length}</span></button>
+        ${rels.map(r=>`<button class="nav-grandchild" onclick="setView('relationships')">${escapeHTML(characterName(r.a))} + ${escapeHTML(characterName(r.b))}</button>`).join("")}
+        <button class="nav-child" onclick="setView('timeline')"><span>Timeline</span><span class="nav-count">${timeline.length}</span></button>
+        ${timeline.map(t=>`<button class="nav-grandchild" onclick="setView('timeline')">${escapeHTML(t.when||"Unplaced")}</button>`).join("")}
+      </div>
+    </div>
+    <div class="nav-section">
+      <button class="nav-parent" onclick="setView('stats')"><span class="nav-label">Writing Stats</span><span>↗</span></button>
+      <button class="nav-parent" onclick="setView('exports')"><span class="nav-label">Export</span><span>⇩</span></button>
+      <button class="nav-parent" onclick="setView('backup')"><span class="nav-label">Backup</span><span>☁</span></button>
+    </div>
+  `;
 }
 
 function addManuscriptChapter() {
   const book = activeBook();
-  if (!book) return alert("Create or select a book first.");
+  if (!book) return alert("Open a book first.");
   saveCurrentManuscriptChapter(false, false);
   if (!book.manuscript) book.manuscript = [];
   const chapter = { id: uid(), title: `Chapter ${book.manuscript.length + 1}`, content: "", created: new Date().toISOString() };
@@ -286,11 +379,7 @@ function addManuscriptChapter() {
   data.activeChapterId = chapter.id;
   saveData();
 }
-function selectManuscriptChapter(id) {
-  saveCurrentManuscriptChapter(false, false);
-  data.activeChapterId = id;
-  saveData();
-}
+function selectManuscriptChapter(id) { setView("write", id); }
 function saveCurrentManuscriptChapter(render = false, scheduleCloud = true) {
   if (isRendering) return;
   const ch = activeManuscriptChapter();
@@ -335,9 +424,7 @@ function insertSceneBreak() {
   document.execCommand("insertHTML", false, "<p style='text-align:center;'>✦ ✦ ✦</p>");
   saveCurrentManuscriptChapter(false);
 }
-function toggleFullscreen() {
-  document.getElementById("manuscriptPanel").classList.toggle("fullscreen");
-}
+function toggleFullscreen() { document.getElementById("manuscriptPanel").classList.toggle("fullscreen"); }
 function updateEditorStats() {
   const ch = activeManuscriptChapter();
   const text = stripHTML(ch?.content || "");
@@ -345,14 +432,20 @@ function updateEditorStats() {
   const chapterWords = countWords(text);
   const bookWords = (book?.manuscript || []).reduce((sum, c) => sum + countWords(stripHTML(c.content || "")), 0);
   const paragraphs = ((ch?.content || "").match(/<p|<div|<h[1-6]/gi) || []).length || (text.trim() ? 1 : 0);
-  const chapterWordEl = document.getElementById("chapterWordCount");
-  const bookWordEl = document.getElementById("bookWordCountInline");
-  const charEl = document.getElementById("chapterCharCount");
-  const paraEl = document.getElementById("chapterParagraphCount");
-  if (chapterWordEl) chapterWordEl.textContent = chapterWords;
-  if (bookWordEl) bookWordEl.textContent = bookWords;
-  if (charEl) charEl.textContent = text.length;
-  if (paraEl) paraEl.textContent = paragraphs;
+  setText("chapterWordCount", chapterWords);
+  setText("bookWordCountInline", bookWords);
+  setText("chapterCharCount", text.length);
+  setText("chapterParagraphCount", paragraphs);
+}
+function setText(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
+
+function scopedItem(scope) {
+  return scope === "series" ? { scope, seriesId: data.activeSeriesId, bookId: null } : { scope, seriesId: data.activeSeriesId, bookId: data.activeBookId };
+}
+function visibleByScope(item) { return item.seriesId === data.activeSeriesId && (item.scope === "series" || item.bookId === data.activeBookId); }
+function characterName(id) { return data.characters.find(c => c.id === id)?.name || "Unknown"; }
+function characterRelationships(characterId) {
+  return data.relationships.filter(r => visibleByScope(r) && (r.a === characterId || r.b === characterId));
 }
 
 function addChapterPlan() {
@@ -365,12 +458,20 @@ function addChapterPlan() {
   saveData();
 }
 function addCharacter() {
-  data.characters.push({ id: uid(), ...scopedItem(val("charScope")), name: val("charName"), role: val("charRole"),
-    species: val("charSpecies"), description: val("charDescription"), personality: val("charPersonality"),
-    wound: val("charWound"), arc: val("charArc"), voice: val("charVoice"), relationships: val("charRelationships"), created: new Date().toISOString()
-  });
-  clearFields(["charName","charSpecies","charDescription","charPersonality","charWound","charArc","charVoice","charRelationships"]);
-  saveData();
+  const file = document.getElementById("charPhoto").files[0];
+  const finish = photo => {
+    data.characters.push({ id: uid(), ...scopedItem(val("charScope")), name: val("charName"), role: val("charRole"),
+      species: val("charSpecies"), photo, description: val("charDescription"), personality: val("charPersonality"),
+      wound: val("charWound"), arc: val("charArc"), voice: val("charVoice"), relationships: val("charRelationships"), created: new Date().toISOString()
+    });
+    clearFields(["charName","charSpecies","charDescription","charPersonality","charWound","charArc","charVoice","charRelationships"]);
+    document.getElementById("charPhoto").value = "";
+    saveData();
+  };
+  if (!file) return finish("");
+  const reader = new FileReader();
+  reader.onload = () => finish(reader.result);
+  reader.readAsDataURL(file);
 }
 function addThread() {
   data.threads.push({ id: uid(), ...scopedItem(val("threadScope")), title: val("threadTitle"), status: val("threadStatus"),
@@ -393,24 +494,35 @@ function addWorld() {
   clearFields(["worldName","worldDescription","worldRules"]);
   saveData();
 }
+function addScene() {
+  if (!data.scenes) data.scenes = [];
+  data.scenes.push({ id: uid(), ...scopedItem(val("sceneScope")), name: val("sceneName"), location: val("sceneLocation"),
+    summary: val("sceneSummary"), purpose: val("scenePurpose"), created: new Date().toISOString()
+  });
+  clearFields(["sceneName","sceneLocation","sceneSummary","scenePurpose"]);
+  saveData();
+}
 function addRelationship() {
   data.relationships.push({ id: uid(), ...scopedItem(val("relScope")), a: val("relA"), b: val("relB"), type: val("relType"),
     notes: val("relNotes"), created: new Date().toISOString()
   });
-  clearFields(["relA","relB","relType","relNotes"]);
+  clearFields(["relType","relNotes"]);
   saveData();
 }
 
-function renderSelectors() {
-  const seriesSelect = document.getElementById("activeSeries");
-  if (!seriesSelect) return;
-  seriesSelect.innerHTML = data.series.map(s => `<option value="${s.id}" ${s.id === data.activeSeriesId ? "selected" : ""}>${escapeHTML(s.title)}</option>`).join("");
-  const bookSelect = document.getElementById("activeBook");
-  const books = data.books.filter(b => b.seriesId === data.activeSeriesId);
-  bookSelect.innerHTML = books.length
-    ? books.map(b => `<option value="${b.id}" ${b.id === data.activeBookId ? "selected" : ""}>${escapeHTML(b.title)}</option>`).join("")
-    : `<option>No books yet</option>`;
+function makeCard(title, body, onDelete) {
+  const template = document.getElementById("cardTemplate");
+  const node = template.content.cloneNode(true);
+  node.querySelector("h3").textContent = title || "Untitled";
+  node.querySelector(".card-body").innerHTML = body;
+  node.querySelector(".delete-btn").onclick = onDelete;
+  return node;
 }
+function deleteItem(collection, id) {
+  data[collection] = data[collection].filter(item => item.id !== id);
+  saveData();
+}
+
 function renderOverview() {
   const s = activeSeries();
   const b = activeBook();
@@ -425,13 +537,13 @@ function renderOverview() {
   setVal("bookSummaryEdit", b?.summary);
   setVal("bookThemeEdit", b?.theme);
   setVal("bookNotesEdit", b?.notes);
-
   const manuscriptWords = (b?.manuscript || []).reduce((sum, ch) => sum + countWords(stripHTML(ch.content || "")), 0);
-  document.getElementById("statWords").textContent = manuscriptWords;
-  document.getElementById("statChapters").textContent = (b?.manuscript || []).length;
-  document.getElementById("statCharacters").textContent = data.characters.filter(visibleByScope).length;
-  document.getElementById("statThreads").textContent = data.threads.filter(t => visibleByScope(t) && t.status !== "Closed").length;
-  document.getElementById("projectPath").textContent = `${s?.title || "No series"} → ${b?.title || "No book selected"}`;
+  setText("statWords", manuscriptWords);
+  setText("statChapters", (b?.manuscript || []).length);
+  setText("statCharacters", data.characters.filter(visibleByScope).length);
+  setText("statThreads", data.threads.filter(t => visibleByScope(t) && t.status !== "Closed").length);
+  setText("projectPath", `${s?.title || "No series"} → ${b?.title || "No book selected"}`);
+  setText("sidebarProjectName", b?.title || "Project");
 }
 function saveOverviewFields(render = false) {
   const s = activeSeries();
@@ -472,24 +584,25 @@ function renderManuscript() {
   }
   updateEditorStats();
 }
+function renderCharacterSelects() {
+  const chars = data.characters.filter(visibleByScope);
+  const options = chars.length ? chars.map(c => `<option value="${c.id}">${escapeHTML(c.name)}</option>`).join("") : `<option value="">No characters yet</option>`;
+  const a = document.getElementById("relA");
+  const b = document.getElementById("relB");
+  if (a) a.innerHTML = options;
+  if (b) b.innerHTML = options;
+}
 function renderCardList(collection, elId, titleKey, bodyFn) {
   const el = document.getElementById(elId);
   if (!el) return;
   el.innerHTML = "";
-  data[collection].filter(visibleByScope).forEach(item => {
-    el.appendChild(makeCard(item[titleKey], bodyFn(item), () => deleteItem(collection, item.id)));
-  });
+  data[collection].filter(visibleByScope).forEach(item => el.appendChild(makeCard(item[titleKey], bodyFn(item), () => deleteItem(collection, item.id))));
 }
 function renderAllLists() {
   renderCardList("chapterPlans", "chapterPlanList", "number", item => `
     <span class="tag">Book</span>${detail("POV", item.pov)}${detail("Target Words", item.wordTarget)}
     ${detail("Goal", item.goal)}${detail("Conflict", item.conflict)}${detail("Outcome", item.outcome)}
     ${detail("Emotional Beat", item.emotion)}${detail("Foreshadowing", item.foreshadowing)}
-  `);
-  renderCardList("characters", "characterList", "name", item => `
-    <span class="tag">${escapeHTML(item.scope)}</span><span class="tag">${escapeHTML(item.role)}</span><span class="tag">${escapeHTML(item.species)}</span>
-    ${detail("Description", item.description)}${detail("Personality", item.personality)}
-    ${detail("Core Wound / Fear / Desire", item.wound)}${detail("Arc", item.arc)}${detail("Voice", item.voice)}${detail("Relationships", item.relationships)}
   `);
   renderCardList("threads", "threadList", "title", item => `
     <span class="tag">${escapeHTML(item.scope)}</span><span class="tag">${escapeHTML(item.status)}</span>
@@ -499,6 +612,13 @@ function renderAllLists() {
     <span class="tag">${escapeHTML(item.scope)}</span><span class="tag">${escapeHTML(item.category)}</span>
     ${detail("Description", item.description)}${detail("Rules / Notes", item.rules)}
   `);
+  renderCardList("scenes", "sceneList", "name", item => `
+    <span class="tag">${escapeHTML(item.scope)}</span>${detail("Location", item.location)}
+    ${detail("Summary", item.summary)}${detail("Purpose", item.purpose)}
+  `);
+
+  renderCharactersByRole();
+  renderCharacterDetail();
 
   const tl = document.getElementById("timelineList");
   if (tl) {
@@ -523,11 +643,56 @@ function renderAllLists() {
     rels.forEach(item => {
       const node = document.createElement("div");
       node.className = "rel-node";
-      node.textContent = `${item.a || "A"} → ${item.b || "B"} (${item.type || "connection"})`;
+      node.textContent = `${characterName(item.a)} → ${characterName(item.b)} (${item.type || "connection"})`;
       map.appendChild(node);
-      list.appendChild(makeCard(`${item.a} + ${item.b}`, `<span class="tag">${escapeHTML(item.scope)}</span>${detail("Type", item.type)}${detail("Notes", item.notes)}`, () => deleteItem("relationships", item.id)));
+      list.appendChild(makeCard(`${characterName(item.a)} + ${characterName(item.b)}`, `<span class="tag">${escapeHTML(item.scope)}</span>${detail("Type", item.type)}${detail("Notes", item.notes)}`, () => deleteItem("relationships", item.id)));
     });
   }
+}
+function renderCharactersByRole() {
+  const el = document.getElementById("characterRoleGroups");
+  if (!el) return;
+  const roles = ["Main", "Side", "Love Interest", "Antagonist", "Mentor", "Other"];
+  el.innerHTML = roles.map(role => {
+    const chars = data.characters.filter(c => visibleByScope(c) && (c.role || "Other") === role);
+    return `<div class="role-group"><h3>${role}</h3><div class="card-grid">${
+      chars.length ? chars.map(c => `
+        <article class="item-card">
+          <div class="card-header"><h3>${escapeHTML(c.name)}</h3><button class="delete-btn" onclick="deleteItem('characters','${c.id}')">Delete</button></div>
+          ${c.photo ? `<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}">` : ""}
+          <div class="card-body">
+            <span class="tag">${escapeHTML(c.species || "")}</span>
+            ${detail("Personality", c.personality)}
+            ${detail("Arc", c.arc)}
+            <button onclick="setView('characterDetail','${c.id}')">Open Character</button>
+          </div>
+        </article>
+      `).join("") : `<p class="muted">No ${role} characters yet.</p>`
+    }</div></div>`;
+  }).join("");
+}
+function renderCharacterDetail() {
+  const el = document.getElementById("characterDetailContent");
+  if (!el) return;
+  const c = data.characters.find(x => x.id === data.selectedCharacterId);
+  if (!c) { el.innerHTML = `<div class="panel"><p>Select a character from the sidebar.</p></div>`; return; }
+  const rels = characterRelationships(c.id);
+  el.innerHTML = `
+    <div class="panel character-detail-grid">
+      <div>${c.photo ? `<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}">` : `<div class="character-photo panel">No Photo</div>`}</div>
+      <div>
+        <h3>${escapeHTML(c.name)}</h3>
+        <span class="tag">${escapeHTML(c.role || "")}</span><span class="tag">${escapeHTML(c.species || "")}</span>
+        ${detail("Description", c.description)}
+        ${detail("Personality", c.personality)}
+        ${detail("Core Wound / Fear / Desire", c.wound)}
+        ${detail("Arc", c.arc)}
+        ${detail("Voice", c.voice)}
+        ${detail("Relationship Notes", c.relationships)}
+        <h3>Linked Relationships</h3>
+        ${rels.length ? rels.map(r => `<p><strong>${escapeHTML(characterName(r.a))} + ${escapeHTML(characterName(r.b))}:</strong> ${escapeHTML(r.type || "")}<br>${escapeHTML(r.notes || "")}</p>`).join("") : "<p>No linked relationships yet.</p>"}
+      </div>
+    </div>`;
 }
 function renderWritingStats() {
   const book = activeBook();
@@ -536,60 +701,40 @@ function renderWritingStats() {
   const total = counts.reduce((a,b) => a + b, 0);
   const avg = counts.length ? Math.round(total / counts.length) : 0;
   const longest = counts.length ? Math.max(...counts) : 0;
-  const bibleItems = data.characters.filter(visibleByScope).length + data.threads.filter(visibleByScope).length + data.timeline.filter(visibleByScope).length + data.world.filter(visibleByScope).length + data.relationships.filter(visibleByScope).length;
-  const ids = {
-    statsTotalWords: total,
-    statsAvgWords: avg,
-    statsLongestChapter: longest,
-    statsBibleItems: bibleItems
-  };
-  Object.entries(ids).forEach(([id, value]) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value;
-  });
+  const bibleItems = data.characters.filter(visibleByScope).length + data.threads.filter(visibleByScope).length + data.timeline.filter(visibleByScope).length + data.world.filter(visibleByScope).length + data.relationships.filter(visibleByScope).length + data.scenes.filter(visibleByScope).length;
+  setText("statsTotalWords", total);
+  setText("statsAvgWords", avg);
+  setText("statsLongestChapter", longest);
+  setText("statsBibleItems", bibleItems);
   const list = document.getElementById("chapterStatsList");
-  if (list) {
-    list.innerHTML = chapters.map((c, i) => `<div class="chapter-stat-row"><span>${i + 1}. ${escapeHTML(c.title || "Untitled")}</span><strong>${counts[i]} words</strong></div>`).join("") || "<p>No chapters yet.</p>";
-  }
+  if (list) list.innerHTML = chapters.map((c, i) => `<div class="chapter-stat-row"><span>${i + 1}. ${escapeHTML(c.title || "Untitled")}</span><strong>${counts[i]} words</strong></div>`).join("") || "<p>No chapters yet.</p>";
 }
 function renderRawData() {
   const raw = document.getElementById("rawData");
   if (raw) raw.value = JSON.stringify(data, null, 2);
 }
 function renderAll() {
-  if (!data.user?.id) {
-    updateAuthGate();
-    return;
-  }
+  if (!data.user?.id) { updateAuthGate(); return; }
   ensureProject();
-  renderSelectors();
+  if (!data.activeSeriesId || !data.activeBookId) { updateAuthGate(); return; }
   renderOverview();
   renderManuscript();
+  renderCharacterSelects();
   renderAllLists();
   renderWritingStats();
   renderRawData();
   renderAccount();
+  renderNestedNav();
   runSearch();
 }
-function setView(view) {
-  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-  document.getElementById(view).classList.add("active");
-  document.querySelector(`[data-view="${view}"]`).classList.add("active");
-  const titles = {
-    overview: "Overview", write: "Manuscript Editor", chapters: "Chapter Planner", characters: "Characters",
-    plot: "Plot Threads", timeline: "Timeline", world: "Worldbuilding", relationships: "Relationships",
-    stats: "Writing Statistics", exports: "Export", backup: "Backup"
-  };
-  document.getElementById("viewTitle").textContent = titles[view];
-  renderWritingStats();
-}
+function setText(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
+
 function searchableItems() {
   const b = activeBook();
   const manuscript = (b?.manuscript || []).map(ch => ({ type: "Manuscript", title: ch.title, text: (ch.title + " " + stripHTML(ch.content || "")).toLowerCase() }));
   const collections = [
     ["Character", data.characters, "name"], ["Relationship", data.relationships, "type"], ["Timeline", data.timeline, "when"],
-    ["Chapter Plan", data.chapterPlans, "number"], ["Plot Thread", data.threads, "title"], ["Worldbuilding", data.world, "name"]
+    ["Chapter Plan", data.chapterPlans, "number"], ["Plot Thread", data.threads, "title"], ["Worldbuilding", data.world, "name"], ["Scene", data.scenes, "name"]
   ];
   return [
     { type: "Series", title: activeSeries()?.title, text: JSON.stringify(activeSeries() || {}).toLowerCase() },
@@ -621,6 +766,7 @@ function seriesBibleHTML() {
   const world = data.world.filter(visibleByScope);
   const timeline = data.timeline.filter(visibleByScope);
   const rels = data.relationships.filter(visibleByScope);
+  const scenes = data.scenes.filter(visibleByScope);
   const plans = data.chapterPlans.filter(visibleByScope);
   return `
   <h1>${escapeHTML(s?.title || "Series Bible")}</h1>
@@ -630,17 +776,14 @@ function seriesBibleHTML() {
   <p><strong>Theme:</strong> ${escapeHTML(s?.theme || "")}</p>
   <p><strong>Mysteries:</strong> ${escapeHTML(s?.mysteries || "")}</p>
   <p><strong>Foreshadowing:</strong> ${escapeHTML(s?.foreshadowing || "")}</p>
-  <h2>Active Book</h2>
-  <h3>${escapeHTML(b?.title || "")}</h3>
-  <p><strong>Status:</strong> ${escapeHTML(b?.status || "")}</p>
-  <p>${escapeHTML(b?.summary || "")}</p>
-  <p><strong>Theme:</strong> ${escapeHTML(b?.theme || "")}</p>
-  <h2>Characters</h2>${chars.map(c => `<h3>${escapeHTML(c.name)}</h3><p><strong>Role:</strong> ${escapeHTML(c.role || "")}</p><p>${escapeHTML(c.description || "")}</p><p>${escapeHTML(c.personality || "")}</p><p>${escapeHTML(c.arc || "")}</p>`).join("")}
-  <h2>Chapter Plans</h2>${plans.map(p => `<h3>${escapeHTML(p.number)}</h3><p><strong>POV:</strong> ${escapeHTML(p.pov || "")}</p><p><strong>Goal:</strong> ${escapeHTML(p.goal || "")}</p><p><strong>Conflict:</strong> ${escapeHTML(p.conflict || "")}</p>`).join("")}
+  <h2>Active Book</h2><h3>${escapeHTML(b?.title || "")}</h3><p>${escapeHTML(b?.summary || "")}</p>
+  <h2>Characters</h2>${chars.map(c => `<h3>${escapeHTML(c.name)}</h3><p><strong>Role:</strong> ${escapeHTML(c.role || "")}</p><p>${escapeHTML(c.description || "")}</p><p>${escapeHTML(c.personality || "")}</p>`).join("")}
+  <h2>Chapter Plans</h2>${plans.map(p => `<h3>${escapeHTML(p.number)}</h3><p>${escapeHTML(p.goal || "")}</p>`).join("")}
+  <h2>Plot Threads</h2>${threads.map(t => `<h3>${escapeHTML(t.title)}</h3><p>${escapeHTML(t.setup || "")}</p>`).join("")}
+  <h2>Scenes</h2>${scenes.map(s => `<h3>${escapeHTML(s.name)}</h3><p>${escapeHTML(s.summary || "")}</p>`).join("")}
   <h2>Timeline</h2>${timeline.map(t => `<p><strong>${escapeHTML(t.when || "")}</strong>: ${escapeHTML(t.event || "")}</p>`).join("")}
-  <h2>Plot Threads</h2>${threads.map(t => `<h3>${escapeHTML(t.title)}</h3><p>${escapeHTML(t.setup || "")}</p><p><strong>Payoff:</strong> ${escapeHTML(t.payoff || "")}</p>`).join("")}
-  <h2>Worldbuilding</h2>${world.map(w => `<h3>${escapeHTML(w.name)}</h3><p><strong>${escapeHTML(w.category || "")}</strong></p><p>${escapeHTML(w.description || "")}</p><p>${escapeHTML(w.rules || "")}</p>`).join("")}
-  <h2>Relationships</h2>${rels.map(r => `<h3>${escapeHTML(r.a)} + ${escapeHTML(r.b)}</h3><p><strong>${escapeHTML(r.type || "")}</strong></p><p>${escapeHTML(r.notes || "")}</p>`).join("")}`;
+  <h2>Worldbuilding</h2>${world.map(w => `<h3>${escapeHTML(w.name)}</h3><p>${escapeHTML(w.description || "")}</p>`).join("")}
+  <h2>Relationships</h2>${rels.map(r => `<h3>${escapeHTML(characterName(r.a))} + ${escapeHTML(characterName(r.b))}</h3><p>${escapeHTML(r.type || "")}: ${escapeHTML(r.notes || "")}</p>`).join("")}`;
 }
 function buildHTMLDoc(title, bodyHTML) {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHTML(title)}</title>
@@ -656,14 +799,12 @@ function exportFullManuscriptTxt() {
 function exportFullManuscriptDocx() {
   const book = activeBook();
   if (!book) return alert("No book selected.");
-  const html = buildHTMLDoc(book.title || "Manuscript", manuscriptHTML());
-  downloadFile(`${safeFile(book.title)}-full-manuscript.docx`, html, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  downloadFile(`${safeFile(book.title)}-full-manuscript.docx`, buildHTMLDoc(book.title || "Manuscript", manuscriptHTML()), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 }
 function exportSeriesBibleDocx() {
   const s = activeSeries();
   if (!s) return alert("No series selected.");
-  const html = buildHTMLDoc(`${s.title} Series Bible`, seriesBibleHTML());
-  downloadFile(`${safeFile(s.title)}-series-bible.docx`, html, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  downloadFile(`${safeFile(s.title)}-series-bible.docx`, buildHTMLDoc(`${s.title} Series Bible`, seriesBibleHTML()), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 }
 function exportFullManuscriptPDF() {
   const book = activeBook();
@@ -676,13 +817,10 @@ function exportSeriesBiblePDF() {
   printHTML(buildHTMLDoc(`${s.title} Series Bible`, seriesBibleHTML()));
 }
 function printHTML(html) {
-  const area = document.getElementById("printArea");
-  area.innerHTML = html;
+  document.getElementById("printArea").innerHTML = html;
   window.print();
 }
-function exportData() {
-  downloadFile("writers-vault-v7-backup.json", JSON.stringify(data, null, 2), "application/json");
-}
+function exportData() { downloadFile("writers-vault-v8-backup.json", JSON.stringify(data, null, 2), "application/json"); }
 function downloadFile(filename, content, type) {
   const blob = new Blob([content], { type });
   const a = document.createElement("a");
@@ -702,9 +840,7 @@ function importData(event) {
       data = { ...structuredClone(defaultData), ...JSON.parse(reader.result), user: currentUser };
       saveData();
       alert("Backup imported.");
-    } catch {
-      alert("Could not import this file.");
-    }
+    } catch { alert("Could not import this file."); }
   };
   reader.readAsText(file);
 }
@@ -715,10 +851,8 @@ function resetAll() {
   saveData(true, false);
 }
 
-document.querySelectorAll(".nav-btn").forEach(btn => btn.addEventListener("click", () => setView(btn.dataset.view)));
 document.getElementById("globalSearch").addEventListener("input", runSearch);
 document.getElementById("clearSearch").addEventListener("click", () => { setVal("globalSearch", ""); runSearch(); });
-
 ["seriesTitleEdit","seriesGenreEdit","seriesSynopsisEdit","seriesThemeEdit","seriesMysteriesEdit","seriesForeshadowingEdit","bookTitleEdit","bookStatusEdit","bookSummaryEdit","bookThemeEdit","bookNotesEdit"].forEach(id => {
   document.getElementById(id).addEventListener("input", () => saveOverviewFields(true));
 });
@@ -729,7 +863,11 @@ document.getElementById("richEditor").addEventListener("blur", () => syncToCloud
 initSupabase();
 refreshSession().then(() => {
   if (data.user?.id) {
-    loadFromCloud(false).then(renderAll);
+    loadFromCloud(false).then(() => {
+      data.activeSeriesId = null;
+      data.activeBookId = null;
+      updateAuthGate();
+    });
   } else {
     updateAuthGate();
   }
