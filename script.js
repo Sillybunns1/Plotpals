@@ -24,6 +24,10 @@ function saveData(render=true,scheduleCloud=true){localStorage.setItem(STORAGE_K
 function val(id){return document.getElementById(id)?.value.trim()||""}
 function setVal(id,value){const el=document.getElementById(id); if(el) el.value=value||""}
 function setText(id,value){const el=document.getElementById(id); if(el) el.textContent=value}
+function setHTML(id,html){const el=document.getElementById(id); if(el) el.innerHTML=html}
+function applyTheme(){
+  document.body.classList.toggle("light-mode", data.theme === "light");
+}
 function clearFields(ids){ids.forEach(id=>setVal(id,""))}
 function escapeHTML(str=""){return String(str).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;")}
 function stripHTML(html=""){const div=document.createElement("div"); div.innerHTML=html; return div.textContent||div.innerText||""}
@@ -44,7 +48,20 @@ function setProjectMessage(message){const el=document.getElementById("projectMes
 async function refreshSession(){if(!supabaseClient)return; const {data:sessionData}=await supabaseClient.auth.getSession(); const user=sessionData?.session?.user||null; data.user=user?{id:user.id,email:user.email}:null; localStorage.setItem(STORAGE_KEY,JSON.stringify(data,null,2)); updateAuthGate()}
 function updateAuthGate(){applyTheme(); const loggedIn=!!data.user?.id; const hasProject=!!(data.activeSeriesId&&data.activeBookId); document.getElementById("loginScreen").classList.toggle("hidden",loggedIn); document.getElementById("projectScreen").classList.toggle("hidden",!loggedIn||hasProject); document.getElementById("appShell").classList.toggle("hidden",!loggedIn||!hasProject); renderAccount(); if(loggedIn&&!hasProject)renderProjectScreen()}
 async function signUp(){if(!supabaseClient)return setLoginMessage("Supabase could not load."); const {error}=await supabaseClient.auth.signUp({email:val("loginEmail"),password:val("loginPassword")}); if(error)return setLoginMessage(error.message); setLoginMessage("Account created. Check email if confirmation is required, then login.")}
-async function signIn(){if(!supabaseClient)return setLoginMessage("Supabase could not load."); const {data:result,error}=await supabaseClient.auth.signInWithPassword({email:val("loginEmail"),password:val("loginPassword")}); if(error)return setLoginMessage(error.message); data.user={id:result.user.id,email:result.user.email}; localStorage.setItem(STORAGE_KEY,JSON.stringify(data,null,2)); await loadFromCloud(false); data.activeSeriesId=null; data.activeBookId=null; updateAuthGate()}
+async function signIn(){
+  if(!supabaseClient)return setLoginMessage("Supabase could not load. Check your internet connection and make sure the Supabase script is available.");
+  const email=val("loginEmail"), password=val("loginPassword");
+  if(!email||!password)return setLoginMessage("Enter both email and password.");
+  setLoginMessage("Logging in...");
+  const {data:result,error}=await supabaseClient.auth.signInWithPassword({email,password});
+  if(error)return setLoginMessage(error.message);
+  data.user={id:result.user.id,email:result.user.email};
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(data,null,2));
+  await loadFromCloud(false);
+  data.activeSeriesId=null; data.activeBookId=null;
+  setLoginMessage("");
+  updateAuthGate();
+}
 async function signOut(){if(supabaseClient)await supabaseClient.auth.signOut(); data.user=null; data.activeSeriesId=null; data.activeBookId=null; localStorage.setItem(STORAGE_KEY,JSON.stringify(data,null,2)); updateAuthGate()}
 async function sendPasswordResetFromLogin(){if(!supabaseClient)return setLoginMessage("Supabase could not load."); const email=val("loginEmail"); if(!email)return setLoginMessage("Enter your email first."); const {error}=await supabaseClient.auth.resetPasswordForEmail(email); setLoginMessage(error?error.message:"Password reset email sent.")}
 function renderAccount(){setText("accountStatus",data.user?.email||"Not signed in"); setText("syncStatus",data.user?.id?"Signed in. Auto-save enabled.":"Login required.")}
