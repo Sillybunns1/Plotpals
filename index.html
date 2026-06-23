@@ -182,8 +182,8 @@
   </section>
 
   <div id="appShell" class="app-shell hidden">
-    <aside id="sidebar" class="sidebar">
-      <div class="brand compact-brand">
+    <aside id="sidebar" class="sidebar story-sidebar workspace-sidebar">
+      <div class="brand">
         <div class="brand-mark">✦</div>
         <div class="brand-text">
           <h1>PlotPals</h1>
@@ -191,18 +191,29 @@
         </div>
       </div>
 
-      <div class="sidebar-actions">
-        <button onclick="toggleSidebar()" title="Collapse menu">☰</button>
-        <button onclick="backToProjects()" title="Change book">Books</button>
-        <button onclick="signOut()" title="Sign out">Exit</button>
+      <button class="wide glow" onclick="backToProjects()">← Main Page</button>
+
+      <div class="story-nav-group">
+        <h4>Library</h4>
+        <button class="story-nav" onclick="backToProjects()">📖 My Stories</button>
+        <button class="story-nav" onclick="setView('overview')">🏠 Project Overview</button>
+        <button class="story-nav" onclick="setView('stats')">📈 Writing Stats</button>
+        <button class="story-nav" onclick="setView('music')">♫ Project Playlist</button>
+      </div>
+
+      <div id="nestedNav" class="nested-nav"></div>
+
+      <div class="story-nav-group">
+        <h4>Cloud</h4>
+        <button class="story-nav" onclick="syncToCloud()">☁️ Sync Now</button>
+        <button class="story-nav" onclick="loadFromCloud()">⇩ Load Cloud</button>
+        <button class="story-nav" onclick="signOut()">🚪 Sign Out</button>
       </div>
 
       <div class="account-card">
         <strong id="accountStatus">Signed in</strong>
         <p id="syncStatus">Cloud sync ready.</p>
       </div>
-
-      <nav id="nestedNav" class="nested-nav"></nav>
 
       <div class="sidebar-footer">
         <input id="globalSearch" placeholder="Search project..." />
@@ -226,6 +237,10 @@
       <section id="searchResults" class="search-results hidden"></section>
 
       <section id="overview" class="view active">
+        <div class="overview-actions">
+          <button onclick="backToProjects()" class="ghost-btn">← Back to Main Page</button>
+          <button onclick="setView('write')" class="glow">Resume Writing</button>
+        </div>
         <div class="two-col">
           <div class="panel">
             <h3>Project Bible</h3>

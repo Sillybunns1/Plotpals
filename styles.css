@@ -394,3 +394,65 @@ body.light-mode .mini-stats strong {
     gap: 18px;
   }
 }
+
+
+/* PlotPals V13 workspace sidebar polish */
+.workspace-sidebar {
+  padding: 18px;
+}
+.workspace-sidebar .story-nav-group {
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+.workspace-sidebar .story-nav-group h4 {
+  margin: 0 0 10px;
+  color: #c68cff;
+  text-transform: uppercase;
+  font-size: .78rem;
+  letter-spacing: .08em;
+}
+.workspace-sidebar .story-nav,
+.workspace-sidebar .nav-parent,
+.workspace-sidebar .nav-child,
+.workspace-sidebar .nav-grandchild {
+  width: 100%;
+  text-align: left;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  background: transparent;
+  border-color: transparent;
+}
+.workspace-sidebar .story-nav:hover,
+.workspace-sidebar .nav-parent:hover,
+.workspace-sidebar .nav-child:hover,
+.workspace-sidebar .nav-grandchild:hover {
+  background: linear-gradient(90deg, rgba(103,43,173,.55), rgba(61,28,98,.2));
+  border-color: rgba(166,97,255,.35);
+}
+.workspace-sidebar .nav-child {
+  padding-left: 22px;
+}
+.workspace-sidebar .nav-grandchild {
+  padding-left: 42px;
+  font-size: .9rem;
+  color: var(--muted);
+}
+.overview-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.app-shell.collapsed .workspace-sidebar .story-nav-group h4,
+.app-shell.collapsed .workspace-sidebar .nav-children,
+.app-shell.collapsed .workspace-sidebar .nav-count,
+.app-shell.collapsed .workspace-sidebar .account-card,
+.app-shell.collapsed .workspace-sidebar .sidebar-footer {
+  display: none;
+}
+body.light-mode .workspace-sidebar .story-nav:hover,
+body.light-mode .workspace-sidebar .nav-parent:hover,
+body.light-mode .workspace-sidebar .nav-child:hover,
+body.light-mode .workspace-sidebar .nav-grandchild:hover {
+  background: rgba(139,61,125,.1);
+}

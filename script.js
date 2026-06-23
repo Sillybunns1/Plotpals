@@ -263,14 +263,77 @@ async function loadFromCloud(showAlert=true){if(!supabaseClient){if(showAlert)al
 
 function toggleSidebar(){document.getElementById("appShell").classList.toggle("collapsed")}
 function setView(view,id=null,extra=null){saveCurrentScene(false,false); if(view==="write"){if(id)data.activeChapterId=id; if(extra)data.activeSceneId=extra; if(!data.activeSceneId)data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null} if(view==="characterDetail"&&id)data.selectedCharacterId=id; document.querySelectorAll(".view").forEach(v=>v.classList.remove("active")); document.getElementById(view).classList.add("active"); const titles={overview:"Overview",write:"Scene-Based Writing",storyBoard:"Story Structure Board",chapters:"Chapter Planner",threads:"Plot Threads",mysteries:"Mystery Tracker",foreshadowing:"Foreshadowing Tracker",plotBoard:"Plot Board",characters:"Characters",characterDetail:"Character Detail",relationships:"Relationship System",locations:"Locations",magic:"Magic System",organizations:"Organizations",scenes:"Scene Database",timeline:"Timeline",world:"Worldbuilding Notes",seriesTools:"Series-Level Tools",music:"Project Playlist",stats:"Writing Analytics",exports:"Export",backup:"Backup"}; setText("viewTitle",titles[view]||"Workspace"); renderAll()}
-function renderNestedNav(){const nav=document.getElementById("nestedNav"); if(!nav)return; const book=activeBook(); const chapters=book?.manuscript||[]; const plans=data.chapterPlans.filter(visibleByScope); const threads=data.threads.filter(visibleByScope); const roles=["Main","Side","Love Interest","Antagonist","Mentor","Other"]; const charsByRole=role=>data.characters.filter(c=>visibleByScope(c)&&(c.role||"Other")===role); const seriesOnly=isSeriesProject(); nav.innerHTML=`
-<div class="nav-section"><button class="nav-parent" onclick="setView('overview')"><span class="nav-label">Overview</span><span>⌂</span></button></div>
-<div class="nav-section"><button class="nav-parent" onclick="setView('write')"><span class="nav-label">Manuscript</span><span class="nav-count">${chapters.length}</span></button><div class="nav-children">${chapters.map((c,i)=>`<button class="nav-child" onclick="setView('write','${c.id}')"><span>${i+1}. ${escapeHTML(c.title||"Untitled")}</span><span class="nav-count">${(c.scenes||[]).length}</span></button>${(c.scenes||[]).map((s,j)=>`<button class="nav-grandchild" onclick="setView('write','${c.id}','${s.id}')">${j+1}. ${escapeHTML(s.title||"Scene")}</button>`).join("")}`).join("")}</div></div>
-<div class="nav-section"><button class="nav-parent"><span class="nav-label">Plot</span><span>▾</span></button><div class="nav-children"><button class="nav-child" onclick="setView('storyBoard')">Story Structure</button><button class="nav-child" onclick="setView('chapters')"><span>Chapter Planner</span><span class="nav-count">${plans.length}</span></button>${plans.map(p=>`<button class="nav-grandchild" onclick="setView('chapters')">${escapeHTML(p.number||"Untitled")}</button>`).join("")}<button class="nav-child" onclick="setView('threads')"><span>Plot Threads</span><span class="nav-count">${threads.length}</span></button>${threads.map(t=>`<button class="nav-grandchild" onclick="setView('threads')">${escapeHTML(t.title||"Untitled")}</button>`).join("")}<button class="nav-child" onclick="setView('mysteries')">Mystery Tracker</button><button class="nav-child" onclick="setView('foreshadowing')">Foreshadowing</button><button class="nav-child" onclick="setView('plotBoard')">Plot Board</button></div></div>
-<div class="nav-section"><button class="nav-parent" onclick="setView('characters')"><span class="nav-label">Characters</span><span class="nav-count">${data.characters.filter(visibleByScope).length}</span></button><div class="nav-children">${roles.map(role=>`<button class="nav-child" onclick="setView('characters')"><span>${role}</span><span class="nav-count">${charsByRole(role).length}</span></button>${charsByRole(role).map(c=>`<button class="nav-grandchild" onclick="setView('characterDetail','${c.id}')">${escapeHTML(c.name||"Unnamed")}</button>`).join("")}`).join("")}</div></div>
-<div class="nav-section"><button class="nav-parent"><span class="nav-label">Worldbuilding</span><span>▾</span></button><div class="nav-children"><button class="nav-child" onclick="setView('locations')">Locations</button><button class="nav-child" onclick="setView('magic')">Magic System</button><button class="nav-child" onclick="setView('organizations')">Organizations</button><button class="nav-child" onclick="setView('world')">Cultures / Species / Artifacts</button><button class="nav-child" onclick="setView('scenes')">Scene Database</button><button class="nav-child" onclick="setView('relationships')">Relationships</button><button class="nav-child" onclick="setView('timeline')">Timeline</button></div></div>
-${seriesOnly?`<div class="nav-section"><button class="nav-parent" onclick="setView('seriesTools')"><span class="nav-label">Series Tools</span><span>★</span></button></div>`:""}
-<div class="nav-section"><button class="nav-parent" onclick="setView('music')"><span class="nav-label">Project Playlist</span><span>♫</span></button><button class="nav-parent" onclick="setView('stats')"><span class="nav-label">Writing Analytics</span><span>↗</span></button><button class="nav-parent" onclick="setView('exports')"><span class="nav-label">Export</span><span>⇩</span></button><button class="nav-parent" onclick="setView('backup')"><span class="nav-label">Backup</span><span>☁</span></button></div>`}
+function renderNestedNav(){
+  const nav=document.getElementById("nestedNav");
+  if(!nav)return;
+  const book=activeBook();
+  const chapters=book?.manuscript||[];
+  const plans=data.chapterPlans.filter(visibleByScope);
+  const threads=data.threads.filter(visibleByScope);
+  const roles=["Main","Side","Love Interest","Antagonist","Mentor","Other"];
+  const charsByRole=role=>data.characters.filter(c=>visibleByScope(c)&&(c.role||"Other")===role);
+  const seriesOnly=isSeriesProject();
+
+  nav.innerHTML=`
+    <div class="story-nav-group">
+      <h4>Manuscript</h4>
+      <button class="story-nav nav-parent" onclick="setView('write')"><span class="nav-label">📘 Manuscript Editor</span><span class="nav-count">${chapters.length}</span></button>
+      <div class="nav-children">
+        ${chapters.map((c,i)=>`
+          <button class="story-nav nav-child" onclick="setView('write','${c.id}')"><span>${i+1}. ${escapeHTML(c.title||"Untitled")}</span><span class="nav-count">${(c.scenes||[]).length}</span></button>
+          ${(c.scenes||[]).map((s,j)=>`<button class="story-nav nav-grandchild" onclick="setView('write','${c.id}','${s.id}')">${j+1}. ${escapeHTML(s.title||"Scene")}</button>`).join("")}
+        `).join("")}
+      </div>
+    </div>
+
+    <div class="story-nav-group">
+      <h4>Plot</h4>
+      <button class="story-nav nav-parent" onclick="setView('storyBoard')">🧭 Story Structure</button>
+      <button class="story-nav nav-parent" onclick="setView('chapters')"><span>📄 Chapter Planner</span><span class="nav-count">${plans.length}</span></button>
+      <div class="nav-children">${plans.map(p=>`<button class="story-nav nav-grandchild" onclick="setView('chapters')">${escapeHTML(p.number||"Untitled")}</button>`).join("")}</div>
+      <button class="story-nav nav-parent" onclick="setView('threads')"><span>🧵 Plot Threads</span><span class="nav-count">${threads.length}</span></button>
+      <div class="nav-children">${threads.map(t=>`<button class="story-nav nav-grandchild" onclick="setView('threads')">${escapeHTML(t.title||"Untitled")}</button>`).join("")}</div>
+      <button class="story-nav nav-parent" onclick="setView('mysteries')">🔎 Mystery Tracker</button>
+      <button class="story-nav nav-parent" onclick="setView('foreshadowing')">🕯️ Foreshadowing</button>
+      <button class="story-nav nav-parent" onclick="setView('plotBoard')">🗂️ Plot Board</button>
+    </div>
+
+    <div class="story-nav-group">
+      <h4>Characters</h4>
+      <button class="story-nav nav-parent" onclick="setView('characters')"><span>👥 All Characters</span><span class="nav-count">${data.characters.filter(visibleByScope).length}</span></button>
+      <div class="nav-children">
+        ${roles.map(role=>`
+          <button class="story-nav nav-child" onclick="setView('characters')"><span>${role}</span><span class="nav-count">${charsByRole(role).length}</span></button>
+          ${charsByRole(role).map(c=>`<button class="story-nav nav-grandchild" onclick="setView('characterDetail','${c.id}')">${escapeHTML(c.name||"Unnamed")}</button>`).join("")}
+        `).join("")}
+      </div>
+      <button class="story-nav nav-parent" onclick="setView('relationships')">💞 Relationships</button>
+    </div>
+
+    <div class="story-nav-group">
+      <h4>World Building</h4>
+      <button class="story-nav nav-parent" onclick="setView('locations')">📍 Locations</button>
+      <button class="story-nav nav-parent" onclick="setView('organizations')">⚜️ Organizations</button>
+      <button class="story-nav nav-parent" onclick="setView('magic')">✨ Magic / Systems</button>
+      <button class="story-nav nav-parent" onclick="setView('world')">🏺 Items / Artifacts</button>
+      <button class="story-nav nav-parent" onclick="setView('scenes')">🎬 Scene Database</button>
+      <button class="story-nav nav-parent" onclick="setView('timeline')">⏳ Timeline</button>
+    </div>
+
+    ${seriesOnly?`
+      <div class="story-nav-group">
+        <h4>Series</h4>
+        <button class="story-nav nav-parent" onclick="setView('seriesTools')">★ Series-Level Tools</button>
+      </div>
+    `:""}
+
+    <div class="story-nav-group">
+      <h4>Story Notes</h4>
+      <button class="story-nav nav-parent" onclick="setView('exports')">⇩ Export</button>
+      <button class="story-nav nav-parent" onclick="setView('backup')">☁ Backup</button>
+    </div>
+  `;
+}
 
 function addManuscriptChapter(){const book=activeBook(); if(!book)return alert("Open a book first."); saveCurrentScene(false,false); const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",created:new Date().toISOString()}; const ch={id:uid(),title:`Chapter ${(book.manuscript||[]).length+1}`,scenes:[scene],created:new Date().toISOString()}; book.manuscript.push(ch); data.activeChapterId=ch.id; data.activeSceneId=scene.id; saveData()}
 function addSceneToActiveChapter(){const ch=activeChapter(); if(!ch)return alert("Select a chapter first."); saveCurrentScene(false,false); if(!ch.scenes)ch.scenes=[]; const scene={id:uid(),title:`Scene ${ch.scenes.length+1}`,content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",created:new Date().toISOString()}; ch.scenes.push(scene); data.activeSceneId=scene.id; saveData()}
