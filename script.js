@@ -5,7 +5,7 @@ const defaultData = {
   activeSeriesId: null, activeBookId: null, activeChapterId: null, activeSceneId: null, selectedCharacterId: null,
   user: null, series: [], books: [], characters: [], relationships: [], timeline: [], chapterPlans: [], threads: [],
   scenes: [], world: [], locations: [], magicSystems: [], organizations: [], mysteries: [], foreshadowing: [], plotArcs: [], plotCards: [],
-  structureBeats: [], music: {}, theme: 'dark', pinnedNote: '', libraryView: 'stories', lastOpened: null
+  structureBeats: [], music: {}, theme: 'dark', pinnedNote: '', libraryView: 'stories', lastOpened: null, currentView: 'projectDashboard'
 };
 
 let supabaseClient = null;
@@ -64,7 +64,7 @@ function activeBook(){return data.books.find(b=>b.id===data.activeBookId)||null}
 function activeChapter(){const b=activeBook(); return (b?.manuscript||[]).find(c=>c.id===data.activeChapterId)||null}
 function activeScene(){const ch=activeChapter(); return (ch?.scenes||[]).find(s=>s.id===data.activeSceneId)||null}
 function isSeriesProject(){return (activeSeries()?.type||"series")==="series"}
-function ensureCollections(){["series","books","characters","relationships","timeline","chapterPlans","threads","scenes","world","locations","magicSystems","organizations","mysteries","foreshadowing","plotArcs","plotCards","structureBeats"].forEach(k=>{if(!data[k])data[k]=[]}); if(!data.music)data.music={}; if(!data.worldCategories)data.worldCategories=[]; if(!data.theme)data.theme="dark"; if(!data.libraryView)data.libraryView="stories"; if(!data.editorCollapsedChapters)data.editorCollapsedChapters={}; if(typeof data.manuscriptSidebarCollapsed!=="boolean")data.manuscriptSidebarCollapsed=false; }
+function ensureCollections(){["series","books","characters","relationships","timeline","chapterPlans","threads","scenes","world","locations","magicSystems","organizations","mysteries","foreshadowing","plotArcs","plotCards","structureBeats"].forEach(k=>{if(!data[k])data[k]=[]}); if(!data.music)data.music={}; if(!data.worldCategories)data.worldCategories=[]; if(!data.theme)data.theme="dark"; if(!data.libraryView)data.libraryView="stories"; if(!data.currentView)data.currentView="projectDashboard"; if(!data.editorCollapsedChapters)data.editorCollapsedChapters={}; if(typeof data.manuscriptSidebarCollapsed!=="boolean")data.manuscriptSidebarCollapsed=false; }
 function ensureProject(){ensureCollections(); const b=activeBook(); if(b){if(!b.manuscript)b.manuscript=[]; if(!b.manuscript.length){const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],plotCardId:"",created:new Date().toISOString()}; const ch={id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()}; b.manuscript.push(ch); data.activeChapterId=ch.id; data.activeSceneId=scene.id} b.manuscript.forEach(ch=>{if(!ch.scenes){ch.scenes=[{id:uid(),title:ch.title||"Scene 1",content:ch.content||"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],plotCardId:"",created:ch.created||new Date().toISOString()}]; delete ch.content} (ch.scenes||[]).forEach(sc=>{if(!Array.isArray(sc.characterIds))sc.characterIds=[]; if(!Array.isArray(sc.organizationIds))sc.organizationIds=[]; if(!Array.isArray(sc.magicSystemIds))sc.magicSystemIds=[]; if(!Array.isArray(sc.itemArtifactIds))sc.itemArtifactIds=[]; if(!Array.isArray(sc.floraFaunaIds))sc.floraFaunaIds=[]; if(typeof sc.plotCardId!=="string")sc.plotCardId="";});}); if(!data.activeChapterId)data.activeChapterId=b.manuscript[0]?.id||null; if(!data.activeSceneId)data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null}}
 
 function switchAuthMode(mode){authMode=mode;document.getElementById("loginTab").classList.toggle("active",mode==="login");document.getElementById("signupTab").classList.toggle("active",mode==="signup");document.getElementById("authSubmitBtn").textContent=mode==="login"?"Login":"Create Account";setLoginMessage("")}
@@ -178,6 +178,7 @@ function openProjectFromDashboard(seriesId, bookId){
   data.activeSceneId = firstChapter?.scenes?.[0]?.id || null;
   saveData();
   updateAuthGate();
+  setView("projectDashboard");
 }
 function renderProjectScreen(){
   ensureCollections();
@@ -219,12 +220,19 @@ function renderProjectScreen(){
     const buttons = view === "trash"
       ? `<button class="ghost-btn" onclick="restoreProject('${s.id}',event)">Restore</button><button class="delete-btn" onclick="permanentlyDeleteProject('${s.id}',event)">Delete Forever</button>`
       : `<button class="ghost-btn" onclick="toggleFavoriteProject('${s.id}',event)">${s.favorite ? "★ Favorited" : "☆ Favorite"}</button><button class="delete-btn" onclick="softDeleteProject('${s.id}',event)">Delete</button>`;
-    return `<article class="story-card" onclick="openProjectFromDashboard('${s.id}','${primaryBook?.id || ""}')">
-      <div class="story-card-art"></div>
+    const shelfBooks = books.slice(0, 4);
+    const shelf = shelfBooks.length ? `<div class="main-bookshelf-preview">${shelfBooks.map(b=>{
+      const cover = b.cover
+        ? `<img class="main-book-cover" src="${b.cover}" alt="${escapeHTML(b.title||"Book cover")}">`
+        : `<div class="main-book-cover main-book-cover-placeholder"><span>No Cover</span><button type="button" onclick="triggerBookCoverUpload('${b.id}',event)">+ Add</button></div>`;
+      return `<div class="main-book-cover-card" onclick="event.stopPropagation(); openProjectFromDashboard('${s.id}','${b.id}')" title="${escapeAttr(b.title||"Untitled Book")}">${cover}<input id="bookCoverUpload_${b.id}" type="file" accept="image/*" class="hidden" onchange="updateBookCover('${b.id}',this)"><small>${escapeHTML(b.title||"Untitled")}</small></div>`;
+    }).join("")}${books.length>4?`<div class="main-book-more">+${books.length-4}</div>`:""}</div>` : `<div class="main-bookshelf-preview empty-shelf"><button type="button" onclick="event.stopPropagation(); openProjectFromDashboard('${s.id}','${primaryBook?.id || ""}')">Open Project</button></div>`;
+    return `<article class="story-card story-card-bookshelf" onclick="openProjectFromDashboard('${s.id}','${primaryBook?.id || ""}')">
       <div class="story-card-body">
         <div class="story-card-title-row"><h3>${escapeHTML(s.title)}</h3><span>${s.favorite ? "★" : ""}</span></div>
         <span class="tag">${escapeHTML(s.type === "standalone" ? "Standalone" : "Series")}</span>
         ${s.deletedAt ? `<span class="tag danger-tag">In Trash</span>` : ""}
+        ${shelf}
         <p>${escapeHTML(status)}</p>
         <p>${books.length} book${books.length === 1 ? "" : "s"} · ${scenes} scenes</p>
         <div class="progress-bar"><span style="width:${progress}%"></span></div>
@@ -269,13 +277,11 @@ function renderProjectScreen(){
   setHTML("recentActivity", recent.length ? recent.map(r => `<p>${r}</p>`).join("") : "<p>No recent activity yet.</p>");
   setVal("dashboardPinnedNote", data.pinnedNote || "");
 
-  const playlistProjects = activeProjects().filter(s => { const m=normalizeMusicRecord(data.music?.[s.id]||{}); return m.link||m.notes; });
+  const playlistProjects = activeProjects().filter(s => { const m=normalizeMusicRecord(data.music?.[s.id]||{}); return (m.tracks&&m.tracks.length)||(m.playlists&&m.playlists.length)||m.notes; });
   setHTML("dashboardPlaylistPreview", playlistProjects.length ? playlistProjects.map(s=>{
     const m=normalizeMusicRecord(data.music[s.id]||{});
-    const service = playlistServiceLabel(m.link);
-    const link = m.link ? `<a class="playlist-link" target="_blank" href="${escapeHTML(m.link)}">${escapeHTML(service || "Playlist Link")}</a>` : "";
-    return `<p><strong>${escapeHTML(s.title)}</strong><br>${link || escapeHTML(m.notes || "Playlist notes saved")}</p>`;
-  }).join("") : "<p>No playlist linked yet. Add one inside a project.</p>");
+    return `<p><strong>${escapeHTML(s.title)}</strong><br>${(m.tracks||[]).length} uploaded track(s) • ${(m.playlists||[]).length} playlist(s)</p>`;
+  }).join("") : "<p>No project music yet. Add uploaded tracks inside a project.</p>");
 }
 function toggleTheme(){
   data.theme = data.theme === "light" ? "dark" : "light";
@@ -292,76 +298,310 @@ function deleteSelectedProject(){
 }
 function normalizeMusicRecord(music){
   music = music || {};
-  if(!music.link){
-    music.link = music.spotify || music.youtube || music.apple || "";
-  }
+  if(!Array.isArray(music.tracks)) music.tracks = [];
+  if(!Array.isArray(music.playlists)) music.playlists = [];
   if(typeof music.notes !== "string") music.notes = "";
+  if(!music.activePlaylistId && music.playlists[0]) music.activePlaylistId = music.playlists[0].id;
+  if(!music.expandedPlaylists) music.expandedPlaylists = {};
+  // Backward compatibility for old link-based playlist data.
+  if(music.link && !music.legacyLink) music.legacyLink = music.link;
+  music.tracks.forEach(t=>{
+    if(!t.id) t.id = uid();
+    if(!t.title) t.title = t.name || "Untitled Track";
+  });
+  music.playlists.forEach(pl=>{
+    if(!pl.id) pl.id = uid();
+    if(!pl.name) pl.name = "Untitled Playlist";
+    if(!Array.isArray(pl.trackIds)) pl.trackIds = [];
+    if(music.expandedPlaylists[pl.id] === undefined) music.expandedPlaylists[pl.id] = false;
+  });
   return music;
 }
 function musicForProject(){
   const id = data.activeSeriesId;
   if(!data.music) data.music = {};
-  if(!data.music[id]) data.music[id] = { link:"", notes:"" };
+  if(!data.music[id]) data.music[id] = { notes:"", tracks:[], playlists:[], activePlaylistId:null };
   data.music[id] = normalizeMusicRecord(data.music[id]);
   return data.music[id];
 }
-function saveMusicLinks(){
+function saveMusicNotes(){
   const music = musicForProject();
-  music.link = val("musicLink");
   music.notes = val("musicNotes");
-  music.spotify = "";
-  music.apple = "";
-  music.youtube = "";
   saveData();
 }
-function playlistServiceLabel(url){
-  if(!url) return "";
-  if(/open\.spotify\.com/i.test(url)) return "Spotify";
-  if(/music\.apple\.com/i.test(url)) return "Apple Music";
-  if(/youtu\.be|youtube\.com|music\.youtube\.com/i.test(url)) return "YouTube";
-  return "Playlist Link";
+function fileToDataURL(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
-function playlistEmbedUrl(url){
-  if(!url) return "";
+function openMusicDB(){
+  return new Promise((resolve,reject)=>{
+    if(!window.indexedDB) return reject(new Error("IndexedDB is not supported in this browser."));
+    const request = indexedDB.open("PlotPalsMusicFiles", 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if(!db.objectStoreNames.contains("tracks")) db.createObjectStore("tracks", { keyPath:"id" });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+async function saveMusicBlob(trackId, file){
+  const db = await openMusicDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction("tracks", "readwrite");
+    tx.objectStore("tracks").put({ id: trackId, blob: file, name: file.name, type: file.type, size: file.size, savedAt: new Date().toISOString() });
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function getMusicBlob(trackId){
+  const db = await openMusicDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction("tracks", "readonly");
+    const req = tx.objectStore("tracks").get(trackId);
+    req.onsuccess = () => resolve(req.result?.blob || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function deleteMusicBlob(trackId){
   try{
-    const u = new URL(url);
-    const host = u.hostname.replace(/^www\./,"").toLowerCase();
-    if(host.includes("open.spotify.com")){
-      const parts = u.pathname.split("/").filter(Boolean);
-      if(parts.length >= 2) return `https://open.spotify.com/embed/${parts[0]}/${parts[1]}`;
-    }
-    if(host.includes("music.apple.com")){
-      return `https://embed.music.apple.com${u.pathname}${u.search}`;
-    }
-    if(host.includes("youtu.be")){
-      const videoId = u.pathname.split("/").filter(Boolean)[0];
-      return videoId ? `https://www.youtube.com/embed/${videoId}` : "";
-    }
-    if(host.includes("youtube.com") || host.includes("music.youtube.com")){
-      const list = u.searchParams.get("list");
-      const video = u.searchParams.get("v");
-      if(list) return `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(list)}`;
-      if(video) return `https://www.youtube.com/embed/${encodeURIComponent(video)}`;
-    }
-  }catch(e){ return ""; }
+    const db = await openMusicDB();
+    return new Promise((resolve)=>{
+      const tx = db.transaction("tracks", "readwrite");
+      tx.objectStore("tracks").delete(trackId);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  }catch(err){ return false; }
+}
+async function resolveMusicTrackSrc(track){
+  if(!track) return "";
+  if(track.src) return track.src;
+  if(track.storage === "indexeddb"){
+    const blob = await getMusicBlob(track.id);
+    if(blob) return URL.createObjectURL(blob);
+  }
   return "";
 }
-function renderMusicPlayer(url){
-  const embed = playlistEmbedUrl(url);
-  if(!url) return `<p>No playlist link yet.</p>`;
-  const label = playlistServiceLabel(url);
-  if(embed){
-    return `<div class="music-player-wrap"><iframe class="music-player" src="${escapeHTML(embed)}" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe></div><p><a class="playlist-link" target="_blank" href="${escapeHTML(url)}">Open ${escapeHTML(label)}</a></p>`;
+async function uploadMusicTracks(event){
+  const files = Array.from(event.target.files || []);
+  if(!files.length) return;
+  const music = musicForProject();
+  let added = 0;
+  setText("musicUploadStatus", "Uploading music into this project...");
+  for(const file of files){
+    if(!file.type.startsWith("audio/")) continue;
+    const id = uid();
+    try{
+      await saveMusicBlob(id, file);
+      music.tracks.push({ id, title: file.name.replace(/\.[^/.]+$/, ""), fileName: file.name, type: file.type, size: file.size, storage:"indexeddb", uploadedAt:new Date().toISOString() });
+    }catch(err){
+      // Fallback for browsers that block IndexedDB: smaller files can still be saved as data URLs.
+      const src = await fileToDataURL(file);
+      music.tracks.push({ id, title: file.name.replace(/\.[^/.]+$/, ""), fileName: file.name, type: file.type, size: file.size, src, storage:"localStorage", uploadedAt:new Date().toISOString() });
+    }
+    added++;
   }
-  return `<p>This link cannot be embedded, but it is saved to the project.</p><a class="playlist-link" target="_blank" href="${escapeHTML(url)}">Open Playlist Link</a>`;
+  if(!music.playlists.length){
+    const pl = { id: uid(), name: "Project Playlist", trackIds: music.tracks.map(t=>t.id) };
+    music.playlists.push(pl);
+    music.activePlaylistId = pl.id;
+  }
+  event.target.value = "";
+  setText("musicUploadStatus", added ? `${added} music file(s) uploaded and saved to this project.` : "No audio files were selected.");
+  saveData();
+}
+function createMusicPlaylist(){
+  const name = val("newMusicPlaylistName") || "New Playlist";
+  const music = musicForProject();
+  const pl = { id: uid(), name, trackIds: [] };
+  music.playlists.push(pl);
+  music.activePlaylistId = pl.id;
+  setVal("newMusicPlaylistName", "");
+  saveData();
+}
+function setActiveMusicPlaylist(id){
+  const music = musicForProject();
+  music.activePlaylistId = id;
+  saveData();
+}
+function toggleMusicPlaylistOpen(id){
+  const music = musicForProject();
+  if(!music.expandedPlaylists) music.expandedPlaylists = {};
+  music.expandedPlaylists[id] = !music.expandedPlaylists[id];
+  music.activePlaylistId = id;
+  saveData();
+}
+function musicPlaylistDragStart(event, playlistId, trackId){
+  event.dataTransfer.setData("text/plain", JSON.stringify({ playlistId, trackId }));
+  event.dataTransfer.effectAllowed = "move";
+}
+function musicPlaylistDragOver(event){
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+}
+function musicPlaylistDrop(event, playlistId, targetTrackId){
+  event.preventDefault();
+  let payload = null;
+  try{ payload = JSON.parse(event.dataTransfer.getData("text/plain") || "{}"); }catch(err){ return; }
+  if(!payload?.trackId || payload.playlistId !== playlistId) return;
+  const music = musicForProject();
+  const pl = music.playlists.find(p=>p.id===playlistId);
+  if(!pl) return;
+  const ids = (pl.trackIds || []).filter(id=>id!==payload.trackId);
+  if(targetTrackId){
+    const targetIndex = ids.indexOf(targetTrackId);
+    ids.splice(targetIndex < 0 ? ids.length : targetIndex, 0, payload.trackId);
+  } else {
+    ids.push(payload.trackId);
+  }
+  pl.trackIds = ids;
+  music.activePlaylistId = playlistId;
+  if(!music.expandedPlaylists) music.expandedPlaylists = {};
+  music.expandedPlaylists[playlistId] = true;
+  saveData();
+}
+function renameMusicPlaylist(id){
+  const music = musicForProject();
+  const pl = music.playlists.find(p=>p.id===id);
+  if(!pl) return;
+  const name = prompt("Rename playlist", pl.name);
+  if(name && name.trim()){ pl.name = name.trim(); saveData(); }
+}
+function deleteMusicPlaylist(id){
+  const music = musicForProject();
+  music.playlists = music.playlists.filter(p=>p.id!==id);
+  if(music.activePlaylistId===id) music.activePlaylistId = music.playlists[0]?.id || null;
+  saveData();
+}
+function toggleTrackInPlaylist(playlistId, trackId){
+  const music = musicForProject();
+  let pl = music.playlists.find(p=>p.id===playlistId);
+  if(!pl){
+    pl = { id: uid(), name: "Project Playlist", trackIds: [] };
+    music.playlists.push(pl);
+    music.activePlaylistId = pl.id;
+  }
+  pl.trackIds = pl.trackIds || [];
+  if(pl.trackIds.includes(trackId)) pl.trackIds = pl.trackIds.filter(id=>id!==trackId);
+  else pl.trackIds.push(trackId);
+  saveData();
+}
+async function deleteMusicTrack(trackId){
+  const music = musicForProject();
+  music.tracks = music.tracks.filter(t=>t.id!==trackId);
+  music.playlists.forEach(pl=>pl.trackIds = (pl.trackIds||[]).filter(id=>id!==trackId));
+  await deleteMusicBlob(trackId);
+  saveData();
+}
+async function playTrack(trackId){
+  const music = musicForProject();
+  const track = music.tracks.find(t=>t.id===trackId);
+  if(!track) return;
+  const src = await resolveMusicTrackSrc(track);
+  if(!src){ alert("This uploaded music file could not be found in browser storage. Try uploading it again."); return; }
+  const audio = document.getElementById("plotpalsAudioPlayer") || document.getElementById("globalAudioMirror");
+  if(audio){
+    audio.src = src;
+    audio.play().catch(()=>{});
+  }
+  setText("globalMusicNowPlaying", track.title || "Now Playing");
+}
+function playPlaylist(playlistId){
+  const music = musicForProject();
+  const pl = music.playlists.find(p=>p.id===playlistId);
+  const firstId = pl?.trackIds?.find(id=>music.tracks.some(t=>t.id===id));
+  if(firstId) playTrack(firstId);
+}
+function renderMusicPlayerPanel(music){
+  const active = music.playlists.find(p=>p.id===music.activePlaylistId) || music.playlists[0];
+  const activeTracks = active ? (active.trackIds||[]).map(id=>music.tracks.find(t=>t.id===id)).filter(Boolean) : [];
+  return `<article class="item-card theme-card playlist-card music-player-card">
+    <div class="card-header"><h3>Music Player</h3>${active?`<button onclick="playPlaylist('${active.id}')">Play Playlist</button>`:""}</div>
+    <div class="card-body">
+      <p><strong>${escapeHTML(active?.name || "No playlist selected")}</strong></p>
+      <audio id="plotpalsAudioPlayer" controls preload="metadata"></audio>
+      <div class="music-track-list">
+        ${activeTracks.length ? activeTracks.map(t=>`<button class="music-track-btn" onclick="playTrack('${t.id}')">▶ ${escapeHTML(t.title)}</button>`).join("") : "<p>Add uploaded tracks to a playlist to play them here.</p>"}
+      </div>
+      ${detail("Notes", music.notes)}
+    </div>
+  </article>`;
+}
+function musicSortValue(track, key){
+  if(!track) return "";
+  if(key === "artist") return (track.artist || track.title || track.fileName || "").toLowerCase();
+  if(key === "duration") return Number(track.duration || 0);
+  if(key === "newest" || key === "oldest") return new Date(track.uploadedAt || track.created || 0).getTime() || 0;
+  return (track.title || track.fileName || "").toLowerCase();
+}
+function getSortedMusicLibrary(music){
+  const search = (val("musicLibrarySearch") || "").trim().toLowerCase();
+  const sort = val("musicLibrarySort") || "az";
+  let tracks = [...(music.tracks || [])];
+  if(search){
+    tracks = tracks.filter(t => [t.title, t.artist, t.album, t.fileName].some(v => String(v || "").toLowerCase().includes(search)));
+  }
+  tracks.sort((a,b)=>{
+    if(sort === "newest") return musicSortValue(b,"newest") - musicSortValue(a,"newest");
+    if(sort === "oldest") return musicSortValue(a,"oldest") - musicSortValue(b,"oldest");
+    if(sort === "duration") return musicSortValue(a,"duration") - musicSortValue(b,"duration");
+    if(sort === "artist") return String(musicSortValue(a,"artist")).localeCompare(String(musicSortValue(b,"artist"))) || String(musicSortValue(a,"az")).localeCompare(String(musicSortValue(b,"az")));
+    if(sort === "za") return String(musicSortValue(b,"az")).localeCompare(String(musicSortValue(a,"az")));
+    return String(musicSortValue(a,"az")).localeCompare(String(musicSortValue(b,"az")));
+  });
+  return tracks;
+}
+function renderPlaylistTrackRow(pl, track){
+  return `<div class="playlist-song-row" draggable="true" ondragstart="musicPlaylistDragStart(event,'${pl.id}','${track.id}')" ondragover="musicPlaylistDragOver(event)" ondrop="musicPlaylistDrop(event,'${pl.id}','${track.id}')">
+    <span class="drag-handle" title="Drag to reorder">☰</span>
+    <button class="music-track-btn" onclick="playTrack('${track.id}')">▶ ${escapeHTML(track.title)}</button>
+    <button class="delete-btn small-btn" onclick="toggleTrackInPlaylist('${pl.id}','${track.id}')">Remove</button>
+  </div>`;
 }
 function renderMusic(){
   const music = musicForProject();
-  setVal("musicLink", music.link);
   setVal("musicNotes", music.notes);
-  setHTML("musicLinks", `<article class="item-card theme-card playlist-card"><div class="card-header"><h3>Music Player</h3></div><div class="card-body">${renderMusicPlayer(music.link)}${detail("Notes", music.notes)}</div></article>`);
+  const activePlaylistId = music.activePlaylistId || music.playlists[0]?.id || "";
+  const playlistTabs = music.playlists.length ? `<div class="music-playlist-tabs">${music.playlists.map(pl=>`<button class="${pl.id===activePlaylistId?"active":""}" onclick="setActiveMusicPlaylist('${pl.id}')">${escapeHTML(pl.name)}</button>`).join("")}</div>` : "<p>No playlists yet. Create one above or upload music to auto-create a Project Playlist.</p>";
+  const playlists = music.playlists.map(pl=>{
+    const isOpen = !!music.expandedPlaylists?.[pl.id];
+    const tracks = (pl.trackIds||[]).map(id=>music.tracks.find(t=>t.id===id)).filter(Boolean);
+    const songs = isOpen ? `<div class="playlist-song-list" ondragover="musicPlaylistDragOver(event)" ondrop="musicPlaylistDrop(event,'${pl.id}',null)">
+      ${tracks.length ? tracks.map(t=>renderPlaylistTrackRow(pl,t)).join("") : `<p class="muted small-text">No songs in this playlist yet. Add songs from the music library below.</p>`}
+      ${tracks.length ? `<p class="muted small-text">Drag songs by the ☰ handle to arrange the playlist order.</p>` : ""}
+    </div>` : "";
+    return `<article class="item-card theme-card playlist-card ${isOpen?"open":""}">
+      <div class="card-header playlist-toggle-header" onclick="toggleMusicPlaylistOpen('${pl.id}')">
+        <h3>${isOpen?"▾":"▸"} ${escapeHTML(pl.name)}</h3>
+        <div onclick="event.stopPropagation()"><button onclick="playPlaylist('${pl.id}')">Play</button><button onclick="renameMusicPlaylist('${pl.id}')">Rename</button><button class="delete-btn" onclick="deleteMusicPlaylist('${pl.id}')">Delete</button></div>
+      </div>
+      <div class="card-body"><p>${tracks.length} track(s)</p>${songs}</div>
+    </article>`;
+  }).join("");
+  const sortedTracks = getSortedMusicLibrary(music);
+  const emptyLibraryMessage = music.tracks.length ? "<p>No tracks match your search.</p>" : "<p>No uploaded music yet.</p>";
+  const library = sortedTracks.length ? sortedTracks.map(t=>`<article class="item-card music-library-track"><div class="card-header"><h3>${escapeHTML(t.title)}</h3><button class="delete-btn" onclick="deleteMusicTrack('${t.id}')">Delete</button></div><div class="card-body"><p class="muted small-text">${escapeHTML(t.fileName||"")} • ${t.storage==="indexeddb"?"Uploaded to browser music storage":"Saved in project data"}</p><button onclick="playTrack('${t.id}')">Play Track</button><div class="playlist-checks">${music.playlists.length ? music.playlists.map(pl=>`<label><input type="checkbox" ${pl.trackIds?.includes(t.id)?"checked":""} onchange="toggleTrackInPlaylist('${pl.id}','${t.id}')" /> ${escapeHTML(pl.name)}</label>`).join("") : "<p>Create a playlist to organize this track.</p>"}</div></div></article>`).join("") : emptyLibraryMessage;
+  const legacy = music.legacyLink ? `<div class="panel"><h3>Old Saved Link</h3><p>Your old playlist link was kept for reference:</p><a class="playlist-link" target="_blank" href="${escapeHTML(music.legacyLink)}">${escapeHTML(music.legacyLink)}</a></div>` : "";
+  setHTML("musicLinks", `${renderMusicPlayerPanel(music)}<div class="panel"><h3>Playlists</h3>${playlistTabs}<div class="card-grid playlist-card-grid">${playlists}</div><p class="muted small-text">Click a playlist to reveal its songs. Playlists keep your custom drag-and-drop order and are not auto-sorted.</p></div><div class="panel"><h3>Uploaded Music Library</h3><div class="card-grid">${library}</div></div>${legacy}`);
+  renderGlobalMusicPlayer();
 }
-
+function renderGlobalMusicPlayer(){
+  const el = document.getElementById("globalMusicPlayer");
+  if(!el) return;
+  const music = musicForProject();
+  const hasTracks = music.tracks && music.tracks.length;
+  el.innerHTML = hasTracks ? `<div class="global-music-inner"><span id="globalMusicNowPlaying">Project Music Player</span><audio id="globalAudioMirror" controls preload="metadata"></audio></div>` : "";
+  const pagePlayer = document.getElementById("plotpalsAudioPlayer");
+  const globalPlayer = document.getElementById("globalAudioMirror");
+  if(pagePlayer && globalPlayer){
+    globalPlayer.onplay = ()=>{ if(pagePlayer.src!==globalPlayer.src) pagePlayer.src=globalPlayer.src; pagePlayer.play().catch(()=>{}); };
+  }
+}
 function projectSeriesChanged(){const seriesId=val("projectSeriesSelect"); const books=data.books.filter(b=>b.seriesId===seriesId); setHTML("projectBookSelect",books.length?books.map(b=>`<option value="${b.id}">${escapeHTML(b.title)}</option>`).join(""):`<option value="">No books in this project</option>`)}
 function projectTypeChanged(){
   const type=val("newProjectType")||"series";
@@ -370,7 +610,7 @@ function projectTypeChanged(){
   if(label) label.textContent = type === "standalone" ? "Series / Project Title (optional)" : "Series / Project Title";
   if(input) input.placeholder = type === "standalone" ? "Optional — Book Title is enough" : "Series title";
 }
-function makeStarterBook(seriesId,name){const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],plotCardId:"",created:new Date().toISOString()}; return {id:uid(),seriesId,title:name,status:"Planning",summary:"",theme:"",notes:"",manuscript:[{id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()}],created:new Date().toISOString()}}
+function makeStarterBook(seriesId,name){const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],plotCardId:"",created:new Date().toISOString()}; return {id:uid(),seriesId,title:name,status:"Planning",summary:"",theme:"",notes:"",cover:"",manuscript:[{id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()}],created:new Date().toISOString()}}
 function createStandaloneBook(name){const series={id:uid(),title:name,type:"standalone",genre:"",synopsis:"",theme:"",mysteries:"",foreshadowing:"",created:new Date().toISOString()}; data.series.push(series); data.books.push(makeStarterBook(series.id,name)); return series;}
 function createSeriesFromProject(){const type=val("newProjectType")||"series"; const bookTitle=val("newBookTitle"); const seriesTitle=val("newSeriesTitle"); if(type==="standalone"){const name=bookTitle||seriesTitle||"Untitled Book"; createStandaloneBook(name); clearFields(["newSeriesTitle","newBookTitle"]); saveData(false); renderProjectScreen(); return setProjectMessage("Standalone book created. No Series/Project Title required.");} const name=seriesTitle||"Untitled Series"; const series={id:uid(),title:name,type,genre:"",synopsis:"",theme:"",mysteries:"",foreshadowing:"",created:new Date().toISOString()}; data.series.push(series); setVal("newSeriesTitle",""); saveData(false); renderProjectScreen(); setProjectMessage("Series created. Now create/select a book.")}
 function createBookFromProject(){let seriesId=val("newBookSeriesSelect"); const name=val("newBookTitle")||"Untitled Book"; if(!seriesId){const series=createStandaloneBook(name); seriesId=series.id;} else {data.books.push(makeStarterBook(seriesId,name));} setVal("newBookTitle",""); saveData(false); renderProjectScreen(); setProjectMessage(seriesId?"Book created.":"Standalone book created.")}
@@ -382,25 +622,27 @@ async function syncToCloud(showAlert=true){if(!supabaseClient){if(showAlert)aler
 async function loadFromCloud(showAlert=true){if(!supabaseClient){if(showAlert)alert("Supabase is not loaded.");return} const session=await supabaseClient.auth.getSession(); const user=session.data?.session?.user; if(!user){if(showAlert)alert("Login first.");return} const {data:rows,error}=await supabaseClient.from(CLOUD_TABLE).select("vault_data, updated_at").eq("user_id",user.id).limit(1); if(error){if(showAlert)alert("Could not load cloud data. "+error.message);return} if(!rows||!rows.length||!rows[0].vault_data){data.user={id:user.id,email:user.email}; localStorage.setItem(STORAGE_KEY,JSON.stringify(data,null,2)); if(showAlert)alert("No cloud vault found yet."); return} data={...structuredClone(defaultData),...rows[0].vault_data,user:{id:user.id,email:user.email}}; ensureCollections(); localStorage.setItem(STORAGE_KEY,JSON.stringify(data,null,2)); if(showAlert){renderAll(); alert("Loaded from Supabase.")}}
 
 function toggleSidebar(){document.getElementById("appShell").classList.toggle("collapsed")}
-function setView(view,id=null,extra=null){saveCurrentScene(false,false); if(view==="write"){if(id)data.activeChapterId=id; if(extra)data.activeSceneId=extra; if(!data.activeSceneId)data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null} if(view==="characterDetail"&&id){ if(data.selectedCharacterId!==id) characterDetailEditMode=false; data.selectedCharacterId=id; } if(view==="worldDetail"&&id){ if(data.selectedWorldId!==id) worldDetailEditMode=false; data.selectedWorldId=id; } if(view==="locationDetail"&&id){ if(data.selectedLocationId!==id) locationDetailEditMode=false; data.selectedLocationId=id; } if(view==="magicDetail"&&id){ if(data.selectedMagicId!==id) magicDetailEditMode=false; data.selectedMagicId=id; } if(view==="organizationDetail"&&id){ if(data.selectedOrganizationId!==id) organizationDetailEditMode=false; data.selectedOrganizationId=id; } document.querySelectorAll(".view").forEach(v=>v.classList.remove("active")); document.getElementById(view).classList.add("active"); const titles={overview:"Overview",write:"Scene-Based Writing",storyBoard:"Story Structure Board",chapters:"Chapter Planner",threads:"Plot Threads",mysteries:"Mystery Tracker",foreshadowing:"Foreshadowing Tracker",plotBoard:"Plot Board",characters:"Characters",characterDetail:"Character Detail",relationships:"Relationship System",locations:"Locations",locationDetail:"Location Detail",magic:"Magic System",magicDetail:"Magic/System Detail",organizations:"Organizations",organizationDetail:"Organization Detail",scenes:"Scene Database",timeline:"Timeline",world:"Worldbuilding",worldDetail:"Worldbuilding Detail",seriesTools:"Series-Level Tools",music:"Project Playlist",stats:"Writing Analytics",exports:"Export",backup:"Backup"}; setText("viewTitle",titles[view]||"Workspace"); renderAll()}
+function setView(view,id=null,extra=null){saveCurrentScene(false,false); data.currentView=view; if(view==="write"){if(id)data.activeChapterId=id; if(extra)data.activeSceneId=extra; if(!data.activeSceneId)data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null} if(view==="characterDetail"&&id){ if(data.selectedCharacterId!==id) characterDetailEditMode=false; data.selectedCharacterId=id; } if(view==="worldDetail"&&id){ if(data.selectedWorldId!==id) worldDetailEditMode=false; data.selectedWorldId=id; } if(view==="locationDetail"&&id){ if(data.selectedLocationId!==id) locationDetailEditMode=false; data.selectedLocationId=id; } if(view==="magicDetail"&&id){ if(data.selectedMagicId!==id) magicDetailEditMode=false; data.selectedMagicId=id; } if(view==="organizationDetail"&&id){ if(data.selectedOrganizationId!==id) organizationDetailEditMode=false; data.selectedOrganizationId=id; } document.querySelectorAll(".view").forEach(v=>v.classList.remove("active")); document.getElementById(view).classList.add("active"); const titles={projectDashboard:"Project Dashboard",overview:"Overview",write:"Scene-Based Writing",storyBoard:"Story Structure Board",chapters:"Chapter Planner",threads:"Plot Threads",mysteries:"Mystery Tracker",foreshadowing:"Foreshadowing Tracker",plotBoard:"Plot Board",characters:"Characters",characterDetail:"Character Detail",relationships:"Relationship System",locations:"Locations",locationDetail:"Location Detail",magic:"Magic System",magicDetail:"Magic/System Detail",organizations:"Organizations",organizationDetail:"Organization Detail",scenes:"Scene Database",timeline:"Timeline",world:"Worldbuilding",worldDetail:"Worldbuilding Detail",seriesTools:"Series-Level Tools",music:"Project Playlist",stats:"Writing Analytics",exports:"Export",backup:"Backup"}; setText("viewTitle",view==="projectDashboard"?`${activeSeries()?.title||"Project"} Dashboard`:(titles[view]||"Workspace")); renderAll()}
 function renderNestedNav(){
   const nav=document.getElementById("nestedNav");
   if(!nav)return;
-  const book=activeBook();
+  const isProjectDashboard = data.currentView === "projectDashboard";
+  const hasBookContext = !!data.activeBookId && !isProjectDashboard;
+  const book=hasBookContext ? activeBook() : null;
   const chapters=book?.manuscript||[];
   const plans=data.chapterPlans.filter(visibleByScope);
   const threads=data.threads.filter(visibleByScope);
   const mysteries=(data.mysteries||[]).filter(seriesScope);
   const foreshadowing=(data.foreshadowing||[]).filter(seriesScope);
   const plotCards=(data.plotCards||[]).filter(visibleByScope);
-  const locations=(data.locations||[]).filter(visibleByScope);
+  const locations=(data.locations||[]).filter(seriesScope);
   const orgs=(data.organizations||[]).filter(seriesScope);
   const magic=(data.magicSystems||[]).filter(seriesScope);
-  const worldNotes=(data.world||[]).filter(visibleByScope);
-  const timeline=(data.timeline||[]).filter(visibleByScope);
-  const rels=(data.relationships||[]).filter(visibleByScope);
+  const worldNotes=(data.world||[]).filter(seriesScope);
+  const timeline=(data.timeline||[]).filter(seriesScope);
+  const rels=(data.relationships||[]).filter(seriesScope);
   const roles=["Main","Side","Love Interest","Antagonist","Mentor","Other"];
-  const charsByRole=role=>data.characters.filter(c=>visibleByScope(c)&&(c.role||"Other")===role);
+  const charsByRole=role=>data.characters.filter(c=>seriesScope(c)&&(c.role||"Other")===role);
   const seriesOnly=isSeriesProject();
 
   nav.innerHTML=`
@@ -410,12 +652,14 @@ function renderNestedNav(){
       </button>
       <div class="menu-content">
         <button class="story-nav" onclick="backToProjects()">📖 My Stories</button>
-        <button class="story-nav" onclick="setView('overview')">🏠 Project Overview</button>
+        <button class="story-nav" onclick="setView('projectDashboard')">🏠 Project Dashboard</button>
+        <button class="story-nav" onclick="setView('overview')">📝 Edit Overview</button>
         <button class="story-nav" onclick="setView('stats')">📈 Writing Stats</button>
         <button class="story-nav" onclick="setView('music')">♫ Project Playlist</button>
       </div>
     </div>
 
+    ${hasBookContext ? `
     <div class="${sectionClass('manuscript')}">
       <button class="menu-heading" onclick="toggleMenuSection('manuscript')">
         <span>Manuscript</span><span>${sectionArrow('manuscript')}</span>
@@ -445,7 +689,7 @@ function renderNestedNav(){
           </div>`;
         }).join("")}
       </div>
-    </div>
+    </div>` : ""}
 
     <div class="${sectionClass('plot')}">
       <button class="menu-heading" onclick="toggleMenuSection('plot')">
@@ -494,7 +738,7 @@ function renderNestedNav(){
       </button>
       <div class="menu-content">
         <button class="story-nav nav-parent" onclick="setView('characters')">
-          <span>👥 All Characters</span><span class="nav-count">${data.characters.filter(visibleByScope).length}</span>
+          <span>👥 All Characters</span><span class="nav-count">${data.characters.filter(seriesScope).length}</span>
         </button>
         ${roles.map(role=>`
           <button class="story-nav nav-child" onclick="setView('characters')">
@@ -552,9 +796,9 @@ function renderNestedNav(){
       </button>
       <div class="menu-content">
         <button class="story-nav nav-parent" onclick="setView('seriesTools')">★ Series-Level Tools</button>
-        <button class="story-nav nav-parent" onclick="setView('scenes')">
+        ${hasBookContext ? `<button class="story-nav nav-parent" onclick="setView('scenes')">
           <span>🎬 Scene Database</span><span class="nav-count">${(activeBook()?.manuscript||[]).flatMap(ch=>ch.scenes||[]).length}</span>
-        </button>
+        </button>` : ""}
         <button class="story-nav nav-parent" onclick="setView('timeline')">
           <span>⏳ Timeline</span><span class="nav-count">${timeline.length}</span>
         </button>
@@ -620,11 +864,11 @@ function sceneTrackingCard(title,emptyText,key,items){
   return `<div class="tracker-card"><div class="tracker-heading"><strong>${escapeHTML(title)}</strong><span>Select anything that appears, is used, or is meaningfully referenced.</span></div>${items.length?`<div class="character-checkbox-grid">${items.map(item=>`<label class="character-check"><input type="checkbox" ${selected.includes(item.id)?"checked":""} onchange="toggleSceneTrackedItem('${key}','${item.id}',this.checked)"> <span>${escapeHTML(item.name||item.title||"Untitled")}</span></label>`).join("")}</div>`:`<p class="muted">${escapeHTML(emptyText)}</p>`}</div>`;
 }
 function renderSceneTracking(){
-  const chars=(data.characters||[]).filter(visibleByScope);
+  const chars=(data.characters||[]).filter(seriesScope);
   const orgs=(data.organizations||[]).filter(seriesScope);
   const magic=(data.magicSystems||[]).filter(seriesScope);
-  const artifacts=(data.world||[]).filter(w=>visibleByScope(w)&&worldTrackingKeyForCategory(w.category)==="itemArtifactIds");
-  const floraFauna=(data.world||[]).filter(w=>visibleByScope(w)&&worldTrackingKeyForCategory(w.category)==="floraFaunaIds");
+  const artifacts=(data.world||[]).filter(w=>seriesScope(w)&&worldTrackingKeyForCategory(w.category)==="itemArtifactIds");
+  const floraFauna=(data.world||[]).filter(w=>seriesScope(w)&&worldTrackingKeyForCategory(w.category)==="floraFaunaIds");
   const html=`
     ${sceneTrackingCard("Characters in this scene","Create characters first, then they will appear here.","characterIds",chars)}
     ${sceneTrackingCard("Organizations in this scene","Create organizations first, then they will appear here.","organizationIds",orgs)}
@@ -662,7 +906,7 @@ function visibleByScope(item){return item.seriesId===data.activeSeriesId&&(item.
 function seriesScope(item){return item.seriesId===data.activeSeriesId}
 function characterName(id){return data.characters.find(c=>c.id===id)?.name||"Unknown"}
 function locationName(id){return data.locations.find(l=>l.id===id)?.name||""}
-function characterRelationships(characterId){return data.relationships.filter(r=>visibleByScope(r)&&(r.a===characterId||r.b===characterId))}
+function characterRelationships(characterId){return data.relationships.filter(r=>seriesScope(r)&&(r.a===characterId||r.b===characterId))}
 function getAppearanceConfig(kind){
   const configs={
     character:{collection:"characters",label:"Character",nameKey:"name",trackedKey:"characterIds"},
@@ -680,8 +924,9 @@ function appearanceLogEntries(kind,itemId){
   if(!cfg||!item)return rows;
   const itemName=String(item[cfg.nameKey]||"").trim();
   const itemNameLower=itemName.toLowerCase();
-  (activeBook()?.manuscript||[]).forEach((chapter,chapterIndex)=>{
-    (chapter.scenes||[]).forEach((scene,sceneIndex)=>{
+  projectScenesAll().forEach(({book,chapter,scene},globalIndex)=>{
+    const chapterIndex=(book.manuscript||[]).findIndex(ch=>ch.id===chapter.id);
+    const sceneIndex=(chapter.scenes||[]).findIndex(sc=>sc.id===scene.id);
       const reasons=[];
       const text=stripHTML(scene.content||"").toLowerCase();
       const trackedKey = kind==="world" ? worldTrackingKeyForCategory(item.category) : cfg.trackedKey;
@@ -691,15 +936,14 @@ function appearanceLogEntries(kind,itemId){
       }
       if(kind==="character" && scene.pov===itemId)reasons.push("POV");
       if(itemNameLower.length>2 && text.includes(itemNameLower) && !reasons.includes("auto-detected mention"))reasons.push("auto-detected mention");
-      if(reasons.length)rows.push({chapter,scene,chapterIndex,sceneIndex,reasons:[...new Set(reasons)]});
-    });
+      if(reasons.length)rows.push({book,chapter,scene,chapterIndex,sceneIndex,reasons:[...new Set(reasons)]});
   });
   return rows;
 }
 function renderSharedAppearanceLog(kind,itemId){
   const rows=appearanceLogEntries(kind,itemId);
   if(!rows.length)return `<section class="character-section"><h3>Appearance Log</h3><p class="muted">No appearances detected yet.</p></section>`;
-  return `<section class="character-section appearance-log-detail"><h3>Appearance Log</h3><p class="muted">Mirrors every chapter and scene where this is selected, assigned, or mentioned.</p><div class="appearance-log">${rows.map(row=>`<button type="button" class="mini-link" onclick="setView('write','${row.chapter.id}','${row.scene.id}')">${escapeHTML(row.chapter.title||`Chapter ${row.chapterIndex+1}`)} → ${escapeHTML(row.scene.title||`Scene ${row.sceneIndex+1}`)} <small>(${escapeHTML(row.reasons.join(", "))})</small></button>`).join("")}</div></section>`;
+  return `<section class="character-section appearance-log-detail"><h3>Appearance Log</h3><p class="muted">Mirrors every chapter and scene where this is selected, assigned, or mentioned.</p><div class="appearance-log">${rows.map(row=>`<button type="button" class="mini-link" onclick="setView('write','${row.chapter.id}','${row.scene.id}')">${escapeHTML(row.book?.title?row.book.title+" → ":"")}${escapeHTML(row.chapter.title||`Chapter ${row.chapterIndex+1}`)} → ${escapeHTML(row.scene.title||`Scene ${row.sceneIndex+1}`)} <small>(${escapeHTML(row.reasons.join(", "))})</small></button>`).join("")}</div></section>`;
 }
 function characterAppearances(characterId){return appearanceLogEntries("character",characterId).map(row=>`${row.chapter.title} — ${row.scene.title}${row.reasons.length?` (${row.reasons.join(", ")})`:""}`)}
 function itemNamesFromIds(items,ids){
@@ -830,7 +1074,7 @@ function worldCategoryIcon(category="Other"){
   return map[category]||"🌍";
 }
 function worldCategoryItems(category){
-  return (data.world||[]).filter(w=>visibleByScope(w)&&(w.category||"Other")===category);
+  return (data.world||[]).filter(w=>seriesScope(w)&&(w.category||"Other")===category);
 }
 function showWorldCategory(category){
   setView('world');
@@ -856,7 +1100,7 @@ function cancelWorldDetailEdit(){worldDetailEditMode=false; renderWorldDetail();
 function saveWorldDetailEdit(worldId){const w=data.world.find(x=>x.id===worldId); if(!w)return; w.name=val("editWorldName"); w.scope=val("editWorldScope"); w.seriesId=w.scope==="series"?data.activeSeriesId:null; w.bookId=w.scope==="book"?data.activeBookId:null; w.category=val("editWorldCategory")||"Other"; w.basicInfo=val("editWorldBasicInfo"); w.description=val("editWorldDescription"); w.history=val("editWorldHistory"); w.culture=val("editWorldCulture"); w.rules=val("editWorldRules"); w.plotRelevance=val("editWorldPlotRelevance"); (w.customSections||[]).forEach(sec=>{sec.title=val(`editWorldCustomTitle_${sec.id}`); sec.text=val(`editWorldCustomText_${sec.id}`)}); if(!data.worldCategories)data.worldCategories=[]; if(w.category&&!data.worldCategories.includes(w.category))data.worldCategories.push(w.category); worldDetailEditMode=false; saveData(true);}
 function renderWorldEditForm(w){const custom=Array.isArray(w.customSections)?w.customSections:[]; return `<div class="panel character-detail-grid"><div>${w.image?`<img class="character-photo" src="${w.image}" alt="${escapeHTML(w.name)}"><input id="worldImageUpload_${w.id}" type="file" accept="image/*" class="hidden" onchange="updateWorldImage('${w.id}',this)"><button type="button" class="wide" onclick="triggerWorldImageUpload('${w.id}')">Change Image</button>`:`<div class="character-photo panel photo-placeholder"><p>No Image</p><input id="worldImageUpload_${w.id}" type="file" accept="image/*" class="hidden" onchange="updateWorldImage('${w.id}',this)"><button type="button" class="wide" onclick="triggerWorldImageUpload('${w.id}')">+ Add Image</button></div>`}</div><div><h3>Edit Worldbuilding Detail</h3><div class="form-grid"><input id="editWorldName" placeholder="Entry name" value="${escapeAttr(w.name||"")}"><select id="editWorldScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select><select id="editWorldCategory">${worldCategories().map(c=>`<option>${escapeHTML(c)}</option>`).join("")}</select><textarea id="editWorldBasicInfo" placeholder="Basic Information">${escapeHTML(w.basicInfo||"")}</textarea><textarea id="editWorldDescription" placeholder="Description">${escapeHTML(w.description||"")}</textarea><textarea id="editWorldHistory" placeholder="History">${escapeHTML(w.history||"")}</textarea><textarea id="editWorldCulture" placeholder="Culture / Society">${escapeHTML(w.culture||"")}</textarea><textarea id="editWorldRules" placeholder="Rules, limits, powers, or important notes">${escapeHTML(w.rules||"")}</textarea><textarea id="editWorldPlotRelevance" placeholder="Plot Relevance">${escapeHTML(w.plotRelevance||"")}</textarea></div><h3>Custom Sections</h3>${custom.map(sec=>`<div class="custom-section-builder"><input id="editWorldCustomTitle_${sec.id}" placeholder="Section title" value="${escapeAttr(sec.title||"")}"><textarea id="editWorldCustomText_${sec.id}" placeholder="Section notes">${escapeHTML(sec.text||"")}</textarea><button type="button" class="delete-btn" onclick="deleteCustomSectionFromWorld('${w.id}','${sec.id}'); worldDetailEditMode=true">Delete Section</button></div>`).join("")||"<p class='muted'>No custom sections yet.</p>"}<button type="button" onclick="addCustomSectionToWorld('${w.id}')">+ Add Custom Section</button><hr><button onclick="saveWorldDetailEdit('${w.id}')">Save Changes</button><button class="ghost-btn" onclick="cancelWorldDetailEdit()">Cancel</button></div></div>`;}
 function renderWorldDetail(){const el=document.getElementById("worldDetailContent"); if(!el)return; const w=data.world.find(x=>x.id===data.selectedWorldId); if(!w){el.innerHTML=`<div class="panel"><p>Select a worldbuilding entry from the sidebar.</p></div>`;return} if(worldDetailEditMode){el.innerHTML=renderWorldEditForm(w); setVal("editWorldScope",w.scope||"book"); setVal("editWorldCategory",w.category||"Other"); addBulletButtons(el); return} const custom=Array.isArray(w.customSections)?w.customSections:[]; el.innerHTML=`<div class="panel character-detail-grid"><div>${w.image?`<img class="character-photo" src="${w.image}" alt="${escapeHTML(w.name)}">`:`<div class="character-photo panel photo-placeholder"><p>No Image</p><input id="worldImageUpload_${w.id}" type="file" accept="image/*" class="hidden" onchange="updateWorldImage('${w.id}',this)"><button type="button" class="wide" onclick="triggerWorldImageUpload('${w.id}')">+ Add Image</button></div>`}<button class="wide" onclick="startWorldDetailEdit()">Edit Worldbuilding Detail</button><button class="wide" onclick="addCustomSectionToWorld('${w.id}')">+ Add Custom Section</button></div><div><h3>${escapeHTML(w.name||"Untitled Entry")}</h3><span class="tag">${escapeHTML(w.category||"Other")}</span><span class="tag">${escapeHTML(w.scope||"book")}</span>${detailBlock("Basic Information",w.basicInfo)}${detailBlock("Description",w.description)}${detailBlock("History",w.history)}${detailBlock("Culture / Society",w.culture)}${detailBlock("Rules / Notes",w.rules)}${detailBlock("Plot Relevance",w.plotRelevance)}${custom.map(sec=>`<section class="character-section custom-character-section"><h4>${escapeHTML(sec.title||"Untitled Section")}</h4><p>${formatMultiline(sec.text||"")}</p><button class="delete-btn" onclick="deleteCustomSectionFromWorld('${w.id}','${sec.id}')">Delete Section</button></section>`).join("")}${renderSharedAppearanceLog("world",w.id)}</div></div>`;}
-function renderWorldByCategory(){renderWorldCategorySelect(); renderWorldCustomDraftList(); const el=document.getElementById("worldCategoryGroups"); if(!el)return; const items=(data.world||[]).filter(visibleByScope); const cats=worldCategories(); el.innerHTML=cats.map(cat=>{const group=items.filter(w=>(w.category||"Other")===cat); return `<div class="role-group" id="worldcat_${worldCategorySlug(cat)}"><h3>${worldCategoryIcon(cat)} ${escapeHTML(cat)}</h3><div class="card-grid">${group.length?group.map(w=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(w.name||"Untitled Entry")}</h3><button class="delete-btn" onclick="deleteItem('world','${w.id}')">Delete</button></div>${w.image?`<img class="character-photo" src="${w.image}" alt="${escapeHTML(w.name||"")}">`:""}<div class="card-body"><span class="tag">${escapeHTML(w.category||"Other")}</span>${detail("Description",w.description)}${detail("Plot Relevance",w.plotRelevance)}<button onclick="setView('worldDetail','${w.id}')">Open Entry</button></div></article>`).join(""):`<p class="muted">No ${escapeHTML(cat)} entries yet.</p>`}</div></div>`}).join("");}
+function renderWorldByCategory(){renderWorldCategorySelect(); renderWorldCustomDraftList(); const el=document.getElementById("worldCategoryGroups"); if(!el)return; const items=(data.world||[]).filter(seriesScope); const cats=worldCategories(); el.innerHTML=cats.map(cat=>{const group=items.filter(w=>(w.category||"Other")===cat); return `<div class="role-group" id="worldcat_${worldCategorySlug(cat)}"><h3>${worldCategoryIcon(cat)} ${escapeHTML(cat)}</h3><div class="card-grid">${group.length?group.map(w=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(w.name||"Untitled Entry")}</h3><button class="delete-btn" onclick="deleteItem('world','${w.id}')">Delete</button></div>${w.image?`<img class="character-photo" src="${w.image}" alt="${escapeHTML(w.name||"")}">`:""}<div class="card-body"><span class="tag">${escapeHTML(w.category||"Other")}</span>${detail("Description",w.description)}${detail("Plot Relevance",w.plotRelevance)}<button onclick="setView('worldDetail','${w.id}')">Open Entry</button></div></article>`).join(""):`<p class="muted">No ${escapeHTML(cat)} entries yet.</p>`}</div></div>`}).join("");}
 
 function addCharacter(){const file=document.getElementById("charPhoto").files[0]; const finish=photo=>{data.characters.push({id:uid(),...scopedItem(val("charScope")),name:val("charName"),role:val("charRole"),species:val("charSpecies"),photo,basicInfo:val("charBasicInfo"),description:val("charDescription"),personality:val("charPersonality"),backstory:val("charBackstory"),wound:val("charWound"),arc:val("charArc"),voice:val("charVoice"),secrets:val("charSecrets"),quotes:val("charQuotes"),customSections:[...characterCustomSectionDrafts],created:new Date().toISOString()}); clearFields(["charName","charSpecies","charBasicInfo","charDescription","charPersonality","charBackstory","charWound","charArc","charVoice","charSecrets","charQuotes","charCustomTitle","charCustomText"]); characterCustomSectionDrafts=[]; renderCharacterCustomDraftList(); document.getElementById("charPhoto").value=""; saveData()}; if(!file)return finish(""); const reader=new FileReader(); reader.onload=()=>finish(reader.result); reader.readAsDataURL(file)}
 function relationshipViewLabel(characterId,fallback){const name=characterName(characterId); return name&&name!=="Unknown"?`${name}'s View`:fallback;}
@@ -885,7 +1129,7 @@ function getEntityConfig(kind){return entityConfigs[kind]}
 function getEntity(kind,id){const cfg=getEntityConfig(kind); return cfg?(data[cfg.collection]||[]).find(x=>x.id===id):null}
 function getEntityEditMode(kind){return kind==="location"?locationDetailEditMode:kind==="magic"?magicDetailEditMode:organizationDetailEditMode}
 function setEntityEditMode(kind,on){if(kind==="location")locationDetailEditMode=on; else if(kind==="magic")magicDetailEditMode=on; else organizationDetailEditMode=on}
-function renderEntityList(kind){const cfg=getEntityConfig(kind), el=document.getElementById(cfg.listId); if(!el)return; const filter=kind==="location"?visibleByScope:seriesScope; const items=(data[cfg.collection]||[]).filter(filter); el.innerHTML=items.length?items.map(item=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(item.name||cfg.label)}</h3></div><div class="card-body">${item.image?`<img class="location-photo" src="${item.image}">`:""}${cfg.fields.slice(0,3).map(([key,label])=>detail(label,item[key])).join("")}</div><button type="button" onclick="setView('${cfg.detailView}','${item.id}')">Open Detail Page</button><button class="delete-btn" onclick="deleteItem('${cfg.collection}','${item.id}')">Delete</button></article>`).join(""):"<p class='muted'>No entries yet.</p>"}
+function renderEntityList(kind){const cfg=getEntityConfig(kind), el=document.getElementById(cfg.listId); if(!el)return; const filter=seriesScope; const items=(data[cfg.collection]||[]).filter(filter); el.innerHTML=items.length?items.map(item=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(item.name||cfg.label)}</h3></div><div class="card-body">${item.image?`<img class="location-photo" src="${item.image}">`:""}${cfg.fields.slice(0,3).map(([key,label])=>detail(label,item[key])).join("")}</div><button type="button" onclick="setView('${cfg.detailView}','${item.id}')">Open Detail Page</button><button class="delete-btn" onclick="deleteItem('${cfg.collection}','${item.id}')">Delete</button></article>`).join(""):"<p class='muted'>No entries yet.</p>"}
 function updateEntityImage(kind,id,input){const file=input?.files?.[0]; if(!file)return; const item=getEntity(kind,id); if(!item)return; const reader=new FileReader(); reader.onload=()=>{item.image=reader.result; saveData(true)}; reader.readAsDataURL(file)}
 function triggerEntityImageUpload(kind,id){const input=document.getElementById(`${kind}ImageUpload_${id}`); if(input)input.click()}
 function startEntityDetailEdit(kind){setEntityEditMode(kind,true); renderEntityDetail(kind)}
@@ -902,7 +1146,101 @@ function addStructureBeat(){data.structureBeats.push({id:uid(),...scopedItem("bo
 function makeCard(title,body,onDelete){const template=document.getElementById("cardTemplate"); const node=template.content.cloneNode(true); node.querySelector("h3").textContent=title||"Untitled"; node.querySelector(".card-body").innerHTML=body; node.querySelector(".delete-btn").onclick=onDelete; return node}
 function deleteItem(collection,id){data[collection]=data[collection].filter(item=>item.id!==id); saveData()}
 
-function renderOverview(){const s=activeSeries(), b=activeBook(); setVal("seriesTitleEdit",s?.title); setVal("seriesTypeEdit",s?.type||"series"); setVal("seriesGenreEdit",s?.genre); setVal("seriesSynopsisEdit",s?.synopsis); setVal("seriesThemeEdit",s?.theme); setVal("seriesMysteriesEdit",s?.mysteries); setVal("seriesForeshadowingEdit",s?.foreshadowing); setVal("bookTitleEdit",b?.title); setVal("bookStatusEdit",b?.status); setVal("bookSummaryEdit",b?.summary); setVal("bookThemeEdit",b?.theme); setVal("bookNotesEdit",b?.notes); const scenes=(b?.manuscript||[]).flatMap(c=>c.scenes||[]); const words=scenes.reduce((sum,s)=>sum+countWords(stripHTML(s.content||"")),0); setText("statWords",words); setText("statChapters",(b?.manuscript||[]).length); setText("statScenes",scenes.length); setText("statCharacters",data.characters.filter(visibleByScope).length); setText("projectPath",`${s?.title||"No project"} → ${b?.title||"No book selected"}`); setText("sidebarProjectName",b?.title||"Project")}
+
+function activeProjectBooks(){
+  return (data.books||[]).filter(b=>b.seriesId===data.activeSeriesId).sort((a,b)=>(a.created||"").localeCompare(b.created||""));
+}
+function bookScenes(book){return (book?.manuscript||[]).flatMap((ch,ci)=>(ch.scenes||[]).map((sc,si)=>({book,chapter:ch,scene:sc,chapterIndex:ci,sceneIndex:si})))}
+function projectScenesAll(){return activeProjectBooks().flatMap(bookScenes)}
+function bookWordCount(book){return bookScenes(book).reduce((sum,x)=>sum+countWords(stripHTML(x.scene.content||"")),0)}
+function quickAddBookToActiveProject(){
+  const s=activeSeries(); if(!s)return alert("Open a project first.");
+  const title=prompt("Book title:",`Book ${activeProjectBooks().length+1}`); if(!title)return;
+  const book=makeStarterBook(s.id,title); data.books.push(book); data.activeBookId=book.id;
+  const first=book.manuscript?.[0]; data.activeChapterId=first?.id||null; data.activeSceneId=first?.scenes?.[0]?.id||null;
+  saveData(true);
+  setView("projectDashboard");
+}
+function switchActiveBookFromDashboard(bookId){
+  const b=(data.books||[]).find(x=>x.id===bookId&&x.seriesId===data.activeSeriesId); if(!b)return;
+  saveCurrentScene(false,false); data.activeBookId=bookId;
+  const first=b.manuscript?.[0]; data.activeChapterId=first?.id||null; data.activeSceneId=first?.scenes?.[0]?.id||null;
+  saveData(true); setView("projectDashboard");
+}
+function openBookFromDashboard(bookId){
+  switchActiveBookFromDashboard(bookId);
+  setView("overview");
+}
+function triggerBookCoverUpload(bookId,event){
+  if(event)event.stopPropagation();
+  const input=document.getElementById(`bookCoverUpload_${bookId}`);
+  if(input)input.click();
+}
+function updateBookCover(bookId,input){
+  const file=input?.files?.[0]; if(!file)return;
+  const b=(data.books||[]).find(x=>x.id===bookId && (!data.activeSeriesId || x.seriesId===data.activeSeriesId || document.getElementById(`bookCoverUpload_${bookId}`))); if(!b)return;
+  const reader=new FileReader();
+  reader.onload=()=>{b.cover=reader.result; saveData(true)};
+  reader.readAsDataURL(file);
+}
+function plotPointUsageForBook(bookId=null){
+  const scenes=(bookId?bookScenes((data.books||[]).find(b=>b.id===bookId)):projectScenesAll()).filter(x=>x.scene.plotCardId);
+  const usage={};
+  scenes.forEach((x,i)=>{const id=x.scene.plotCardId; if(!usage[id])usage[id]={first:i,last:i,count:0,items:[]}; usage[id].last=i; usage[id].count++; usage[id].items.push(x);});
+  return {scenes,usage};
+}
+function computedPlotStatus(card,bookId=null){
+  const {scenes,usage}=plotPointUsageForBook(bookId||card.bookId||null);
+  const u=usage[card.id];
+  if(!u)return "Not Started";
+  const laterDifferent=scenes.some((x,i)=>i>u.last && x.scene.plotCardId && x.scene.plotCardId!==card.id);
+  return laterDifferent?"Completed":"Active";
+}
+function syncPlotCompletionStatuses(){
+  (data.plotCards||[]).forEach(card=>{card.autoStatus=computedPlotStatus(card,card.bookId||null);});
+}
+function renderProjectWritingChart(books){
+  const chart=document.getElementById("projectWritingChart"); if(!chart)return;
+  const values=(books||[]).slice(-7).map(b=>bookWordCount(b));
+  const padded=values.length?values:[0,0,0,0,0,0,0];
+  const max=Math.max(...padded,1);
+  chart.innerHTML=padded.map(v=>`<span title="${v.toLocaleString()} words" style="height:${Math.max(12,Math.round((v/max)*88))}%"></span>`).join("");
+}
+
+function renderProjectDashboard(){
+  const el=document.getElementById("projectDashboard"); if(!el)return;
+  const s=activeSeries(); if(!s)return;
+  syncPlotCompletionStatuses();
+  const books=activeProjectBooks();
+  const allScenes=projectScenesAll();
+  const totalWords=books.reduce((sum,b)=>sum+bookWordCount(b),0);
+  const projectDashboardName=`${s.title||"Project"} Dashboard`;
+  setText("projectDashboardTitle",projectDashboardName);
+  setText("viewTitle",projectDashboardName);
+  setText("projectDashboardSubtitle",`${books.length} book${books.length===1?"":"s"} tracked across this project.`);
+  setText("projectDashBooks",books.length);
+  setText("projectDashWords",totalWords.toLocaleString());
+  setText("projectDashChapters",books.reduce((n,b)=>n+(b.manuscript||[]).length,0));
+  setText("projectDashScenes",allScenes.length);
+  setText("projectDashCharacters",(data.characters||[]).filter(seriesScope).length);
+  renderProjectWritingChart(books);
+  const lastBook=activeBook()||books[0]; const lastChapter=activeChapter()||lastBook?.manuscript?.[0]; const lastScene=activeScene()||lastChapter?.scenes?.[0];
+  setHTML("projectContinueWriting", lastBook&&lastChapter&&lastScene ? `<p><strong>${escapeHTML(lastBook.title||"Untitled Book")}</strong></p><p>${escapeHTML(lastChapter.title||"Chapter")} → ${escapeHTML(lastScene.title||"Scene")}</p><button onclick="setView('write','${lastChapter.id}','${lastScene.id}')">Open Scene</button>` : `<p>No scene yet.</p><button onclick="quickAddBookToActiveProject()">+ Add Book</button>`);
+  setHTML("projectDashboardBooks", books.length?books.map(b=>{const wc=bookWordCount(b); const sc=bookScenes(b).length; const cover=b.cover?`<img class="book-cover-thumb" src="${b.cover}" alt="${escapeHTML(b.title||"Book cover")}">`:`<div class="book-cover-thumb book-cover-placeholder"><span>No Cover</span><button type="button" onclick="triggerBookCoverUpload('${b.id}',event)">+ Add Cover</button></div>`; return `<article class="item-card book-shelf-card ${b.id===data.activeBookId?"active-card":""}" onclick="openBookFromDashboard('${b.id}')"><div class="book-cover-wrap">${cover}<input id="bookCoverUpload_${b.id}" type="file" accept="image/*" class="hidden" onchange="updateBookCover('${b.id}',this)"></div><div class="book-card-content"><div class="card-header"><h3>${escapeHTML(b.title||"Untitled Book")}</h3><span class="tag">${escapeHTML(b.status||"Planning")}</span></div><div class="card-body"><p>${wc} words • ${(b.manuscript||[]).length} chapters • ${sc} scenes</p>${detail("Summary",b.summary)}<div class="book-card-actions"><button onclick="event.stopPropagation(); switchActiveBookFromDashboard('${b.id}')">${b.id===data.activeBookId?"Current Book":"Switch to Book"}</button>${b.cover?`<button class="ghost-btn" onclick="triggerBookCoverUpload('${b.id}',event)">Change Cover</button>`:""}</div></div></div></article>`}).join(""):`<p>No books yet.</p>`);
+  const chars=(data.characters||[]).filter(seriesScope); const locs=(data.locations||[]).filter(seriesScope); const orgs=(data.organizations||[]).filter(seriesScope); const magic=(data.magicSystems||[]).filter(seriesScope); const points=(data.plotCards||[]).filter(seriesScope);
+  setHTML("projectStoryHealth",`<div class="mini-stats"><div><strong>${chars.length}</strong><span>Characters</span></div><div><strong>${points.length}</strong><span>Plot Points</span></div><div><strong>${locs.length}</strong><span>Locations</span></div><div><strong>${orgs.length+magic.length}</strong><span>Orgs/Magic</span></div></div>`);
+  const filter=document.getElementById("plotProgressBookFilter"); if(filter){const current=filter.value||"all"; filter.innerHTML=`<option value="all">All Books</option>`+books.map(b=>`<option value="${b.id}">${escapeHTML(b.title||"Untitled Book")}</option>`).join(""); filter.value=books.some(b=>b.id===current)?current:"all";}
+  const selectedBook=filter?.value&&filter.value!=="all"?filter.value:null;
+  const arcs=(data.plotArcs||[]).filter(a=>a.seriesId===data.activeSeriesId && (!selectedBook || a.bookId===selectedBook || !a.bookId));
+  const cards=(data.plotCards||[]).filter(c=>c.seriesId===data.activeSeriesId && (!selectedBook || c.bookId===selectedBook || !c.bookId));
+  setHTML("projectPlotArcProgress", arcs.length?arcs.map(arc=>{const arcCards=cards.filter(c=>c.arcId===arc.id); const done=arcCards.filter(c=>computedPlotStatus(c,selectedBook||c.bookId)==="Completed").length; const active=arcCards.filter(c=>computedPlotStatus(c,selectedBook||c.bookId)==="Active").length; const pct=arcCards.length?Math.round(done/arcCards.length*100):0; return `<div class="progress-row"><div class="card-header"><strong>${escapeHTML(arc.title||"Plot Arc")}</strong><span class="tag">${pct}%</span></div><div class="progress-bar"><span style="width:${pct}%"></span></div><small>${done} completed • ${active} active • ${arcCards.length-done-active} not started</small></div>`}).join(""):`<p>No plot arcs yet.</p>`);
+  const appearedChars=chars.filter(c=>appearanceLogEntries("character",c.id).length); const unusedChars=chars.filter(c=>!appearanceLogEntries("character",c.id).length);
+  setHTML("projectAppearanceSummary",`<p><strong>${appearedChars.length}</strong> characters have appeared. <strong>${unusedChars.length}</strong> have not appeared yet.</p>${unusedChars.slice(0,5).map(c=>`<span class="tag">${escapeHTML(c.name||"Unnamed")}</span>`).join(" ")||"<p>No unused characters.</p>"}`);
+  const unusedPoints=cards.filter(c=>!plotPointUsageForBook(selectedBook||c.bookId).usage[c.id]);
+  const warnings=[]; if(unusedPoints.length)warnings.push(`${unusedPoints.length} plot point${unusedPoints.length===1?"":"s"} never used in scenes.`); if(unusedChars.length)warnings.push(`${unusedChars.length} character${unusedChars.length===1?"":"s"} never marked in scenes.`); if(!books.length)warnings.push("This project has no books yet.");
+  setHTML("projectContinuityWarnings", warnings.length?warnings.map(w=>`<p>⚠ ${escapeHTML(w)}</p>`).join(""):`<p>No major warnings right now.</p>`);
+}
+function renderOverview(){const s=activeSeries(), b=activeBook(); setVal("seriesTitleEdit",s?.title); setVal("seriesTypeEdit",s?.type||"series"); setVal("seriesGenreEdit",s?.genre); setVal("seriesSynopsisEdit",s?.synopsis); setVal("seriesThemeEdit",s?.theme); setVal("seriesMysteriesEdit",s?.mysteries); setVal("seriesForeshadowingEdit",s?.foreshadowing); setVal("bookTitleEdit",b?.title); setVal("bookStatusEdit",b?.status); setVal("bookSummaryEdit",b?.summary); setVal("bookThemeEdit",b?.theme); setVal("bookNotesEdit",b?.notes); const scenes=(b?.manuscript||[]).flatMap(c=>c.scenes||[]); const words=scenes.reduce((sum,s)=>sum+countWords(stripHTML(s.content||"")),0); setText("statWords",words); setText("statChapters",(b?.manuscript||[]).length); setText("statScenes",scenes.length); setText("statCharacters",data.characters.filter(seriesScope).length); setText("projectPath",`${s?.title||"No project"} → ${b?.title||"No book selected"}`); setText("sidebarProjectName",b?.title||"Project")}
 function saveOverviewFields(render=false){const s=activeSeries(), b=activeBook(); if(s){s.title=val("seriesTitleEdit"); s.type=val("seriesTypeEdit")||"series"; s.genre=val("seriesGenreEdit"); s.synopsis=val("seriesSynopsisEdit"); s.theme=val("seriesThemeEdit"); s.mysteries=val("seriesMysteriesEdit"); s.foreshadowing=val("seriesForeshadowingEdit")} if(b){b.title=val("bookTitleEdit"); b.status=val("bookStatusEdit"); b.summary=val("bookSummaryEdit"); b.theme=val("bookThemeEdit"); b.notes=val("bookNotesEdit")} saveData(render)}
 function renderManuscript(){
   const book=activeBook();
@@ -935,7 +1273,7 @@ function renderManuscript(){
   renderSceneCharacterTracker();
   updateEditorStats();
 }
-function renderSelects(){const chars=data.characters.filter(visibleByScope); const charOptions=`<option value="">Select character</option>`+chars.map(c=>`<option value="${c.id}">${escapeHTML(c.name)}</option>`).join(""); ["scenePOV","relA","relB"].forEach(id=>setHTML(id,charOptions)); updateRelationshipViewLabels(); const locs=data.locations.filter(visibleByScope); setHTML("sceneLocation",`<option value="">Select location</option>`+locs.map(l=>`<option value="${l.id}">${escapeHTML(l.name)}</option>`).join("")); const plotOptions=`<option value="">Plot Board Point</option>`+plotBoardItems().map(p=>`<option value="${p.id}">${escapeHTML((plotArcItems().find(a=>a.id===p.arcId)?.title||"Plot")+" — "+(p.title||"Untitled Point"))}</option>`).join(""); setHTML("scenePlotPoint",plotOptions); const beats=data.structureBeats.filter(visibleByScope); setHTML("chapterStructureBeat",`<option value="">Structure beat</option>`+beats.map(b=>`<option value="${b.id}">${escapeHTML(b.name)}</option>`).join(""))}
+function renderSelects(){const chars=data.characters.filter(seriesScope); const charOptions=`<option value="">Select character</option>`+chars.map(c=>`<option value="${c.id}">${escapeHTML(c.name)}</option>`).join(""); ["scenePOV","relA","relB"].forEach(id=>setHTML(id,charOptions)); updateRelationshipViewLabels(); const locs=data.locations.filter(seriesScope); setHTML("sceneLocation",`<option value="">Select location</option>`+locs.map(l=>`<option value="${l.id}">${escapeHTML(l.name)}</option>`).join("")); const plotOptions=`<option value="">Plot Board Point</option>`+plotBoardItems().map(p=>`<option value="${p.id}">${escapeHTML((plotArcItems().find(a=>a.id===p.arcId)?.title||"Plot")+" — "+(p.title||"Untitled Point"))}</option>`).join(""); setHTML("scenePlotPoint",plotOptions); const beats=data.structureBeats.filter(visibleByScope); setHTML("chapterStructureBeat",`<option value="">Structure beat</option>`+beats.map(b=>`<option value="${b.id}">${escapeHTML(b.name)}</option>`).join(""))}
 function renderCardList(collection,elId,titleKey,bodyFn,filter=visibleByScope){const el=document.getElementById(elId); if(!el)return; el.innerHTML=""; (data[collection]||[]).filter(filter).forEach(item=>el.appendChild(makeCard(item[titleKey],bodyFn(item),()=>deleteItem(collection,item.id))))}
 function renderAllLists(){renderStoryBoard(); renderPlotBoard(); renderCharactersByRole(); renderCharacterDetail(); renderWorldByCategory(); renderWorldDetail(); renderEntityDetail("location"); renderEntityDetail("magic"); renderEntityDetail("organization"); renderRelationships(); renderSeriesTools(); renderWritingStats();
 renderCardList("chapterPlans","chapterPlanList","number",item=>`<span class="tag">Book</span>${detail("POV",item.pov)}${detail("Structure Beat",data.structureBeats.find(b=>b.id===item.structureBeat)?.name||"")}${detail("Target Words",item.wordTarget)}${detail("Goal",item.goal)}${detail("Conflict",item.conflict)}${detail("Outcome",item.outcome)}${detail("Emotional Beat",item.emotion)}${detail("Foreshadowing",item.foreshadowing)}`);
@@ -951,22 +1289,23 @@ function plotCardAppearanceLog(cardId){return appearanceLogEntries("plotCard",ca
 function renderPlotCardAppearanceLog(cardId){
   const appearances=plotCardAppearanceLog(cardId);
   if(!appearances.length)return `<div class="appearance-log"><small class="muted">Appearance Log: Not connected to any scenes yet.</small></div>`;
-  return `<div class="appearance-log"><strong>Appearance Log</strong>${appearances.map(item=>`<button type="button" class="mini-link" onclick="setView('write','${item.chapter.id}','${item.scene.id}')">${escapeHTML(item.chapter.title||`Chapter ${item.chapterIndex+1}`)} → ${escapeHTML(item.scene.title||`Scene ${item.sceneIndex+1}`)} <small>(${escapeHTML(item.reasons.join(", "))})</small></button>`).join("")}</div>`;
+  return `<div class="appearance-log"><strong>Appearance Log</strong>${appearances.map(item=>`<button type="button" class="mini-link" onclick="setView('write','${item.chapter.id}','${item.scene.id}')">${escapeHTML(item.book?.title?item.book.title+" → ":"")}${escapeHTML(item.chapter.title||`Chapter ${item.chapterIndex+1}`)} → ${escapeHTML(item.scene.title||`Scene ${item.sceneIndex+1}`)} <small>(${escapeHTML(item.reasons.join(", "))})</small></button>`).join("")}</div>`;
 }
 function renderPlotBoard(){
   const el=document.getElementById("plotBoardList"); if(!el)return;
   normalizePlotBoard();
+  syncPlotCompletionStatuses();
   const arcs=plotArcItems();
   setHTML("plotCardArc",arcs.map(a=>`<option value="${a.id}">${escapeHTML(a.title)}</option>`).join(""));
   el.innerHTML=arcs.map(arc=>{
     const cards=plotBoardItems().filter(c=>c.arcId===arc.id);
     return `<div class="board-column plot-arc-column" ondragover="onPlotCardDragOver(event)" ondrop="onPlotCardDrop(event,'${arc.id}')">
       <div class="board-column-header"><h3>${escapeHTML(arc.title)}</h3><div><button onclick="renamePlotArc('${arc.id}')">Rename</button><button class="delete-btn" onclick="deletePlotArc('${arc.id}')">Delete Arc</button></div></div>
-      ${cards.length?cards.map(c=>`<div class="board-card plot-card" draggable="true" ondragstart="onPlotCardDragStart(event,'${c.id}')" ondragover="onPlotCardDragOver(event)" ondrop="onPlotCardDrop(event,'${arc.id}','${c.id}')"><strong>${escapeHTML(c.title)}</strong><p>${escapeHTML(c.notes||"")}</p>${renderPlotCardAppearanceLog(c.id)}<button class="delete-btn" onclick="deleteItem('plotCards','${c.id}')">Delete Point</button></div>`).join(""):`<p class="muted drop-hint">Drop plot points here.</p>`}
+      ${cards.length?cards.map(c=>`<div class="board-card plot-card" draggable="true" ondragstart="onPlotCardDragStart(event,'${c.id}')" ondragover="onPlotCardDragOver(event)" ondrop="onPlotCardDrop(event,'${arc.id}','${c.id}')"><strong>${escapeHTML(c.title)}</strong><span class="tag">${escapeHTML(computedPlotStatus(c,c.bookId||null))}</span><p>${escapeHTML(c.notes||"")}</p>${renderPlotCardAppearanceLog(c.id)}<button class="delete-btn" onclick="deleteItem('plotCards','${c.id}')">Delete Point</button></div>`).join(""):`<p class="muted drop-hint">Drop plot points here.</p>`}
     </div>`;
   }).join("");
 }
-function renderCharactersByRole(){const el=document.getElementById("characterRoleGroups"); if(!el)return; const roles=["Main","Side","Love Interest","Antagonist","Mentor","Other"]; el.innerHTML=roles.map(role=>{const chars=data.characters.filter(c=>visibleByScope(c)&&(c.role||"Other")===role); return `<div class="role-group"><h3>${role}</h3><div class="card-grid">${chars.length?chars.map(c=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(c.name)}</h3><button class="delete-btn" onclick="deleteItem('characters','${c.id}')">Delete</button></div>${c.photo?`<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}">`:""}<div class="card-body"><span class="tag">${escapeHTML(c.species||"")}</span>${detail("Personality",c.personality)}${detail("Arc",c.arc)}<button onclick="setView('characterDetail','${c.id}')">Open Character</button></div></article>`).join(""):`<p class="muted">No ${role} characters yet.</p>`}</div></div>`}).join("")}
+function renderCharactersByRole(){const el=document.getElementById("characterRoleGroups"); if(!el)return; const roles=["Main","Side","Love Interest","Antagonist","Mentor","Other"]; el.innerHTML=roles.map(role=>{const chars=data.characters.filter(c=>seriesScope(c)&&(c.role||"Other")===role); return `<div class="role-group"><h3>${role}</h3><div class="card-grid">${chars.length?chars.map(c=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(c.name)}</h3><button class="delete-btn" onclick="deleteItem('characters','${c.id}')">Delete</button></div>${c.photo?`<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}">`:""}<div class="card-body"><span class="tag">${escapeHTML(c.species||"")}</span>${detail("Personality",c.personality)}${detail("Arc",c.arc)}<button onclick="setView('characterDetail','${c.id}')">Open Character</button></div></article>`).join(""):`<p class="muted">No ${role} characters yet.</p>`}</div></div>`}).join("")}
 
 function startCharacterDetailEdit(){characterDetailEditMode=true; renderCharacterDetail()}
 function cancelCharacterDetailEdit(){characterDetailEditMode=false; renderCharacterDetail()}
@@ -994,19 +1333,19 @@ function renderCharacterEditForm(c){
   return `<div class="panel character-detail-grid"><div>${c.photo?`<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}"><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}')">Change Photo</button>`:`<div class="character-photo panel photo-placeholder"><p>No Photo</p><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}')">+ Add Character Photo</button></div>`}</div><div><h3>Edit Character Detail</h3><div class="form-grid"><input id="editCharName" placeholder="Character name" value="${escapeAttr(c.name||"")}"><select id="editCharRole"><option>Main</option><option>Side</option><option>Love Interest</option><option>Antagonist</option><option>Mentor</option><option>Other</option></select><input id="editCharSpecies" placeholder="Species / identity" value="${escapeAttr(c.species||"")}"><textarea id="editCharBasicInfo" placeholder="Basic Information">${escapeHTML(c.basicInfo||c.bio||"")}</textarea><textarea id="editCharDescription" placeholder="Physical Appearance">${escapeHTML(c.description||"")}</textarea><textarea id="editCharPersonality" placeholder="Personality">${escapeHTML(c.personality||"")}</textarea><textarea id="editCharBackstory" placeholder="Backstory">${escapeHTML(c.backstory||"")}</textarea><textarea id="editCharWound" placeholder="Psychology: Core Wound, Core Fear, Core Desire, Fatal Flaw">${escapeHTML(c.wound||"")}</textarea><textarea id="editCharArc" placeholder="Character Arc">${escapeHTML(c.arc||"")}</textarea><textarea id="editCharVoice" placeholder="Voice / speech patterns">${escapeHTML(c.voice||"")}</textarea><textarea id="editCharSecrets" placeholder="Secrets">${escapeHTML(c.secrets||"")}</textarea><textarea id="editCharQuotes" placeholder="Quotes">${escapeHTML(c.quotes||"")}</textarea></div><h3>Custom Sections</h3>${custom.map(sec=>`<div class="custom-section-builder"><input id="editCustomTitle_${sec.id}" placeholder="Section title" value="${escapeAttr(sec.title||"")}"><textarea id="editCustomText_${sec.id}" placeholder="Section notes">${escapeHTML(sec.text||"")}</textarea><button type="button" class="delete-btn" onclick="deleteCustomSectionFromCharacter('${c.id}','${sec.id}'); characterDetailEditMode=true">Delete Section</button></div>`).join("")||"<p class='muted'>No custom sections yet.</p>"}<button type="button" onclick="addCharacterCustomSectionFromDetail('${c.id}')">+ Add Custom Section</button><hr><button onclick="saveCharacterDetailEdit('${c.id}')">Save Changes</button><button class="ghost-btn" onclick="cancelCharacterDetailEdit()">Cancel</button></div></div>`
 }
 function renderCharacterDetail(){const el=document.getElementById("characterDetailContent"); if(!el)return; const c=data.characters.find(x=>x.id===data.selectedCharacterId); if(!c){el.innerHTML=`<div class="panel"><p>Select a character from the sidebar.</p></div>`;return} if(characterDetailEditMode){el.innerHTML=renderCharacterEditForm(c); setVal("editCharRole",c.role||"Other"); return} const rels=characterRelationships(c.id), apps=characterAppearances(c.id), custom=Array.isArray(c.customSections)?c.customSections:[]; el.innerHTML=`<div class="panel character-detail-grid"><div>${c.photo?`<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}">`:`<div class="character-photo panel photo-placeholder"><p>No Photo</p><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}')">+ Add Character Photo</button></div>`}<button class="wide" onclick="startCharacterDetailEdit()">Edit Character Detail</button><button class="wide" onclick="addCharacterCustomSectionFromDetail('${c.id}')">+ Add Custom Section</button></div><div><h3>${escapeHTML(c.name)}</h3><span class="tag">${escapeHTML(c.role||"")}</span><span class="tag">${escapeHTML(c.species||"")}</span>${detailBlock("Basic Information",c.basicInfo||c.bio)}${detailBlock("Physical Appearance",c.description)}${detailBlock("Personality",c.personality)}${detailBlock("Backstory",c.backstory)}${detailBlock("Psychology: Core Wound, Core Fear, Core Desire, Fatal Flaw",c.wound)}${detailBlock("Character Arc",c.arc)}${detailBlock("Voice / Speech Patterns",c.voice)}${detailBlock("Secrets",c.secrets)}${detailBlock("Quotes",c.quotes)}${custom.map(sec=>`<section class="character-section custom-character-section"><h4>${escapeHTML(sec.title||"Untitled Section")}</h4><p>${formatMultiline(sec.text||"")}</p><button class="delete-btn" onclick="deleteCustomSectionFromCharacter('${c.id}','${sec.id}')">Delete Section</button></section>`).join("")}<h3>Linked Relationships</h3>${rels.length?rels.map(r=>{const other=r.a===c.id?r.b:r.a; const ownView=r.a===c.id?r.aView:r.bView; const otherView=r.a===c.id?r.bView:r.aView; return `<p><strong>${escapeHTML(characterName(r.a))} + ${escapeHTML(characterName(r.b))}:</strong> ${escapeHTML(r.type||"")} — ${escapeHTML(r.status||"")}<br>${escapeHTML(r.history||r.arc||"")}${ownView?`<br><strong>${escapeHTML(c.name)}'s View:</strong> ${escapeHTML(ownView)}`:""}${otherView?`<br><strong>${escapeHTML(characterName(other))}'s View:</strong> ${escapeHTML(otherView)}`:""}</p>`}).join(""):"<p>No linked relationships yet.</p>"}${renderSharedAppearanceLog("character",c.id)}</div></div>`}
-function renderRelationships(){const map=document.getElementById("relationshipMap"), list=document.getElementById("relationshipList"); if(!map||!list)return; map.innerHTML=""; list.innerHTML=""; const rels=data.relationships.filter(visibleByScope); if(!rels.length)map.innerHTML="<p>No relationships yet.</p>"; rels.forEach(item=>{const nameA=characterName(item.a), nameB=characterName(item.b); const node=document.createElement("div"); node.className="rel-node"; node.textContent=`${nameA} ↔ ${nameB} (${item.type||"connection"})`; map.appendChild(node); list.appendChild(makeCard(`${nameA} + ${nameB}`,`<span class="tag">${escapeHTML(item.status||"")}</span>${detail("Type",item.type)}${detail("History",item.history)}${detail("Important Moments",item.moments)}${detail("Arc / Future Changes",item.arc)}${detail(`${nameA}'s View`,item.aView)}${detail(`${nameB}'s View`,item.bView)}`,()=>deleteItem("relationships",item.id)))})}
+function renderRelationships(){const map=document.getElementById("relationshipMap"), list=document.getElementById("relationshipList"); if(!map||!list)return; map.innerHTML=""; list.innerHTML=""; const rels=data.relationships.filter(seriesScope); if(!rels.length)map.innerHTML="<p>No relationships yet.</p>"; rels.forEach(item=>{const nameA=characterName(item.a), nameB=characterName(item.b); const node=document.createElement("div"); node.className="rel-node"; node.textContent=`${nameA} ↔ ${nameB} (${item.type||"connection"})`; map.appendChild(node); list.appendChild(makeCard(`${nameA} + ${nameB}`,`<span class="tag">${escapeHTML(item.status||"")}</span>${detail("Type",item.type)}${detail("History",item.history)}${detail("Important Moments",item.moments)}${detail("Arc / Future Changes",item.arc)}${detail(`${nameA}'s View`,item.aView)}${detail(`${nameB}'s View`,item.bView)}`,()=>deleteItem("relationships",item.id)))})}
 function renderSceneDatabase(){const el=document.getElementById("sceneList"); if(!el)return; const scenes=(activeBook()?.manuscript||[]).flatMap(ch=>(ch.scenes||[]).map(sc=>({...sc,chapterId:ch.id,chapterTitle:ch.title}))); el.innerHTML=scenes.length?scenes.map(sc=>`<article class="item-card clickable-card" onclick="setView('write','${sc.chapterId}','${sc.id}')"><div class="card-header"><h3>${escapeHTML(sc.title)}</h3><button type="button" onclick="event.stopPropagation(); setView('write','${sc.chapterId}','${sc.id}')">Open Scene</button></div><div class="card-body"><span class="tag">${escapeHTML(sc.chapterTitle)}</span>${detail("POV",characterName(sc.pov))}${detail("Location",locationName(sc.locationId))}${detail("Date",sc.date)}${detail("Mood",sc.mood)}${detail("Purpose",sc.purpose)}<p><strong>Words:</strong> ${countWords(stripHTML(sc.content||""))}</p>${sceneAppearancesHTML(sc)}</div></article>`).join(""):"<p>No scenes yet.</p>"}
-function renderTimeline(){const tl=document.getElementById("timelineList"); if(!tl)return; tl.innerHTML=""; data.timeline.filter(visibleByScope).forEach(item=>{const div=document.createElement("article"); div.className="item-card timeline-item"; div.innerHTML=`<div class="card-header"><h3>${escapeHTML(item.when||"Unplaced Event")}</h3><button class="delete-btn">Delete</button></div><div class="card-body"><span class="tag">${escapeHTML(item.scope)}</span>${detail("Event",item.event)}${detail("Impact",item.impact)}</div>`; div.querySelector("button").onclick=()=>deleteItem("timeline",item.id); tl.appendChild(div)})}
+function renderTimeline(){const tl=document.getElementById("timelineList"); if(!tl)return; tl.innerHTML=""; data.timeline.filter(seriesScope).forEach(item=>{const div=document.createElement("article"); div.className="item-card timeline-item"; div.innerHTML=`<div class="card-header"><h3>${escapeHTML(item.when||"Unplaced Event")}</h3><button class="delete-btn">Delete</button></div><div class="card-body"><span class="tag">${escapeHTML(item.scope)}</span>${detail("Event",item.event)}${detail("Impact",item.impact)}</div>`; div.querySelector("button").onclick=()=>deleteItem("timeline",item.id); tl.appendChild(div)})}
 function renderWritingStats(){const book=activeBook(); const chapters=book?.manuscript||[]; const counts=chapters.map(c=>(c.scenes||[]).reduce((sum,s)=>sum+countWords(stripHTML(s.content||"")),0)); const total=counts.reduce((a,b)=>a+b,0); const avg=counts.length?Math.round(total/counts.length):0; const longest=counts.length?Math.max(...counts):0; const bibleItems=["characters","threads","timeline","world","relationships","locations","magicSystems","organizations","mysteries","foreshadowing","plotArcs","plotCards"].reduce((sum,k)=>sum+(data[k]||[]).filter(k==="magicSystems"||k==="organizations"||k==="mysteries"||k==="foreshadowing"?seriesScope:visibleByScope).length,0); setText("statsTotalWords",total); setText("statsAvgWords",avg); setText("statsLongestChapter",longest); setText("statsBibleItems",bibleItems); setHTML("chapterStatsList",chapters.map((c,i)=>`<div class="chapter-stat-row"><span>${i+1}. ${escapeHTML(c.title||"Untitled")}</span><strong>${counts[i]} words</strong></div>`).join("")||"<p>No chapters yet.</p>"); const povCounts={}; chapters.flatMap(c=>c.scenes||[]).forEach(s=>{if(s.pov)povCounts[characterName(s.pov)]=(povCounts[characterName(s.pov)]||0)+countWords(stripHTML(s.content||""))}); setHTML("povStatsList",Object.entries(povCounts).map(([name,count])=>`<div class="chapter-stat-row"><span>${escapeHTML(name)}</span><strong>${count} words</strong></div>`).join("")||"<p>No POV data yet. Choose POV characters on scenes.</p>")}
 function renderSeriesTools(){const warn=document.getElementById("seriesOnlyWarning"), content=document.getElementById("seriesToolsContent"); if(!warn||!content)return; if(!isSeriesProject()){warn.innerHTML="Series-level tools only appear for projects marked as Series."; content.classList.add("hidden"); return} warn.innerHTML=""; content.classList.remove("hidden"); const books=data.books.filter(b=>b.seriesId===data.activeSeriesId); const seriesWords=books.reduce((sum,b)=>sum+(b.manuscript||[]).flatMap(c=>c.scenes||[]).reduce((s,sc)=>s+countWords(stripHTML(sc.content||"")),0),0); setText("seriesBookCount",books.length); setText("seriesTotalWords",seriesWords); setText("seriesTimelineCount",data.timeline.filter(seriesScope).length); setText("seriesThreadCount",data.threads.filter(seriesScope).length); setHTML("crossBookArcs",data.characters.filter(seriesScope).map(c=>`<p><strong>${escapeHTML(c.name)}</strong><br>${escapeHTML(c.arc||"No arc notes yet.")}</p>`).join("")||"<p>No characters yet.</p>"); setHTML("seriesContinuity",`<p><strong>Characters:</strong> ${data.characters.filter(seriesScope).length}</p><p><strong>Relationships:</strong> ${data.relationships.filter(seriesScope).length}</p><p><strong>Locations:</strong> ${data.locations.filter(seriesScope).length}</p><p><strong>Artifacts / World Notes:</strong> ${data.world.filter(seriesScope).length}</p><p><strong>Major Events:</strong> ${data.timeline.filter(seriesScope).length}</p>`)}
 function renderRawData(){const raw=document.getElementById("rawData"); if(raw)raw.value=JSON.stringify(data,null,2)}
-function renderAll(){if(!data.user?.id){updateAuthGate();return} ensureProject(); if(!data.activeSeriesId||!data.activeBookId){updateAuthGate();return} applyTheme(); renderOverview(); renderSelects(); renderManuscript(); renderAllLists(); renderMusic(); renderRawData(); renderAccount(); renderNestedNav(); addBulletButtons(); runSearch()}
+function renderAll(){if(!data.user?.id){updateAuthGate();return} ensureProject(); if(!data.activeSeriesId||!data.activeBookId){updateAuthGate();return} applyTheme(); renderProjectDashboard(); renderOverview(); renderSelects(); renderManuscript(); renderAllLists(); renderMusic(); renderRawData(); renderAccount(); renderNestedNav(); addBulletButtons(); runSearch()}
 
 function searchableItems(){const b=activeBook(); const manuscript=(b?.manuscript||[]).flatMap(ch=>(ch.scenes||[]).map(sc=>({type:"Scene",title:`${ch.title} — ${sc.title}`,text:(ch.title+" "+sc.title+" "+stripHTML(sc.content||"")).toLowerCase()}))); const collections=[["Character",data.characters,"name"],["Relationship",data.relationships,"type"],["Timeline",data.timeline,"when"],["Chapter Plan",data.chapterPlans,"number"],["Plot Thread",data.threads,"title"],["Worldbuilding",data.world,"name"],["Location",data.locations,"name"],["Magic",data.magicSystems,"name"],["Organization",data.organizations,"name"],["Mystery",data.mysteries,"question"],["Foreshadowing",data.foreshadowing,"hint"]]; return[{type:"Project",title:activeSeries()?.title,text:JSON.stringify(activeSeries()||{}).toLowerCase()},{type:"Book",title:b?.title,text:JSON.stringify(b||{}).toLowerCase()},...manuscript,...collections.flatMap(([type,arr,key])=>(arr||[]).filter(seriesScope).map(item=>({type,title:item[key]||"Untitled",text:JSON.stringify(item).toLowerCase()})))]}
 function runSearch(){const search=document.getElementById("globalSearch"), box=document.getElementById("searchResults"); if(!search||!box)return; const q=search.value.trim().toLowerCase(); if(!q){box.classList.add("hidden"); box.innerHTML=""; return} const matches=searchableItems().filter(item=>item.text.includes(q)); box.classList.remove("hidden"); box.innerHTML=`<h3>Search Results</h3>`+(matches.length?matches.map(m=>`<p><strong>${escapeHTML(m.type)}:</strong> ${escapeHTML(m.title||"Untitled")}</p>`).join(""):"<p>No matches found.</p>")}
 
 function manuscriptHTML(){return (activeBook()?.manuscript||[]).map(ch=>`<h2>${escapeHTML(ch.title||"Untitled")}</h2>${(ch.scenes||[]).map(sc=>`<h3>${escapeHTML(sc.title||"Scene")}</h3>${sc.content||""}`).join("")}`).join("<div style='page-break-after: always;'></div>")}
-function seriesBibleHTML(){return `<h1>${escapeHTML(activeSeries()?.title||"Project Bible")}</h1><h2>Project</h2><p>${escapeHTML(activeSeries()?.synopsis||"")}</p><h2>Characters</h2>${data.characters.filter(seriesScope).map(c=>`<h3>${escapeHTML(c.name)}</h3><p>${escapeHTML(c.bio||c.description||"")}</p>`).join("")}<h2>Locations</h2>${data.locations.filter(seriesScope).map(l=>`<h3>${escapeHTML(l.name)}</h3><p>${escapeHTML(l.description||"")}</p>`).join("")}<h2>Magic</h2>${data.magicSystems.filter(seriesScope).map(m=>`<h3>${escapeHTML(m.name)}</h3><p>${escapeHTML(m.rules||"")}</p>`).join("")}<h2>Organizations</h2>${data.organizations.filter(seriesScope).map(o=>`<h3>${escapeHTML(o.name)}</h3><p>${escapeHTML(o.description||"")}</p>`).join("")}<h2>Timeline</h2>${data.timeline.filter(seriesScope).map(t=>`<p><strong>${escapeHTML(t.when||"")}</strong>: ${escapeHTML(t.event||"")}</p>`).join("")}<h2>Project Playlist</h2><p><strong>Link:</strong> ${escapeHTML(normalizeMusicRecord(data.music?.[data.activeSeriesId]||{}).link||"")}</p><p>${escapeHTML((data.music?.[data.activeSeriesId]?.notes)||"")}</p>`}
+function seriesBibleHTML(){return `<h1>${escapeHTML(activeSeries()?.title||"Project Bible")}</h1><h2>Project</h2><p>${escapeHTML(activeSeries()?.synopsis||"")}</p><h2>Characters</h2>${data.characters.filter(seriesScope).map(c=>`<h3>${escapeHTML(c.name)}</h3><p>${escapeHTML(c.bio||c.description||"")}</p>`).join("")}<h2>Locations</h2>${data.locations.filter(seriesScope).map(l=>`<h3>${escapeHTML(l.name)}</h3><p>${escapeHTML(l.description||"")}</p>`).join("")}<h2>Magic</h2>${data.magicSystems.filter(seriesScope).map(m=>`<h3>${escapeHTML(m.name)}</h3><p>${escapeHTML(m.rules||"")}</p>`).join("")}<h2>Organizations</h2>${data.organizations.filter(seriesScope).map(o=>`<h3>${escapeHTML(o.name)}</h3><p>${escapeHTML(o.description||"")}</p>`).join("")}<h2>Timeline</h2>${data.timeline.filter(seriesScope).map(t=>`<p><strong>${escapeHTML(t.when||"")}</strong>: ${escapeHTML(t.event||"")}</p>`).join("")}<h2>Project Playlist</h2><p>${escapeHTML((normalizeMusicRecord(data.music?.[data.activeSeriesId]||{}).tracks||[]).length)} uploaded track(s)</p><p>${escapeHTML((data.music?.[data.activeSeriesId]?.notes)||"")}</p>`}
 function buildHTMLDoc(title,bodyHTML){return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHTML(title)}</title><style>body{font-family:Georgia,serif;line-height:1.6;font-size:12pt}h1{text-align:center}h2{margin-top:32px}</style></head><body><h1>${escapeHTML(title)}</h1>${bodyHTML}</body></html>`}
 function exportFullManuscriptTxt(){const book=activeBook(); if(!book)return alert("No book selected."); const text=(book.manuscript||[]).map(ch=>`${ch.title}\n\n${(ch.scenes||[]).map(sc=>`${sc.title}\n${stripHTML(sc.content||"")}`).join("\n\n")}`).join("\n\n\n"); downloadFile(`${safeFile(book.title)}-full-manuscript.txt`,text,"text/plain")}
 function exportFullManuscriptDocx(){const book=activeBook(); if(!book)return alert("No book selected."); downloadFile(`${safeFile(book.title)}-full-manuscript.docx`,buildHTMLDoc(book.title||"Manuscript",manuscriptHTML()),"application/vnd.openxmlformats-officedocument.wordprocessingml.document")}

@@ -221,7 +221,84 @@
 
       <section id="searchResults" class="search-results hidden"></section>
 
-      <section id="overview" class="view active">
+
+      <section id="projectDashboard" class="view active">
+        <div class="overview-actions">
+          <button onclick="backToProjects()" class="ghost-btn">← Back to Main Page</button>
+          <button onclick="setView('write')" class="glow">Continue Writing</button>
+          <button onclick="setView('overview')">Edit Overview</button>
+        </div>
+        <section class="welcome-hero project-landing-hero">
+          <div>
+            <h1 id="projectDashboardTitle">Project Dashboard</h1>
+            <p id="projectDashboardSubtitle">All books in this project at a glance.</p>
+          </div>
+          <div class="hero-actions">
+            <button onclick="quickAddBookToActiveProject()" class="glow">+ Add Book</button>
+            <button onclick="setView('plotBoard')">Open Plot Board</button>
+          </div>
+        </section>
+
+        <section class="dashboard-widgets">
+          <div class="dashboard-panel continue-panel">
+            <h3>📖 Continue Writing</h3>
+            <div id="projectContinueWriting"></div>
+          </div>
+          <div class="dashboard-panel stats-panel project-writing-stats-panel">
+            <div class="card-header">
+              <h3>📈 Project Writing Stats</h3>
+              <span class="tag">All Books</span>
+            </div>
+            <div class="mini-stats">
+              <div><strong id="projectDashWords">0</strong><span>Words</span></div>
+              <div><strong id="projectDashChapters">0</strong><span>Chapters</span></div>
+              <div><strong id="projectDashScenes">0</strong><span>Scenes</span></div>
+              <div><strong id="projectDashCharacters">0</strong><span>Characters</span></div>
+            </div>
+            <div class="fake-chart" id="projectWritingChart">
+              <span style="height:20%"></span><span style="height:28%"></span><span style="height:36%"></span><span style="height:44%"></span><span style="height:52%"></span><span style="height:60%"></span><span style="height:68%"></span>
+            </div>
+          </div>
+          <div class="dashboard-panel quick-panel">
+            <h3>⚡ Quick Add</h3>
+            <button onclick="quickAddBookToActiveProject()">+ Book</button>
+            <button onclick="setView('characters')">+ Character</button>
+            <button onclick="setView('plotBoard')">+ Plot Point</button>
+            <button onclick="setView('world')">+ Worldbuilding</button>
+          </div>
+        </section>
+
+        <section class="dashboard-widgets lower">
+          <div class="dashboard-panel project-books-panel">
+            <div class="card-header"><h3>📚 Books in This Project</h3><button onclick="quickAddBookToActiveProject()">+ Add Book</button></div>
+            <div id="projectDashboardBooks" class="card-grid"></div>
+          </div>
+          <div class="dashboard-panel">
+            <h3>🧭 Story Health</h3>
+            <div id="projectStoryHealth"></div>
+          </div>
+        </section>
+
+        <section class="dashboard-widgets lower">
+          <div class="dashboard-panel">
+            <div class="card-header">
+              <h3>🗂️ Plot Arc Progress</h3>
+              <select id="plotProgressBookFilter" onchange="renderProjectDashboard()"></select>
+            </div>
+            <div id="projectPlotArcProgress"></div>
+          </div>
+          <div class="dashboard-panel">
+            <h3>👀 Appearance Summary</h3>
+            <div id="projectAppearanceSummary"></div>
+          </div>
+          <div class="dashboard-panel">
+            <h3>⚠️ Continuity Warnings</h3>
+            <div id="projectContinuityWarnings"></div>
+          </div>
+        </section>
+      </section>
+
+      <section id="overview" class="view">
         <div class="overview-actions">
           <button onclick="backToProjects()" class="ghost-btn">← Back to Main Page</button>
           <button onclick="setView('write')" class="glow">Resume Writing</button>
@@ -618,15 +695,29 @@
 
       <section id="music" class="view">
         <div class="panel">
-          <h3>Project Playlist</h3>
-          <p>Paste one playlist, album, video, or song link for the music that fits this story. Supported embeds include Spotify, YouTube, YouTube Music, and Apple Music when the link allows embedding.</p>
+          <h3>Project Music Library</h3>
+          <p>Upload audio files, build your own playlists, and play music inside PlotPals across this project. Uploaded tracks are saved with the project data in this browser.</p>
           <div class="form-grid">
-            <input id="musicLink" placeholder="Paste playlist / song link" />
+            <label class="file-label">Upload Music <input type="file" id="musicUpload" accept="audio/*" multiple onchange="uploadMusicTracks(event)" /></label>
+            <input id="newMusicPlaylistName" placeholder="New playlist name" />
+            <button onclick="createMusicPlaylist()">Create Playlist</button>
             <textarea id="musicNotes" placeholder="Playlist notes, mood, character themes, chapter songs..."></textarea>
           </div>
-          <button onclick="saveMusicLinks()">Save Playlist Link</button>
+          <div class="music-library-controls">
+            <input id="musicLibrarySearch" placeholder="Search music..." oninput="renderMusic()" />
+            <select id="musicLibrarySort" onchange="renderMusic()">
+              <option value="az">Alphabetical (A-Z)</option>
+              <option value="za">Alphabetical (Z-A)</option>
+              <option value="newest">Date Added (Newest)</option>
+              <option value="oldest">Date Added (Oldest)</option>
+              <option value="duration">Duration</option>
+              <option value="artist">Artist</option>
+            </select>
+          </div>
+          <button onclick="saveMusicNotes()">Save Music Notes</button>
+          <p id="musicUploadStatus" class="muted small-text"></p>
         </div>
-        <div id="musicLinks" class="card-grid"></div>
+        <div id="musicLinks" class="music-dashboard"></div>
       </section>
 
       <section id="stats" class="view">
@@ -670,6 +761,8 @@
       </section>
     </main>
   </div>
+
+  <div id="globalMusicPlayer" class="global-music-player"></div>
 
   <template id="cardTemplate">
     <article class="item-card">
