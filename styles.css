@@ -838,3 +838,105 @@ body.light-mode .workspace-sidebar .nav-grandchild:hover {
 #trashActionsInfo {
   margin-top: 12px;
 }
+
+
+/* PlotPals V16 Connected Workspace */
+.scene-link-panel {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px;
+  margin: 8px 0 12px;
+  background: rgba(255,255,255,.035);
+}
+.checkbox-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 12px;
+}
+.check-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: var(--text);
+  background: rgba(255,255,255,.045);
+}
+.connection-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding: 9px 0;
+}
+.relationship-visualizer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+.relationship-node {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255,255,255,.045);
+}
+.relationship-node h3 {
+  color: var(--gold);
+  margin-top: 0;
+}
+.relationship-branch {
+  border-left: 2px solid var(--accent-2);
+  margin: 8px 0;
+  padding: 6px 0 6px 12px;
+}
+.three-col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+.sprint-display {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin: 18px 0;
+}
+.sprint-display div {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 22px;
+  text-align: center;
+  background: rgba(255,255,255,.045);
+}
+.sprint-display span {
+  font-size: 2.6rem;
+  color: var(--gold);
+  font-weight: bold;
+}
+.music-embeds {
+  margin-top: 18px;
+}
+.music-player {
+  width: 100%;
+  min-height: 360px;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(0,0,0,.25);
+}
+body.editor-wide .editor-layout {
+  grid-template-columns: 240px 1fr;
+}
+body.editor-focused .chapter-sidebar {
+  display: none;
+}
+body.editor-focused .editor-layout {
+  grid-template-columns: 1fr;
+}
+@media(max-width:1050px){
+  .three-col, .sprint-display {
+    grid-template-columns: 1fr;
+  }
+}

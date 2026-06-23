@@ -272,6 +272,15 @@
 
         <div class="story-nav-group static-sidebar-fallback">
           <h4>Story Notes</h4>
+          <button class="story-nav nav-parent" onclick="setView('connections')">🕸️ Connected Story Web</button>
+          <button class="story-nav nav-parent" onclick="setView('relationshipVisualizer')">🧩 Relationship Visualizer</button>
+          <button class="story-nav nav-parent" onclick="setView('threadTracker')">🧵 Thread Tracker</button>
+          <button class="story-nav nav-parent" onclick="setView('arcTracker')">📈 Character Arc Tracker</button>
+          <button class="story-nav nav-parent" onclick="setView('locationLinks')">📍 Location Linking</button>
+          <button class="story-nav nav-parent" onclick="setView('smartSearch')">🔍 Smart Search</button>
+          <button class="story-nav nav-parent" onclick="setView('seriesContinuity')">🧭 Series Continuity</button>
+          <button class="story-nav nav-parent" onclick="setView('sprintMode')">⏱️ Sprint Mode</button>
+          <button class="story-nav nav-parent" onclick="setView('authorSettings')">⚙️ Author Settings</button>
           <button class="story-nav nav-parent" onclick="setView('goals')">🎯 Writing Goals</button>
           <button class="story-nav nav-parent" onclick="setView('covers')">🖼️ Covers & Artwork</button>
           <button class="story-nav nav-parent" onclick="setView('encyclopedia')">📚 Encyclopedia</button>
@@ -381,6 +390,12 @@
               <input id="sceneDate" placeholder="Timeline date / placement" />
               <input id="sceneMood" placeholder="Mood" />
               <input id="scenePurpose" placeholder="Scene purpose" />
+            </div>
+            <div class="scene-link-panel">
+              <label>Characters Present</label>
+              <div id="sceneCharactersPresent" class="checkbox-grid"></div>
+              <label>Plot Threads In This Scene</label>
+              <div id="sceneThreadsPresent" class="checkbox-grid"></div>
             </div>
 
             <div class="format-bar">
@@ -667,6 +682,7 @@
           <button onclick="saveMusicLinks()">Save Playlist Links</button>
         </div>
         <div id="musicLinks" class="card-grid"></div>
+        <div id="musicEmbeds" class="card-grid music-embeds"></div>
       </section>
 
 
@@ -771,6 +787,124 @@
           <button onclick="createManualSnapshot()">Create Restore Point</button>
         </div>
         <div id="snapshotList" class="card-grid"></div>
+      </section>
+
+
+      <section id="connections" class="view">
+        <div class="panel">
+          <h3>Connected Story Web</h3>
+          <p>Characters, scenes, locations, relationships, plot threads, and POV data connected together.</p>
+        </div>
+        <div class="grid stats-grid">
+          <div class="stat-card"><span id="connectCharacters">0</span><p>Characters</p></div>
+          <div class="stat-card"><span id="connectScenes">0</span><p>Scenes</p></div>
+          <div class="stat-card"><span id="connectThreads">0</span><p>Plot Threads</p></div>
+          <div class="stat-card"><span id="connectLocations">0</span><p>Locations</p></div>
+        </div>
+        <div class="two-col">
+          <div class="panel"><h3>POV Statistics</h3><div id="connectedPovStats"></div></div>
+          <div class="panel"><h3>Character Appearances</h3><div id="connectedAppearances"></div></div>
+        </div>
+      </section>
+
+      <section id="relationshipVisualizer" class="view">
+        <div class="panel">
+          <h3>Relationship Visualizer</h3>
+          <p>A visual relationship tree generated from your Relationship System.</p>
+        </div>
+        <div id="relationshipVisualizerContent" class="relationship-visualizer"></div>
+      </section>
+
+      <section id="threadTracker" class="view">
+        <div class="form-panel">
+          <h3>Plot Thread Tracker</h3>
+          <p>Attach plot threads to scenes and track unresolved threads.</p>
+          <div class="form-grid">
+            <select id="threadLinkThread"></select>
+            <select id="threadLinkScene"></select>
+          </div>
+          <button onclick="linkThreadToScene()">Attach Thread to Scene</button>
+        </div>
+        <div id="threadTrackerContent" class="card-grid"></div>
+      </section>
+
+      <section id="arcTracker" class="view">
+        <div class="form-panel">
+          <h3>Character Arc Tracker</h3>
+          <div class="form-grid">
+            <select id="arcCharacter"></select>
+            <textarea id="arcStart" placeholder="Starting state"></textarea>
+            <textarea id="arcMiddle" placeholder="Major turning points"></textarea>
+            <textarea id="arcEnd" placeholder="Ending state"></textarea>
+          </div>
+          <button onclick="saveCharacterArcTracker()">Save Arc</button>
+        </div>
+        <div id="arcTrackerContent" class="card-grid"></div>
+      </section>
+
+      <section id="locationLinks" class="view">
+        <div class="panel">
+          <h3>Location Linking</h3>
+          <p>Each location automatically shows connected scenes and characters.</p>
+        </div>
+        <div id="locationLinksContent" class="card-grid"></div>
+      </section>
+
+      <section id="smartSearch" class="view">
+        <div class="panel">
+          <h3>Smart Search</h3>
+          <input id="smartSearchInput" placeholder="Search across the entire project..." oninput="renderSmartSearch()" />
+        </div>
+        <div id="smartSearchResults" class="card-grid"></div>
+      </section>
+
+      <section id="seriesContinuity" class="view">
+        <div id="seriesContinuityGate"></div>
+        <div id="seriesContinuityContent"></div>
+      </section>
+
+      <section id="sprintMode" class="view">
+        <div class="panel">
+          <h3>Writing Sprint Mode</h3>
+          <div class="form-grid">
+            <input id="sprintMinutes" type="number" placeholder="Minutes" value="25" />
+            <input id="sprintGoalWords" type="number" placeholder="Word goal" value="1000" />
+          </div>
+          <div class="sprint-display">
+            <div><span id="sprintTimer">25:00</span><p>Timer</p></div>
+            <div><span id="sprintWords">0</span><p>Words This Sprint</p></div>
+          </div>
+          <div class="backup-row">
+            <button onclick="startSprint()">Start Sprint</button>
+            <button onclick="stopSprint()">Stop</button>
+            <button onclick="finishSprint()">Finish & Log</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="authorSettings" class="view">
+        <div class="form-panel">
+          <h3>Author Settings</h3>
+          <div class="form-grid">
+            <select id="settingTheme">
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+            <input id="settingAccent" type="color" value="#9d4edd" />
+            <select id="settingEditorFont">
+              <option value="Georgia, serif">Georgia</option>
+              <option value="'Times New Roman', serif">Times New Roman</option>
+              <option value="Arial, sans-serif">Arial</option>
+              <option value="'Courier New', monospace">Courier New</option>
+            </select>
+            <select id="settingEditorWidth">
+              <option value="normal">Normal Editor</option>
+              <option value="wide">Wide Editor</option>
+              <option value="focused">Focused Editor</option>
+            </select>
+          </div>
+          <button onclick="saveAuthorSettings()">Save Settings</button>
+        </div>
       </section>
 
       <section id="stats" class="view">
