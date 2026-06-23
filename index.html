@@ -37,50 +37,146 @@
   </section>
 
   <section id="projectScreen" class="project-screen hidden">
-    <div class="project-card">
-      <div class="top-row">
+    <div class="story-dashboard">
+      <aside class="story-sidebar">
         <div class="brand">
           <div class="brand-mark">✦</div>
           <div>
-            <h1>Select Your Project</h1>
-            <p>My Stories: choose, create, or delete a standalone book or series before opening the workspace.</p>
+            <h1>PlotPals</h1>
+            <p>Plan. Write. Build Worlds.</p>
           </div>
         </div>
-        <button onclick="signOut()" class="ghost-btn">Sign Out</button>
-      </div>
 
-      <div class="project-grid">
-        <div class="panel">
-          <h3>Create New Project</h3>
-          <label>Project Type</label>
-          <select id="newProjectType">
-            <option value="series">Series</option>
-            <option value="standalone">Standalone Book</option>
-          </select>
-          <label>Series / Project Title</label>
-          <input id="newSeriesTitle" placeholder="Series or standalone project title" />
-          <button onclick="createSeriesFromProject()">Create Project</button>
+        <button class="wide glow" onclick="showCreateProjectPanel()">+ New Book / Series</button>
 
-          <hr />
-          <h3>Add Book to Series</h3>
-          <label>Book Title</label>
-          <input id="newBookTitle" placeholder="Book title" />
-          <label>Add to Project</label>
-          <select id="newBookSeriesSelect"></select>
-          <button onclick="createBookFromProject()">Create Book</button>
+        <div class="story-nav-group">
+          <h4>Library</h4>
+          <button class="story-nav active">📖 My Stories</button>
+          <button class="story-nav">⭐ Favorites</button>
+          <button class="story-nav">🕘 Recently Opened</button>
+          <button class="story-nav">🗑️ Trash</button>
         </div>
 
-        <div class="panel">
-          <h3>Select Existing</h3>
-          <label>Project</label>
-          <select id="projectSeriesSelect" onchange="projectSeriesChanged()"></select>
-          <label>Book</label>
-          <select id="projectBookSelect"></select>
-          <button class="wide glow" onclick="openWorkspace()">Open Workspace</button>
-          <button class="wide danger" onclick="deleteSelectedProject()">Delete Selected Project</button>
+        <div class="story-nav-group">
+          <h4>Quick Links</h4>
+          <button class="story-nav" onclick="showCreateProjectPanel()">➕ New Project</button>
+          <button class="story-nav" onclick="loadFromCloud()">☁️ Load Cloud</button>
+          <button class="story-nav" onclick="signOut()">🚪 Sign Out</button>
+        </div>
+
+        <button class="collapse-btn">‹ Collapse Sidebar</button>
+      </aside>
+
+      <main class="story-main">
+        <header class="story-topbar">
+          <div class="dashboard-search">
+            🔍 <input id="projectSearch" placeholder="Search your stories..." oninput="renderProjectScreen()" />
+          </div>
+          <div class="dashboard-icons">
+            <button onclick="toggleTheme()">☾</button>
+            <button onclick="signOut()">Sign Out</button>
+          </div>
+        </header>
+
+        <section class="welcome-hero">
+          <div>
+            <h1>Welcome back, <span id="dashboardName">Writer</span> ✒</h1>
+            <p>What story will you tell today?</p>
+          </div>
+          <div class="hero-actions">
+            <button onclick="showCreateProjectPanel()" class="glow">+ New Book / Series</button>
+            <button onclick="importDataFromDashboard()">⇧ Import</button>
+          </div>
+        </section>
+
+        <section id="createProjectPanel" class="dashboard-panel create-panel hidden">
+          <div class="card-header">
+            <h3>Create New Story</h3>
+            <button class="delete-btn" onclick="hideCreateProjectPanel()">Close</button>
+          </div>
+          <div class="project-grid compact">
+            <div>
+              <label>Project Type</label>
+              <select id="newProjectType">
+                <option value="series">Series</option>
+                <option value="standalone">Standalone Book</option>
+              </select>
+              <label>Series / Project Title</label>
+              <input id="newSeriesTitle" placeholder="Series or standalone project title" />
+              <button onclick="createSeriesFromProject()">Create Project</button>
+            </div>
+            <div>
+              <label>Book Title</label>
+              <input id="newBookTitle" placeholder="Book title" />
+              <label>Add to Project</label>
+              <select id="newBookSeriesSelect"></select>
+              <button onclick="createBookFromProject()">Create Book</button>
+            </div>
+          </div>
           <p id="projectMessage"></p>
-        </div>
-      </div>
+        </section>
+
+        <section class="dashboard-section">
+          <div class="section-title">
+            <h2>My Stories</h2>
+            <button onclick="showCreateProjectPanel()">View / Create →</button>
+          </div>
+          <div id="dashboardStoryCards" class="story-card-grid"></div>
+        </section>
+
+        <section class="dashboard-widgets">
+          <div class="dashboard-panel continue-panel">
+            <h3>📖 Continue Writing</h3>
+            <div id="continueWritingCard"></div>
+          </div>
+
+          <div class="dashboard-panel stats-panel">
+            <div class="card-header">
+              <h3>📈 Writing Stats</h3>
+              <span class="tag">This Project</span>
+            </div>
+            <div class="mini-stats">
+              <div><strong id="dashWords">0</strong><span>Words</span></div>
+              <div><strong id="dashChapters">0</strong><span>Chapters</span></div>
+              <div><strong id="dashScenes">0</strong><span>Scenes</span></div>
+              <div><strong id="dashCharacters">0</strong><span>Characters</span></div>
+            </div>
+            <div class="fake-chart">
+              <span style="height:35%"></span><span style="height:52%"></span><span style="height:41%"></span><span style="height:78%"></span><span style="height:44%"></span><span style="height:58%"></span><span style="height:65%"></span>
+            </div>
+          </div>
+
+          <div class="dashboard-panel quick-panel">
+            <h3>⚡ Quick Create</h3>
+            <button onclick="showCreateProjectPanel()">Write New Book</button>
+            <button onclick="quickOpenFirstProject()">Resume Writing</button>
+            <button onclick="showCreateProjectPanel()">Create Series</button>
+            <button onclick="loadFromCloud()">Load Cloud Save</button>
+          </div>
+        </section>
+
+        <section class="dashboard-widgets lower">
+          <div class="dashboard-panel">
+            <h3>↺ Recent Activity</h3>
+            <div id="recentActivity"></div>
+          </div>
+
+          <div class="dashboard-panel pinned-panel">
+            <div class="card-header">
+              <h3>📌 Pinned Notes</h3>
+              <button onclick="savePinnedNote()">Save</button>
+            </div>
+            <textarea id="dashboardPinnedNote" placeholder="Pin a quote, theme, reminder, or story note..."></textarea>
+          </div>
+
+          <div class="dashboard-panel">
+            <h3>♫ Project Playlist</h3>
+            <div id="dashboardPlaylistPreview"></div>
+          </div>
+        </section>
+
+        <input type="file" id="dashboardImportFile" accept="application/json" class="hidden" onchange="importData(event)" />
+      </main>
     </div>
   </section>
 

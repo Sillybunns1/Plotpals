@@ -5,7 +5,7 @@ const defaultData = {
   activeSeriesId: null, activeBookId: null, activeChapterId: null, activeSceneId: null, selectedCharacterId: null,
   user: null, series: [], books: [], characters: [], relationships: [], timeline: [], chapterPlans: [], threads: [],
   scenes: [], world: [], locations: [], magicSystems: [], organizations: [], mysteries: [], foreshadowing: [], plotCards: [],
-  structureBeats: [], music: {}, theme: 'dark'
+  structureBeats: [], music: {}, theme: 'dark', pinnedNote: ''
 };
 
 let supabaseClient = null;
@@ -49,11 +49,134 @@ async function signOut(){if(supabaseClient)await supabaseClient.auth.signOut(); 
 async function sendPasswordResetFromLogin(){if(!supabaseClient)return setLoginMessage("Supabase could not load."); const email=val("loginEmail"); if(!email)return setLoginMessage("Enter your email first."); const {error}=await supabaseClient.auth.resetPasswordForEmail(email); setLoginMessage(error?error.message:"Password reset email sent.")}
 function renderAccount(){setText("accountStatus",data.user?.email||"Not signed in"); setText("syncStatus",data.user?.id?"Signed in. Auto-save enabled.":"Login required.")}
 
-function renderProjectScreen(){ensureCollections(); const projectOptions=data.series.length?data.series.map(s=>`<option value="${s.id}">${escapeHTML(s.title)} (${s.type==="standalone"?"Standalone":"Series"})</option>`).join(""):`<option value="">No projects yet</option>`; setHTML("projectSeriesSelect",projectOptions); setHTML("newBookSeriesSelect",projectOptions); projectSeriesChanged()}
-function setHTML(id,html){const el=document.getElementById(id); if(el)el.innerHTML=html}
 
-function applyTheme(){
-  document.body.classList.toggle("light-mode", data.theme === "light");
+function showCreateProjectPanel(){
+  document.getElementById("createProjectPanel")?.classList.remove("hidden");
+}
+function hideCreateProjectPanel(){
+  document.getElementById("createProjectPanel")?.classList.add("hidden");
+}
+function importDataFromDashboard(){
+  document.getElementById("dashboardImportFile")?.click();
+}
+function savePinnedNote(){
+  data.pinnedNote = val("dashboardPinnedNote");
+  saveData(false);
+  renderProjectScreen();
+}
+function firstProjectBook(){
+  const firstSeries = data.series?.[0];
+  if(!firstSeries) return null;
+  const firstBook = data.books.find(b => b.seriesId === firstSeries.id);
+  if(!firstBook) return null;
+  return { series:firstSeries, book:firstBook };
+}
+function quickOpenFirstProject(){
+  const item = firstProjectBook();
+  if(!item) { showCreateProjectPanel(); return; }
+  data.activeSeriesId = item.series.id;
+  data.activeBookId = item.book.id;
+  const firstChapter = item.book.manuscript?.[0];
+  data.activeChapterId = firstChapter?.id || null;
+  data.activeSceneId = firstChapter?.scenes?.[0]?.id || null;
+  saveData();
+  updateAuthGate();
+}
+function projectWordCount(book){
+  return (book?.manuscript || []).flatMap(ch => ch.scenes || []).reduce((sum, sc) => sum + countWords(stripHTML(sc.content || "")), 0);
+}
+function projectSceneCount(book){
+  return (book?.manuscript || []).flatMap(ch => ch.scenes || []).length;
+}
+function openProjectFromDashboard(seriesId, bookId){
+  if(!bookId){ setProjectMessage("This project has no books yet. Create a book first."); showCreateProjectPanel(); return; }
+  data.activeSeriesId = seriesId;
+  data.activeBookId = bookId;
+  const book = activeBook();
+  const firstChapter = book?.manuscript?.[0];
+  data.activeChapterId = firstChapter?.id || null;
+  data.activeSceneId = firstChapter?.scenes?.[0]?.id || null;
+  saveData();
+  updateAuthGate();
+}
+function renderProjectScreen(){
+  ensureCollections();
+  applyTheme();
+
+  const name = data.user?.email ? data.user.email.split("@")[0] : "Writer";
+  setText("dashboardName", name.charAt(0).toUpperCase() + name.slice(1));
+
+  const projectOptions = data.series.length
+    ? data.series.map(s=>`<option value="${s.id}">${escapeHTML(s.title)} (${s.type==="standalone"?"Standalone":"Series"})</option>`).join("")
+    : `<option value="">No projects yet</option>`;
+  setHTML("projectSeriesSelect", projectOptions);
+  setHTML("newBookSeriesSelect", projectOptions);
+  projectSeriesChanged();
+
+  const q = (val("projectSearch") || "").toLowerCase();
+  const projects = data.series.filter(s => !q || JSON.stringify(s).toLowerCase().includes(q) || data.books.some(b => b.seriesId === s.id && b.title.toLowerCase().includes(q)));
+
+  const cards = projects.map((s, index) => {
+    const books = data.books.filter(b => b.seriesId === s.id);
+    const primaryBook = books[0];
+    const words = books.reduce((sum, b) => sum + projectWordCount(b), 0);
+    const scenes = books.reduce((sum, b) => sum + projectSceneCount(b), 0);
+    const progress = Math.min(100, Math.round(words / 50000 * 100));
+    const status = primaryBook?.status || (s.type === "standalone" ? "Planning" : `${books.length} book${books.length === 1 ? "" : "s"}`);
+    return `<article class="story-card" onclick="openProjectFromDashboard('${s.id}','${primaryBook?.id || ""}')">
+      <div class="story-card-art"></div>
+      <div class="story-card-body">
+        <h3>${escapeHTML(s.title)}</h3>
+        <span class="tag">${escapeHTML(s.type === "standalone" ? "Standalone" : "Series")}</span>
+        <p>${escapeHTML(status)}</p>
+        <p>${books.length} book${books.length === 1 ? "" : "s"} · ${scenes} scenes</p>
+        <div class="progress-bar"><span style="width:${progress}%"></span></div>
+        <p>${words.toLocaleString()} words</p>
+      </div>
+    </article>`;
+  }).join("");
+
+  setHTML("dashboardStoryCards", cards + `<div class="add-story-card" onclick="showCreateProjectPanel()"><div><div style="font-size:3rem;">✒</div><strong>+ New Book<br>or Series</strong></div></div>`);
+
+  const item = firstProjectBook();
+  if(item) {
+    const ch = item.book.manuscript?.[0];
+    const sc = ch?.scenes?.[0];
+    setHTML("continueWritingCard", `<div class="continue-card">
+      <strong>${escapeHTML(sc?.title || ch?.title || item.book.title)}</strong>
+      <span>${escapeHTML(item.series.title)} — ${escapeHTML(item.book.title)}</span>
+      <div class="progress-bar"><span style="width:65%"></span></div>
+      <button onclick="quickOpenFirstProject()">Resume Writing</button>
+    </div>`);
+  } else {
+    setHTML("continueWritingCard", `<p>No stories yet.</p><button onclick="showCreateProjectPanel()">Create your first story</button>`);
+  }
+
+  const allBooks = data.books || [];
+  const allWords = allBooks.reduce((sum, b) => sum + projectWordCount(b), 0);
+  const allScenes = allBooks.reduce((sum, b) => sum + projectSceneCount(b), 0);
+  const allChapters = allBooks.reduce((sum, b) => sum + (b.manuscript || []).length, 0);
+  setText("dashWords", allWords.toLocaleString());
+  setText("dashChapters", allChapters);
+  setText("dashScenes", allScenes);
+  setText("dashCharacters", (data.characters || []).length);
+
+  const recent = [
+    ...allBooks.slice(-3).map(b => `Edited ${escapeHTML(b.title)}`),
+    ...(data.characters || []).slice(-2).map(c => `Added character: ${escapeHTML(c.name)}`),
+    ...(data.threads || []).slice(-2).map(t => `Created plot thread: ${escapeHTML(t.title)}`)
+  ].slice(-5).reverse();
+
+  setHTML("recentActivity", recent.length ? recent.map(r => `<p>${r}</p>`).join("") : "<p>No recent activity yet.</p>");
+  setVal("dashboardPinnedNote", data.pinnedNote || "");
+
+  const firstMusic = item?.series ? (data.music?.[item.series.id] || {}) : {};
+  const musicLinks = [
+    firstMusic.spotify ? `<a class="playlist-link" target="_blank" href="${escapeHTML(firstMusic.spotify)}">Spotify</a>` : "",
+    firstMusic.apple ? `<a class="playlist-link" target="_blank" href="${escapeHTML(firstMusic.apple)}">Apple Music</a>` : "",
+    firstMusic.youtube ? `<a class="playlist-link" target="_blank" href="${escapeHTML(firstMusic.youtube)}">YouTube Music</a>` : ""
+  ].filter(Boolean).join("");
+  setHTML("dashboardPlaylistPreview", musicLinks || "<p>No playlist linked yet. Add one inside a project.</p>");
 }
 function toggleTheme(){
   data.theme = data.theme === "light" ? "dark" : "light";
