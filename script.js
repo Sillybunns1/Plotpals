@@ -12,6 +12,11 @@ const defaultData = {
 let supabaseClient = null;
 let data = loadData();
 let cloudSaveTimer = null;
+let cloudSaveRetryTimer = null;
+let cloudSaveInProgress = false;
+let pendingCloudSave = false;
+let lastCloudSaveError = null;
+let lastCloudSaveAt = null;
 let cloudLoaded = false;
 let isMigratingLegacyLocalData = false;
 let authMode = "login";
@@ -107,6 +112,27 @@ function supabaseMediaReady(){
   return !!(supabaseClient && data.user?.id && window.PLOTPALS_SUPABASE_MEDIA_BUCKET !== false);
 }
 function mediaBucketName(){ return window.PLOTPALS_SUPABASE_MEDIA_BUCKET || "plotpals-media"; }
+
+function describeSupabaseStorageError(err){
+  const raw = err || {};
+  const message = raw.message || raw.error_description || raw.error || String(raw);
+  const status = raw.status || raw.statusCode || raw.code || "";
+  const lower = String(message || "").toLowerCase();
+  if(lower.includes("bucket") && (lower.includes("not found") || lower.includes("does not exist"))){
+    return `Supabase Storage bucket "${mediaBucketName()}" was not found. Create a public bucket named "${mediaBucketName()}".`;
+  }
+  if(String(status)==="403" || lower.includes("row-level security") || lower.includes("rls") || lower.includes("violates")){
+    return `Supabase Storage rejected the upload because of bucket policies/RLS. Add authenticated INSERT/SELECT/UPDATE/DELETE policies for the "${mediaBucketName()}" bucket.`;
+  }
+  if(String(status)==="401" || lower.includes("jwt") || lower.includes("unauthorized")){
+    return "Supabase says you are not authorized. Log out/in again and confirm the anon/publishable key belongs to this Supabase project.";
+  }
+  if(lower.includes("failed to fetch") || lower.includes("network") || lower.includes("cors")){
+    return "The browser could not reach Supabase Storage. Check the Supabase URL/key, CORS/ad-blocker settings, and that the site is running over https or localhost.";
+  }
+  return `Supabase Storage error${status ? " ("+status+")" : ""}: ${message}`;
+}
+
 async function uploadMediaToSupabase(file, folder="media"){
   if(!supabaseMediaReady()) throw new Error("Supabase media storage is not configured or user is not logged in.");
   const bucket = mediaBucketName();
@@ -117,7 +143,7 @@ async function uploadMediaToSupabase(file, folder="media"){
     upsert: false,
     contentType: file.type || undefined
   });
-  if(error) throw error;
+  if(error){ console.error("Supabase media upload failed", error); throw new Error(describeSupabaseStorageError(error)); }
   const { data: publicData } = supabaseClient.storage.from(bucket).getPublicUrl(path);
   let url = publicData?.publicUrl || "";
   if(!url){
@@ -185,7 +211,8 @@ async function readImageUpload(input,onDone){
     if(input) input.value="";
     return;
   }catch(err){
-    alert("This image could not be uploaded. Please try a different file.");
+    console.error("Image upload failed", err);
+    alert(err?.message || "This image could not be uploaded. Please try a different file.");
   }
   if(input) input.value="";
 }
@@ -724,7 +751,7 @@ async function uploadMusicTracks(event){
       added++;
     }catch(err){
       console.warn("Supabase audio upload failed.", err);
-      alert(`Could not upload ${file.name} to Supabase Storage. Check the plotpals-media bucket and storage policies.`);
+      alert(`Could not upload ${file.name}. ${err?.message || "Check the plotpals-media bucket and storage policies."}`);
     }
   }
   if(!music.playlists.length){
@@ -1048,8 +1075,88 @@ function createBookFromProject(){let seriesId=val("newBookSeriesSelect"); const 
 function openWorkspace(){const seriesId=val("projectSeriesSelect"), bookId=val("projectBookSelect"); if(!seriesId||!bookId)return setProjectMessage("Select both a project and a book."); data.activeSeriesId=seriesId; data.activeBookId=bookId; const book=activeBook(); data.activeChapterId=book?.manuscript?.[0]?.id||null; data.activeSceneId=book?.manuscript?.[0]?.scenes?.[0]?.id||null; saveData(); updateAuthGate()}
 function backToProjects(){saveCurrentScene(false,false); data.activeSeriesId=null; data.activeBookId=null; saveData(false,false); updateAuthGate()}
 
-function scheduleCloudSave(){if(!data.user?.id||!supabaseClient)return; clearTimeout(cloudSaveTimer); cloudSaveTimer=setTimeout(()=>syncToCloud(false),1600)}
-async function syncToCloud(showAlert=true){if(!supabaseClient){if(showAlert)alert("Supabase is not loaded.");return} const currentProject={seriesId:data.activeSeriesId,bookId:data.activeBookId,chapterId:data.activeChapterId,sceneId:data.activeSceneId}; await refreshSession(); data.activeSeriesId=currentProject.seriesId; data.activeBookId=currentProject.bookId; data.activeChapterId=currentProject.chapterId; data.activeSceneId=currentProject.sceneId; if(!data.user?.id){if(showAlert)alert("Login first.");return} const payload={user_id:data.user.id,user_email:data.user.email,vault_data:data,updated_at:new Date().toISOString()}; const {error}=await supabaseClient.from(CLOUD_TABLE).upsert(payload,{onConflict:"user_id"}); if(error){setText("syncStatus","Sync failed."); if(showAlert)alert("Cloud sync failed. Check Supabase table/RLS. "+error.message); return} setText("syncStatus","Synced "+new Date().toLocaleTimeString()); setText("autosaveStatus","Saved"); if(showAlert)alert("Synced to Supabase.")}
+function scheduleCloudSave(){
+  if(!data.user?.id || !supabaseClient){
+    setText("autosaveStatus", data.user?.id ? "Cloud unavailable" : "Login required");
+    return;
+  }
+  pendingCloudSave = true;
+  setText("autosaveStatus","Saving...");
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(()=>syncToCloud(false), 1200);
+}
+
+function describeCloudError(error){
+  const raw = (error && (error.message || error.error_description || error.details || String(error))) || "Unknown error";
+  const msg = raw.toLowerCase();
+  if(msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("load failed")){
+    return "Could not reach Supabase. Check the Supabase URL, internet connection, browser/ad-blocker, and CORS/mixed-content issues.";
+  }
+  if(msg.includes("jwt") || msg.includes("permission") || msg.includes("policy") || msg.includes("rls") || msg.includes("row-level")){
+    return "Supabase reached the table, but RLS/policies blocked the save. Check writer_vaults insert/update/select policies for authenticated users.";
+  }
+  if(msg.includes("not found") || msg.includes("does not exist") || msg.includes("relation")){
+    return "Supabase table not found. Create the writer_vaults table or update CLOUD_TABLE in script.js.";
+  }
+  if(msg.includes("apikey") || msg.includes("api key") || msg.includes("invalid key")){
+    return "Supabase API key is missing or invalid. Check WRITERS_VAULT_SUPABASE_KEY.";
+  }
+  return raw;
+}
+
+async function syncToCloud(showAlert=false){
+  if(!supabaseClient){
+    const msg="Supabase is not loaded. Check the Supabase script and credentials.";
+    setText("syncStatus", msg); setText("autosaveStatus","Cloud unavailable");
+    if(showAlert) alert(msg);
+    return false;
+  }
+  if(cloudSaveInProgress){ pendingCloudSave = true; return false; }
+  cloudSaveInProgress = true;
+  pendingCloudSave = false;
+  clearTimeout(cloudSaveRetryTimer);
+  const currentProject={seriesId:data.activeSeriesId,bookId:data.activeBookId,chapterId:data.activeChapterId,sceneId:data.activeSceneId};
+  try{
+    setText("autosaveStatus","Saving...");
+    const sessionResp = await supabaseClient.auth.getSession();
+    const user = sessionResp?.data?.session?.user;
+    if(!user){
+      const msg="Login first. Auto-sync pauses until you are signed in.";
+      setText("syncStatus", msg); setText("autosaveStatus","Login required");
+      if(showAlert) alert(msg);
+      return false;
+    }
+    data.user={id:user.id,email:user.email};
+    data.activeSeriesId=currentProject.seriesId; data.activeBookId=currentProject.bookId; data.activeChapterId=currentProject.chapterId; data.activeSceneId=currentProject.sceneId;
+    const cleanData = structuredClone(data);
+    cleanData.user={id:user.id,email:user.email};
+    const payload={user_id:user.id,user_email:user.email,vault_data:cleanData,updated_at:new Date().toISOString()};
+    const {error}=await supabaseClient.from(CLOUD_TABLE).upsert(payload,{onConflict:"user_id"});
+    if(error) throw error;
+    lastCloudSaveError=null;
+    lastCloudSaveAt=new Date();
+    setText("syncStatus","Auto-synced "+lastCloudSaveAt.toLocaleTimeString());
+    setText("autosaveStatus","Saved");
+    if(showAlert) alert("Synced to Supabase.");
+    return true;
+  }catch(error){
+    lastCloudSaveError=error;
+    const friendly=describeCloudError(error);
+    console.error("Cloud auto-sync failed", error);
+    setText("syncStatus","Auto-sync failed: "+friendly);
+    setText("autosaveStatus","Cloud retry pending");
+    // quiet retry: this avoids repeated popups while still trying again
+    cloudSaveRetryTimer=setTimeout(()=>{ if(data.user?.id) syncToCloud(false); }, 15000);
+    if(showAlert) alert("Cloud sync failed. "+friendly);
+    return false;
+  }finally{
+    cloudSaveInProgress=false;
+    if(pendingCloudSave){
+      clearTimeout(cloudSaveTimer);
+      cloudSaveTimer=setTimeout(()=>syncToCloud(false), 1200);
+    }
+  }
+}
 async function loadFromCloud(showAlert=true){
   if(!supabaseClient){if(showAlert)alert("Supabase is not loaded.");return}
   const session=await supabaseClient.auth.getSession();
