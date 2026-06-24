@@ -3521,3 +3521,64 @@ function updateCharacterArcBook(characterId, arcId, bookId){
   if(document.body) mo.observe(document.body,{childList:true,subtree:true});
   else document.addEventListener('DOMContentLoaded',()=>mo.observe(document.body,{childList:true,subtree:true}));
 })();
+
+
+/* === Strong auto-grow textarea behavior patch === */
+(function(){
+  function shouldGrow(el){
+    return el && el.tagName === 'TEXTAREA' && el.id !== 'rawData' && !el.closest('.textarea-modal');
+  }
+  function grow(el){
+    if(!shouldGrow(el)) return;
+    const style = window.getComputedStyle(el);
+    const min = parseInt(style.minHeight, 10) || 260;
+    el.style.overflowY = 'hidden';
+    el.style.height = 'auto';
+    el.style.height = Math.max(min, el.scrollHeight + 8) + 'px';
+  }
+  function growAll(root=document){
+    root.querySelectorAll('textarea').forEach(grow);
+  }
+  window.autoGrowTextarea = grow;
+  window.autoGrowAllTextareas = growAll;
+
+  document.addEventListener('input', function(e){
+    if(shouldGrow(e.target)) grow(e.target);
+  }, true);
+
+  document.addEventListener('change', function(e){
+    if(shouldGrow(e.target)) grow(e.target);
+  }, true);
+
+  const run = () => {
+    growAll(document);
+    setTimeout(()=>growAll(document), 50);
+    setTimeout(()=>growAll(document), 250);
+  };
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
+
+  const observer = new MutationObserver(mutations => {
+    let needsRun = false;
+    for(const m of mutations){
+      if(m.type === 'childList' && m.addedNodes.length) needsRun = true;
+      if(m.type === 'attributes' && m.target?.tagName === 'TEXTAREA') needsRun = true;
+    }
+    if(needsRun) requestAnimationFrame(run);
+  });
+
+  const startObserver = () => observer.observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['style','class']});
+  if(document.body) startObserver();
+  else document.addEventListener('DOMContentLoaded', startObserver);
+
+  const originalSetHTML = window.setHTML;
+  if(typeof originalSetHTML === 'function'){
+    window.setHTML = function(id, html){
+      const result = originalSetHTML.apply(this, arguments);
+      setTimeout(()=>growAll(document.getElementById(id) || document), 0);
+      setTimeout(()=>growAll(document.getElementById(id) || document), 100);
+      return result;
+    };
+  }
+})();

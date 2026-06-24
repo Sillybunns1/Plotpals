@@ -1217,3 +1217,27 @@ textarea.large-textarea,
 .textarea-modal{width:min(980px,96vw);height:min(760px,88vh);background:var(--panel);border:1px solid var(--border);border-radius:22px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;}
 .textarea-modal textarea{flex:1;min-height:0;overflow-y:auto;font-size:1rem;line-height:1.65;}
 .textarea-modal-actions{display:flex;justify-content:flex-end;gap:10px;}
+
+/* === Stronger auto-growing textarea fix === */
+textarea:not(#rawData):not(.textarea-modal textarea){
+  min-height:260px !important;
+  height:auto;
+  resize:vertical;
+  overflow-y:hidden !important;
+  box-sizing:border-box;
+}
+.form-grid textarea:not(#rawData),
+.custom-section-builder textarea:not(#rawData),
+.book-arc-row textarea:not(#rawData),
+.field-stack textarea:not(#rawData),
+.lookup-detail-body textarea:not(#rawData){
+  min-height:300px !important;
+}
+#charArcText,
+.editArcText,
+textarea.large-textarea{
+  min-height:340px !important;
+}
+.inline-textarea-tools + textarea{
+  margin-top:0;
+}
