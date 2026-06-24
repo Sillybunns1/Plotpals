@@ -3379,3 +3379,87 @@ function renumberEditBookArcRows(){
     }
   });
 }
+
+/* === Character Arc Sequential Book Label Fix ===
+   Every arc row is numbered by its position, even when linked to a real book.
+   Entry 1 = Book #1, Entry 2 = Book #2, etc. */
+function normalizeArcPlaceholders(arcs=[]){
+  return (arcs||[]).map((arc,i)=>{
+    const a={...arc};
+    if(!a.id)a.id=uid();
+    if(!a.bookId)a.bookId=arcPlaceholderId(i+1);
+    a.bookLabel=`Book #${i+1}`;
+    return a;
+  });
+}
+function arcOrderNumber(arcs=[], selected='', arcId=''){
+  const idx=(arcs||[]).findIndex(a=>(arcId && a.id===arcId) || (!arcId && selected && a.bookId===selected));
+  return idx>=0 ? idx+1 : (arcs||[]).length+1;
+}
+function characterArcBookLabel(arc, fallbackIndex=0){
+  const num=(fallbackIndex||0)+1;
+  const b=seriesBooks().find(x=>x.id===(arc||{}).bookId);
+  if(b)return `Book #${num} — ${b.title||'Untitled Book'}`;
+  return `Book #${num}`;
+}
+function nextPlaceholderBookIdForArcs(arcs=[]){return arcPlaceholderId((arcs||[]).filter(Boolean).length+1);}
+function seriesBookOptions(selected='', characterId='', arcId='', draftMode=false){
+  let sourceArcs=[];
+  if(characterId){
+    const c=data.characters.find(x=>x.id===characterId);
+    sourceArcs=normalizeCharacterBookArcs(c||{});
+  }else if(draftMode){
+    sourceArcs=characterArcDrafts||[];
+  }
+  const normalized=normalizeArcPlaceholders(sourceArcs);
+  const orderNum=arcOrderNumber(normalized, selected, arcId);
+  const placeholder=arcPlaceholderId(orderNum);
+  const placeholderSelected=isPlaceholderBookId(selected)||!selected;
+  const realBooks=availableRealBooksForArcs(normalized, selected, arcId);
+  const placeholderOption=`<option value="${placeholder}" ${placeholderSelected?'selected':''}>Book #${orderNum}</option>`;
+  const realOptions=realBooks.map(b=>`<option value="${b.id}" ${b.id===selected?'selected':''}>Book #${orderNum} — ${escapeHTML(b.title||'Untitled Book')}</option>`).join('');
+  return `${placeholderOption}${realOptions?`<option disabled>──────────</option>${realOptions}`:''}`;
+}
+function renderCharacterArcDraftList(){
+  const el=document.getElementById('charArcDraftList'); if(!el)return;
+  characterArcDrafts=normalizeArcPlaceholders(characterArcDrafts||[]);
+  el.innerHTML=characterArcDrafts.length?characterArcDrafts.map((a,i)=>`<div class="custom-section-chip"><strong>${escapeHTML(characterArcBookLabel(a,i))}</strong> ${typeof characterArcTypeTag==='function'?characterArcTypeTag(a):''}<button type="button" onclick="removeCharacterArcDraft('${a.id}')">Remove</button></div>`).join(''):`<p class="muted">No book arcs added yet.</p>`;
+}
+function addCharacterArcDraft(){
+  let bookId=val('charArcBook');
+  const text=val('charArcText').trim();
+  characterArcDrafts=normalizeArcPlaceholders(characterArcDrafts||[]);
+  const nextNum=characterArcDrafts.length+1;
+  if(!bookId || isPlaceholderBookId(bookId)) bookId=arcPlaceholderId(nextNum);
+  if(!text && !bookId)return;
+  characterArcDrafts.push({id:uid(),bookId,bookLabel:`Book #${nextNum}`,text,isImpactArc:typeof characterArcImpactChecked==='function'?characterArcImpactChecked():false});
+  if(typeof clearCharacterArcCreatorFields==='function') clearCharacterArcCreatorFields(); else clearFields(['charArcText']);
+  populateCharacterArcCreator();
+}
+function collectCharacterArcDrafts(){
+  const arcs=normalizeArcPlaceholders([...(characterArcDrafts||[])]);
+  let bookId=val('charArcBook');
+  const text=val('charArcText').trim();
+  if(text){
+    const nextNum=arcs.length+1;
+    if(!bookId || isPlaceholderBookId(bookId)) bookId=arcPlaceholderId(nextNum);
+    arcs.push({id:uid(),bookId,bookLabel:`Book #${nextNum}`,text,isImpactArc:typeof characterArcImpactChecked==='function'?characterArcImpactChecked():false});
+  }
+  return normalizeArcPlaceholders(arcs).filter(a=>a.bookId||a.text).map(a=>({...a,isImpactArc:!!a.isImpactArc}));
+}
+function collectEditBookArcs(){
+  const rows=[...document.querySelectorAll('#editBookArcsList .book-arc-row')];
+  const raw=rows.map((row,i)=>{
+    let bookId=row.querySelector('.editArcBook')?.value||arcPlaceholderId(i+1);
+    if(isPlaceholderBookId(bookId)) bookId=arcPlaceholderId(i+1);
+    return {id:row.dataset.arcId||uid(),bookId,bookLabel:`Book #${i+1}`,text:row.querySelector('.editArcText')?.value||'',isImpactArc:!!row.querySelector('.editArcImpact')?.checked};
+  }).filter(a=>a.bookId||a.text);
+  return normalizeArcPlaceholders(raw);
+}
+function updateCharacterArcBook(characterId, arcId, bookId){
+  const c=data.characters.find(x=>x.id===characterId); if(!c)return;
+  const arcs=normalizeCharacterBookArcs(c); const arc=arcs.find(a=>a.id===arcId); if(!arc)return;
+  if(bookId){arc.bookId=bookId;}
+  c.bookArcs=normalizeArcPlaceholders(arcs);
+  saveData(true); renderSeriesArcs(); renderCharacterDetail(); renderSeriesTools();
+}
