@@ -1481,3 +1481,27 @@ body.light-mode .rich-text-toolbar button:active {
     width: 100%;
   }
 }
+
+
+/* Lightweight app status toast */
+.status-toast{
+  position:fixed;
+  left:50%;
+  bottom:24px;
+  transform:translate(-50%, 18px);
+  z-index:9999;
+  max-width:min(92vw,520px);
+  padding:12px 16px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  background:rgba(22,12,24,.96);
+  color:var(--text);
+  box-shadow:0 14px 38px rgba(0,0,0,.35);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .18s ease, transform .18s ease;
+}
+.status-toast.show{
+  opacity:1;
+  transform:translate(-50%, 0);
+}

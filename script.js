@@ -2,6 +2,31 @@ const STORAGE_KEY = "plotpals"; // Legacy local project-data key, used only for 
 const UI_STORAGE_KEY = "plotpals_ui_preferences";
 const CLOUD_TABLE = "writer_vaults";
 
+
+/* === Status Toast Helper ===
+   Some save flows call showStatus(). Keep it global and safe so optional status messages never block saving. */
+function showStatus(message, duration=2600){
+  try{
+    const text=String(message||'').trim();
+    if(!text) return;
+    let el=document.getElementById('plotpalsStatusToast');
+    if(!el){
+      el=document.createElement('div');
+      el.id='plotpalsStatusToast';
+      el.className='status-toast';
+      el.setAttribute('role','status');
+      el.setAttribute('aria-live','polite');
+      document.body.appendChild(el);
+    }
+    el.textContent=text;
+    el.classList.add('show');
+    clearTimeout(showStatus._timer);
+    showStatus._timer=setTimeout(()=>el.classList.remove('show'), duration);
+  }catch(err){
+    console.info(message);
+  }
+}
+
 const defaultData = {
   activeSeriesId: null, activeBookId: null, activeChapterId: null, activeSceneId: null, selectedCharacterId: null,
   user: null, series: [], books: [], characters: [], relationships: [], timeline: [], chapterPlans: [], threads: [],
