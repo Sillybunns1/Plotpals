@@ -3465,196 +3465,84 @@ function updateCharacterArcBook(characterId, arcId, bookId){
   saveData(true); renderSeriesArcs(); renderCharacterDetail(); renderSeriesTools();
 }
 
-/* === Larger textareas + auto-grow + fullscreen editor patch === */
-(function(){
-  function autoGrow(el){
-    if(!el || el.dataset.noAutogrow==='true') return;
-    el.style.height='auto';
-    const min=parseInt(getComputedStyle(el).minHeight,10)||220;
-    el.style.height=Math.max(min, el.scrollHeight + 2)+'px';
-  }
-  function addExpandButton(el){
-    if(!el || el.dataset.expandReady==='true' || el.closest('.textarea-modal')) return;
-    if(el.id==='rawData') return;
-    el.dataset.expandReady='true';
-    const wrap=document.createElement('div');
-    wrap.className='inline-textarea-tools';
-    const btn=document.createElement('button');
-    btn.type='button';
-    btn.className='textarea-expand-btn';
-    btn.textContent='⤢ Expand';
-    btn.addEventListener('click',()=>openTextareaModal(el));
-    wrap.appendChild(btn);
-    el.insertAdjacentElement('beforebegin', wrap);
-  }
-  function openTextareaModal(source){
-    const backdrop=document.createElement('div');
-    backdrop.className='textarea-modal-backdrop';
-    backdrop.innerHTML=`<div class="textarea-modal"><textarea></textarea><div class="textarea-modal-actions"><button type="button" class="modalCancel">Cancel</button><button type="button" class="modalSave">Save</button></div></div>`;
-    const area=backdrop.querySelector('textarea');
-    area.value=source.value||'';
-    backdrop.querySelector('.modalCancel').onclick=()=>backdrop.remove();
-    backdrop.querySelector('.modalSave').onclick=()=>{
-      source.value=area.value;
-      source.dispatchEvent(new Event('input',{bubbles:true}));
-      source.dispatchEvent(new Event('change',{bubbles:true}));
-      autoGrow(source);
-      backdrop.remove();
-    };
-    document.body.appendChild(backdrop);
-    area.focus();
-  }
-  function enhanceTextareas(root=document){
-    root.querySelectorAll('textarea').forEach(el=>{
-      autoGrow(el);
-      el.addEventListener('input',()=>autoGrow(el));
-      addExpandButton(el);
-    });
-  }
-  window.enhanceTextareas=enhanceTextareas;
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>enhanceTextareas());
-  else enhanceTextareas();
-  const mo=new MutationObserver(muts=>muts.forEach(m=>m.addedNodes.forEach(n=>{
-    if(n.nodeType!==1)return;
-    if(n.matches?.('textarea')) enhanceTextareas(n.parentElement||document);
-    else if(n.querySelectorAll) enhanceTextareas(n);
-  })));
-  if(document.body) mo.observe(document.body,{childList:true,subtree:true});
-  else document.addEventListener('DOMContentLoaded',()=>mo.observe(document.body,{childList:true,subtree:true}));
-})();
-
-
-/* === Strong auto-grow textarea behavior patch === */
-(function(){
-  function shouldGrow(el){
-    return el && el.tagName === 'TEXTAREA' && el.id !== 'rawData' && !el.closest('.textarea-modal');
-  }
-  function grow(el){
-    if(!shouldGrow(el)) return;
-    const style = window.getComputedStyle(el);
-    const min = parseInt(style.minHeight, 10) || 260;
-    el.style.overflowY = 'hidden';
-    el.style.height = 'auto';
-    el.style.height = Math.max(min, el.scrollHeight + 8) + 'px';
-  }
-  function growAll(root=document){
-    root.querySelectorAll('textarea').forEach(grow);
-  }
-  window.autoGrowTextarea = grow;
-  window.autoGrowAllTextareas = growAll;
-
-  document.addEventListener('input', function(e){
-    if(shouldGrow(e.target)) grow(e.target);
-  }, true);
-
-  document.addEventListener('change', function(e){
-    if(shouldGrow(e.target)) grow(e.target);
-  }, true);
-
-  const run = () => {
-    growAll(document);
-    setTimeout(()=>growAll(document), 50);
-    setTimeout(()=>growAll(document), 250);
-  };
-
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
-  else run();
-
-  const observer = new MutationObserver(mutations => {
-    let needsRun = false;
-    for(const m of mutations){
-      if(m.type === 'childList' && m.addedNodes.length) needsRun = true;
-      if(m.type === 'attributes' && m.target?.tagName === 'TEXTAREA') needsRun = true;
-    }
-    if(needsRun) requestAnimationFrame(run);
-  });
-
-  const startObserver = () => observer.observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['style','class']});
-  if(document.body) startObserver();
-  else document.addEventListener('DOMContentLoaded', startObserver);
-
-  const originalSetHTML = window.setHTML;
-  if(typeof originalSetHTML === 'function'){
-    window.setHTML = function(id, html){
-      const result = originalSetHTML.apply(this, arguments);
-      setTimeout(()=>growAll(document.getElementById(id) || document), 0);
-      setTimeout(()=>growAll(document.getElementById(id) || document), 100);
-      return result;
-    };
-  }
-})();
-
-/* === Global all-form textarea auto-grow patch === */
+/* === Optimized textarea auto-grow patch ===
+   Replaces the earlier multi-observer version that was causing slow typing/rendering.
+   Uses one delegated input listener and one lightweight post-render hook. */
 (function(){
   function canGrow(el){
     return el && el.tagName === 'TEXTAREA' && el.id !== 'rawData' && !el.closest('.textarea-modal') && el.dataset.noAutogrow !== 'true' && !el.classList.contains('compact-textarea');
   }
   function grow(el){
     if(!canGrow(el)) return;
-    const min = parseInt(getComputedStyle(el).minHeight, 10) || 320;
+    const min = parseInt(getComputedStyle(el).minHeight, 10) || 220;
     el.style.overflowY = 'hidden';
     el.style.height = 'auto';
-    const nextHeight = Math.max(min, el.scrollHeight + 14);
-    el.style.height = nextHeight + 'px';
+    el.style.height = Math.max(min, el.scrollHeight + 8) + 'px';
   }
   function growAll(root=document){
     const base = root && root.querySelectorAll ? root : document;
     base.querySelectorAll('textarea').forEach(grow);
   }
-  window.growAllPlotPalsTextareas = growAll;
+  function addExpandButton(el){
+    if(!canGrow(el) || el.dataset.expandReady === 'true') return;
+    el.dataset.expandReady = 'true';
+    const wrap = document.createElement('div');
+    wrap.className = 'inline-textarea-tools';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'textarea-expand-btn';
+    btn.textContent = '⤢ Expand';
+    btn.addEventListener('click', () => openTextareaModal(el));
+    wrap.appendChild(btn);
+    el.insertAdjacentElement('beforebegin', wrap);
+  }
+  function enhanceAll(root=document){
+    const base = root && root.querySelectorAll ? root : document;
+    base.querySelectorAll('textarea').forEach(el => { addExpandButton(el); grow(el); });
+  }
+  function openTextareaModal(source){
+    const backdrop = document.createElement('div');
+    backdrop.className = 'textarea-modal-backdrop';
+    backdrop.innerHTML = `<div class="textarea-modal"><textarea></textarea><div class="textarea-modal-actions"><button type="button" class="modalCancel">Cancel</button><button type="button" class="modalSave">Save</button></div></div>`;
+    const area = backdrop.querySelector('textarea');
+    area.value = source.value || '';
+    backdrop.querySelector('.modalCancel').onclick = () => backdrop.remove();
+    backdrop.querySelector('.modalSave').onclick = () => {
+      source.value = area.value;
+      source.dispatchEvent(new Event('input', { bubbles:true }));
+      source.dispatchEvent(new Event('change', { bubbles:true }));
+      grow(source);
+      backdrop.remove();
+    };
+    document.body.appendChild(backdrop);
+    area.focus();
+  }
+  function scheduleEnhance(root=document){
+    cancelAnimationFrame(scheduleEnhance._raf || 0);
+    scheduleEnhance._raf = requestAnimationFrame(() => enhanceAll(root));
+  }
   window.growPlotPalsTextarea = grow;
+  window.growAllPlotPalsTextareas = enhanceAll;
+  window.enhanceTextareas = enhanceAll;
 
-  ['input','change','keyup','paste','cut'].forEach(evt => {
-    document.addEventListener(evt, function(e){
-      if(canGrow(e.target)) requestAnimationFrame(() => grow(e.target));
-    }, true);
-  });
+  document.addEventListener('input', e => { if(canGrow(e.target)) requestAnimationFrame(() => grow(e.target)); }, true);
+  document.addEventListener('focusin', e => { if(canGrow(e.target)) requestAnimationFrame(() => grow(e.target)); }, true);
 
-  document.addEventListener('focusin', function(e){
-    if(canGrow(e.target)) requestAnimationFrame(() => grow(e.target));
-  }, true);
-
-  function runSoon(root=document){
-    requestAnimationFrame(() => growAll(root));
-    setTimeout(() => growAll(root), 80);
-    setTimeout(() => growAll(root), 300);
+  const originalSetHTML = window.setHTML;
+  if(typeof originalSetHTML === 'function' && !originalSetHTML.__textareaOptimized){
+    const wrapped = function(id, html){
+      const result = originalSetHTML.apply(this, arguments);
+      const target = document.getElementById(id) || document;
+      scheduleEnhance(target);
+      return result;
+    };
+    wrapped.__textareaOptimized = true;
+    window.setHTML = wrapped;
   }
 
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => runSoon(document));
-  else runSoon(document);
-
-  const observer = new MutationObserver(mutations => {
-    const targets = new Set();
-    mutations.forEach(m => {
-      if(m.type === 'childList'){
-        m.addedNodes.forEach(n => {
-          if(n.nodeType === 1) targets.add(n);
-        });
-      }
-      if(m.type === 'attributes' && m.target?.tagName === 'TEXTAREA') targets.add(m.target);
-    });
-    if(targets.size){
-      targets.forEach(t => runSoon(t));
-    }
-  });
-  const start = () => observer.observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['class','style','value']});
-  if(document.body) start(); else document.addEventListener('DOMContentLoaded', start);
-
-  // Re-grow after common render/navigation calls without needing to edit each individual form renderer.
-  ['setView','renderAll','renderCharacterDetail','renderWorldCategory','renderWorldDetail','renderPlotBoard','renderPlotThreads','renderSeriesTools','renderRelationships','renderManuscript'].forEach(name => {
-    const original = window[name];
-    if(typeof original === 'function' && !original.__autogrowWrapped){
-      const wrapped = function(){
-        const result = original.apply(this, arguments);
-        runSoon(document);
-        return result;
-      };
-      wrapped.__autogrowWrapped = true;
-      window[name] = wrapped;
-    }
-  });
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => scheduleEnhance(document));
+  else scheduleEnhance(document);
 })();
-
 
 /* === Add Character Save Button Reliability Fix ===
    Keeps the Character Creator save flow working even when the optional image upload fails.
