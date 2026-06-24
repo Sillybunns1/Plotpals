@@ -1148,7 +1148,7 @@ function scheduleCloudSave(){
   pendingCloudSave = true;
   setText("autosaveStatus","Saving...");
   clearTimeout(cloudSaveTimer);
-  cloudSaveTimer = setTimeout(()=>syncToCloud(false), 5000);
+  cloudSaveTimer = setTimeout(()=>syncToCloud(false), 1200);
 }
 
 function describeCloudError(error){
@@ -1218,7 +1218,7 @@ async function syncToCloud(showAlert=false){
     cloudSaveInProgress=false;
     if(pendingCloudSave){
       clearTimeout(cloudSaveTimer);
-      cloudSaveTimer=setTimeout(()=>syncToCloud(false), 5000);
+      cloudSaveTimer=setTimeout(()=>syncToCloud(false), 1200);
     }
   }
 }
@@ -1458,8 +1458,7 @@ function toggleSceneTrackedItem(key,itemId,checked){
   if(checked && !ids.includes(itemId))ids.push(itemId);
   if(!checked)scene[key]=ids.filter(id=>id!==itemId);
   setText("autosaveStatus","Saving...");
-  saveData(false);
-  renderSceneTracking();
+  saveData(true);
 }
 function sceneTrackingCard(title,emptyText,key,items){
   const scene=activeScene();
@@ -1489,36 +1488,13 @@ function saveScenePlotPoint(){
   if(!scene)return;
   scene.plotCardId=val("scenePlotPoint");
   setText("autosaveStatus","Saving...");
-  saveData(false);
+  saveData(true);
 }
 
 function addManuscriptChapter(){const book=activeBook(); if(!book)return alert("Open a book first."); saveCurrentScene(false,false); const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],locationIds:[],plotCardId:"",created:new Date().toISOString()}; const ch={id:uid(),title:`Chapter ${(book.manuscript||[]).length+1}`,scenes:[scene],created:new Date().toISOString()}; book.manuscript.push(ch); data.activeChapterId=ch.id; data.activeSceneId=scene.id; saveData()}
 function addSceneToActiveChapter(){const ch=activeChapter(); if(!ch)return alert("Select a chapter first."); saveCurrentScene(false,false); if(!ch.scenes)ch.scenes=[]; const scene={id:uid(),title:`Scene ${ch.scenes.length+1}`,content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],locationIds:[],plotCardId:"",created:new Date().toISOString()}; ch.scenes.push(scene); data.activeSceneId=scene.id; saveData()}
 function selectScene(chapterId,sceneId){setView("write",chapterId,sceneId)}
-function saveCurrentScene(render=false,scheduleCloud=true){
-  if(isRendering)return;
-  const scene=activeScene(); const ch=activeChapter(); const book=activeBook(); const editor=document.getElementById("richEditor");
-  if(!scene||!ch||!editor)return;
-  const oldWords=(scene._lastWordCount ?? countWords(stripHTML(scene.content||"")));
-  const newContent=editor.innerHTML;
-  const newWords=countWords(stripHTML(newContent||""));
-  ch.title=val("currentChapterTitle")||ch.title;
-  scene.title=val("currentSceneTitle")||scene.title;
-  scene.pov=isPovBook(book)?val("scenePOV"):"";
-  scene.locationId=val("sceneLocation");
-  if(!Array.isArray(scene.locationIds))scene.locationIds=[];
-  if(scene.locationId && !scene.locationIds.includes(scene.locationId))scene.locationIds.unshift(scene.locationId);
-  scene.plotCardId=val("scenePlotPoint");
-  scene.date=val("sceneDate");
-  scene.mood=val("sceneMood");
-  scene.purpose=val("scenePurpose");
-  scene.content=newContent;
-  scene._lastWordCount=newWords;
-  if(newWords>oldWords)trackWordsWritten(data.activeSeriesId,book?.id,newWords-oldWords);
-  setText("autosaveStatus","Saving...");
-  saveData(render,scheduleCloud);
-  updateEditorStats();
-}
+function saveCurrentScene(render=false,scheduleCloud=true){if(isRendering)return; const scene=activeScene(); const ch=activeChapter(); const book=activeBook(); const editor=document.getElementById("richEditor"); if(!scene||!ch||!editor)return; const oldWords=(scene._lastWordCount ?? countWords(stripHTML(scene.content||""))); const newContent=editor.innerHTML; const newWords=countWords(stripHTML(newContent||"")); ch.title=val("currentChapterTitle")||ch.title; scene.title=val("currentSceneTitle")||scene.title; scene.pov=isPovBook(book)?val("scenePOV"):""; scene.locationId=val("sceneLocation"); if(!Array.isArray(scene.locationIds))scene.locationIds=[]; if(scene.locationId && !scene.locationIds.includes(scene.locationId))scene.locationIds.unshift(scene.locationId); scene.plotCardId=val("scenePlotPoint"); scene.date=val("sceneDate"); scene.mood=val("sceneMood"); scene.purpose=val("scenePurpose"); scene.content=newContent; scene._lastWordCount=newWords; if(newWords>oldWords)trackWordsWritten(data.activeSeriesId,book?.id,newWords-oldWords); setText("autosaveStatus","Saving..."); saveData(render,scheduleCloud); updateEditorStats(); renderDashboardDailyWordChart(); renderProjectDailyWordChart()}
 function deleteManuscriptChapter(id){const book=activeBook(); if(!book)return; const ch=(book.manuscript||[]).find(c=>c.id===id); if(!ch)return; if(!confirm("Move this chapter and all scenes to Trash?"))return; data.trash=data.trash||[]; data.trash.unshift({id:uid(),collection:"manuscriptChapters",title:ch.title||"Chapter",seriesId:data.activeSeriesId,bookId:book.id,item:{...ch,deletedAt:new Date().toISOString()},deletedAt:new Date().toISOString()}); book.manuscript=book.manuscript.filter(c=>c.id!==id); data.activeChapterId=book.manuscript[0]?.id||null; data.activeSceneId=book.manuscript[0]?.scenes?.[0]?.id||null; saveData()}
 function deleteScene(chId,sceneId){const book=activeBook(); const ch=(book?.manuscript||[]).find(c=>c.id===chId); if(!ch)return; const sc=(ch.scenes||[]).find(s=>s.id===sceneId); if(!sc)return; if(!confirm("Move this scene to Trash?"))return; data.trash=data.trash||[]; data.trash.unshift({id:uid(),collection:"manuscriptScenes",title:`${ch.title||"Chapter"} — ${sc.title||"Scene"}`,seriesId:data.activeSeriesId,bookId:book.id,chapterId:ch.id,item:{...sc,deletedAt:new Date().toISOString()},deletedAt:new Date().toISOString()}); ch.scenes=(ch.scenes||[]).filter(s=>s.id!==sceneId); data.activeSceneId=ch.scenes[0]?.id||null; saveData()}
 function moveScene(direction){const ch=activeChapter(); if(!ch?.scenes)return; const index=ch.scenes.findIndex(s=>s.id===data.activeSceneId); const ni=index+direction; if(index<0||ni<0||ni>=ch.scenes.length)return; const [scene]=ch.scenes.splice(index,1); ch.scenes.splice(ni,0,scene); saveData()}
@@ -1681,23 +1657,8 @@ let magicDetailEditMode=false;
 let organizationDetailEditMode=false;
 function bulletize(text){return (text||"").split(/\n/).map(line=>line.trim()?(/^\s*[-*•]/.test(line)?line:`• ${line}`):line).join("\n")}
 function addBulletToTextarea(target){const el=typeof target==="string"?document.getElementById(target):target; if(!el)return; const start=el.selectionStart??el.value.length, end=el.selectionEnd??start; const before=el.value.slice(0,start), selected=el.value.slice(start,end), after=el.value.slice(end); const insert=selected?bulletize(selected):"• "; el.value=before+insert+after; el.focus(); el.selectionStart=el.selectionEnd=before.length+insert.length; el.dispatchEvent(new Event("input",{bubbles:true}))}
-function addBulletButtons(container=document){
-  const root=container||document;
-  root.querySelectorAll("textarea").forEach(t=>{
-    if(t.dataset.bulletReady)return;
-    t.dataset.bulletReady="1";
-    const btn=document.createElement("button");
-    btn.type="button";
-    btn.className="bullet-helper";
-    btn.textContent="• Bullet";
-    btn.onclick=()=>addBulletToTextarea(t);
-    t.insertAdjacentElement("beforebegin",btn);
-  });
-}
-function startBulletButtonObserver(){
-  // Avoid a document-wide MutationObserver. It was rescanning every textarea after large renders.
-  addBulletButtons(document.querySelector('.view.active')||document);
-}
+function addBulletButtons(container=document){container.querySelectorAll("textarea").forEach(t=>{if(t.dataset.bulletReady)return; t.dataset.bulletReady="1"; const btn=document.createElement("button"); btn.type="button"; btn.className="bullet-helper"; btn.textContent="• Bullet"; btn.onclick=()=>addBulletToTextarea(t); t.insertAdjacentElement("beforebegin",btn)})}
+function startBulletButtonObserver(){addBulletButtons(); if(window.__plotpalsBulletObserverStarted||!document.body)return; window.__plotpalsBulletObserverStarted=true; const observer=new MutationObserver(mutations=>{if(mutations.some(m=>m.addedNodes&&m.addedNodes.length))addBulletButtons()}); observer.observe(document.body,{childList:true,subtree:true})}
 function addCharacterCustomSectionDraft(){const title=val("charCustomTitle").trim(), text=val("charCustomText").trim(); if(!title&&!text)return; characterCustomSectionDrafts.push({id:uid(),title:title||"Untitled Section",text}); clearFields(["charCustomTitle","charCustomText"]); renderCharacterCustomDraftList()}
 function renderCharacterCustomDraftList(){const el=document.getElementById("charCustomDraftList"); if(!el)return; el.innerHTML=characterCustomSectionDrafts.map(sec=>`<div class="custom-section-chip"><strong>${escapeHTML(sec.title)}</strong><button type="button" onclick="removeCharacterCustomSectionDraft('${sec.id}')">Remove</button></div>`).join("")}
 function removeCharacterCustomSectionDraft(id){characterCustomSectionDrafts=characterCustomSectionDrafts.filter(s=>s.id!==id); renderCharacterCustomDraftList()}
@@ -2533,62 +2494,7 @@ function renderBookHandoffs(){const el=document.getElementById('bookHandoffList'
 function addSeriesMilestone(){data.seriesMilestones.push({id:uid(),...scopedItem('series'),title:val('milestoneTitle'),status:val('milestoneStatus'),date:val('milestoneDate'),notes:val('milestoneNotes'),created:new Date().toISOString()}); clearFields(['milestoneTitle','milestoneDate','milestoneNotes']); saveData(); hideAddForm('seriesMilestoneAddForm')}
 function renderSeriesMilestones(){const el=document.getElementById('seriesMilestoneList'); if(!el)return; const items=(data.seriesMilestones||[]).filter(seriesScope); el.innerHTML=items.length?items.map(m=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(m.title||'Untitled Milestone')}</h3><button class="delete-btn" onclick="deleteItem('seriesMilestones','${m.id}')">Delete</button></div><div class="card-body"><span class="tag">${escapeHTML(m.status||'Not Started')}</span>${detail('Target / Date',m.date)}${detail('Notes',m.notes)}</div></article>`).join(''):'<p class="muted">No milestones yet.</p>';}
 function renderRawData(){const raw=document.getElementById("rawData"); if(raw)raw.value=JSON.stringify(data,null,2); setText("storageHealth",storageHealthMessage())}
-function renderCurrentViewOnly(){
-  const view=data.currentView||"projectDashboard";
-  switch(view){
-    case "projectDashboard": renderProjectDashboard(); break;
-    case "overview": renderOverview(); break;
-    case "write": renderManuscript(); renderSprintPanel(); break;
-    case "storyBoard": renderStoryBoard(); break;
-    case "sceneBoard": renderSceneBoard(); break;
-    case "plotBoard": renderPlotBoard(); break;
-    case "chapters": renderCardList("chapterPlans","chapterPlanList","number",item=>`<span class="tag">Book</span>${detail("POV",item.pov)}${detail("Structure Beat",data.structureBeats.find(b=>b.id===item.structureBeat)?.name||"")}${detail("Target Words",item.wordTarget)}${detail("Goal",item.goal)}${detail("Conflict",item.conflict)}${detail("Outcome",item.outcome)}${detail("Emotional Beat",item.emotion)}${detail("Foreshadowing",item.foreshadowing)}`); break;
-    case "threads": renderPlotThreads(); break;
-    case "mysteries": renderCardList("mysteries","mysteryList","question",item=>`<span class="tag">${escapeHTML(item.status)}</span>${detail("Introduced",item.introduced)}${detail("Payoff",item.payoff)}${detail("Hints",item.hints)}${detail("Answer",item.answer)}`,seriesScope); break;
-    case "foreshadowing": renderCardList("foreshadowing","foreshadowList","hint",item=>`<span class="tag">${escapeHTML(item.status)}</span>${detail("Appears",item.appears)}${detail("Payoff",item.payoff)}${detail("Notes",item.notes)}`,seriesScope); break;
-    case "characters": renderCharactersByRole(); break;
-    case "characterDetail": renderCharacterDetail(); break;
-    case "relationships": renderRelationships(); break;
-    case "relationshipGraph": renderRelationshipGraph(); break;
-    case "locations": renderEntityList("location"); break;
-    case "locationDetail": renderEntityDetail("location"); break;
-    case "magic": renderEntityList("magic"); break;
-    case "magicDetail": renderEntityDetail("magic"); break;
-    case "organizations": renderEntityList("organization"); break;
-    case "organizationDetail": renderEntityDetail("organization"); break;
-    case "world": renderWorldByCategory(); break;
-    case "worldCategory": renderWorldCategoryPage(); break;
-    case "worldDetail": renderWorldDetail(); break;
-    case "scenes": renderSceneDatabase(); break;
-    case "timeline": renderTimeline(); break;
-    case "seriesTools": renderSeriesTools(); break;
-    case "storyBible": renderStoryBible(); break;
-    case "seriesArcs": renderSeriesArcs(); break;
-    case "themeTracker": renderThemeTracker(); break;
-    case "continuityCenter": renderContinuityCenter(); break;
-    case "bookHandoffs": renderBookHandoffs(); break;
-    case "seriesMilestones": renderSeriesMilestones(); break;
-    case "music": renderMusic(); break;
-    case "stats": renderWritingStats(); break;
-    case "backup": renderBackupSnapshots(); renderTrashManager(); renderRawData(); break;
-    case "exports": renderRawData(); break;
-    default: renderProjectDashboard();
-  }
-}
-function renderAll(){
-  if(!data.user?.id){updateAuthGate();return}
-  ensureProject();
-  if(!data.activeSeriesId||!data.activeBookId){updateAuthGate();return}
-  applyTheme();
-  renderSelects();
-  renderCurrentViewOnly();
-  renderAccount();
-  renderNestedNav();
-  renderGlobalMusicPlayer();
-  addBulletButtons(document.querySelector('.view.active')||document);
-  const gs=document.getElementById("globalSearch");
-  if(gs&&gs.value.trim()) runSearch();
-}
+function renderAll(){if(!data.user?.id){updateAuthGate();return} ensureProject(); if(!data.activeSeriesId||!data.activeBookId){updateAuthGate();return} applyTheme(); renderProjectDashboard(); renderOverview(); renderSelects(); renderManuscript(); renderAllLists(); renderMusic(); renderRawData(); renderAccount(); renderBackupSnapshots(); renderTrashManager(); renderNestedNav(); renderSprintPanel(); addBulletButtons(); runSearch()}
 
 function searchableItems(){
   const b=activeBook();
@@ -2703,7 +2609,7 @@ function importData(event){const file=event.target.files[0]; if(!file)return; co
 function resetAll(){if(!confirm("Clear the currently loaded workspace view? This does not delete Supabase cloud data. Use Trash/Delete inside the app for cloud data."))return; const currentUser=data.user; data={...structuredClone(defaultData),...loadUiPrefs(),user:currentUser}; cloudLoaded=false; saveUiPrefs(); renderAll()}
 
 ["seriesTitleEdit","seriesTypeEdit","seriesGenreEdit","seriesSynopsisEdit","seriesThemeEdit","seriesMysteriesEdit","seriesForeshadowingEdit","bookTitleEdit","bookStatusEdit","bookSummaryEdit","bookThemeEdit","bookNotesEdit"].forEach(id=>{document.getElementById(id).addEventListener("input",()=>saveOverviewFields(true))});
-["currentChapterTitle","currentSceneTitle","scenePOV","sceneLocation","scenePlotPoint","sceneDate","sceneMood","scenePurpose"].forEach(id=>{const el=document.getElementById(id); if(el)el.addEventListener("input",()=>saveCurrentScene(false))});
+["currentChapterTitle","currentSceneTitle","scenePOV","sceneLocation","scenePlotPoint","sceneDate","sceneMood","scenePurpose"].forEach(id=>{const el=document.getElementById(id); if(el)el.addEventListener("input",()=>saveCurrentScene(true))});
 ["bookIsPovEdit"].forEach(id=>{const el=document.getElementById(id); if(el)el.addEventListener("change",()=>saveOverviewFields(true))});
 document.getElementById("richEditor").addEventListener("input",()=>saveCurrentScene(false));
 document.getElementById("scenePlotPoint")?.addEventListener("change",saveScenePlotPoint);
@@ -3644,3 +3550,241 @@ async function addCharacter(){
     if(saveBtn){saveBtn.disabled=false; saveBtn.textContent=oldText||"Add Character";}
   }
 }
+
+/* === Character Save Reliability Patch v2 ===
+   Saves the character immediately, then uploads the optional photo in the background.
+   This prevents the form from getting stuck on "Saving Character..." when Supabase Storage is slow/failing. */
+function findCharacterCreatorSaveButton(){
+  return [...document.querySelectorAll('#characterAddForm button')].find(btn=>String(btn.getAttribute('onclick')||'').trim()==='addCharacter()');
+}
+function clearCharacterCreatorAfterSave(){
+  clearFields(["charName","charSpecies","charBasicInfo","charDescription","charPersonality","charBackstory","charWound","charArcText","charVoice","charSecrets","charQuotes","charCustomTitle","charCustomText"]);
+  characterCustomSectionDrafts=[];
+  if(typeof characterArcDrafts!=="undefined") characterArcDrafts=[];
+  if(typeof renderCharacterCustomDraftList==='function') renderCharacterCustomDraftList();
+  if(typeof renderCharacterArcDraftList==='function') renderCharacterArcDraftList();
+  const photoInput=document.getElementById('charPhoto');
+  if(photoInput) photoInput.value='';
+  if(typeof clearOverviewImagePreview==='function') clearOverviewImagePreview('charPhotoPreview');
+}
+function promiseWithTimeout(promise, ms, message){
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(message||'Operation timed out')), ms);})
+  ]).finally(()=>clearTimeout(timer));
+}
+async function uploadCharacterPhotoInBackground(characterId, file){
+  if(!file) return;
+  try{
+    if(!file.type || !file.type.startsWith('image/')) throw new Error('Selected character photo is not an image file.');
+    if(!supabaseMediaReady()) throw new Error('Supabase Storage is not ready. Log in and check the plotpals-media bucket/policies.');
+    const uploadFile=await promiseWithTimeout(compressImageFile(file), 12000, 'Image compression timed out.');
+    const uploaded=await promiseWithTimeout(uploadMediaToSupabase(uploadFile,'images'), 20000, 'Supabase photo upload timed out.');
+    const c=data.characters.find(x=>x.id===characterId);
+    if(!c) return;
+    c.photo=uploaded?.url||'';
+    c.photoStorage=uploaded?.storage||'';
+    c.photoBucket=uploaded?.bucket||'';
+    c.photoPath=uploaded?.path||'';
+    saveData(true,true);
+    showStatus?.('Character photo uploaded.');
+  }catch(err){
+    console.error('Background character photo upload failed:',err);
+    showStatus?.('Character saved. Photo upload failed; check Supabase Storage settings.');
+  }
+}
+async function addCharacter(){
+  const name=val('charName');
+  if(!name){
+    alert('Please enter a character name before saving.');
+    document.getElementById('charName')?.focus();
+    return;
+  }
+  const saveBtn=findCharacterCreatorSaveButton();
+  const oldText=saveBtn?.textContent||'Add Character';
+  if(saveBtn){saveBtn.disabled=true; saveBtn.textContent='Saving Character...';}
+  try{
+    const photoFile=document.getElementById('charPhoto')?.files?.[0]||null;
+    const bookArcs=typeof collectCharacterArcDrafts==='function' ? collectCharacterArcDrafts() : [];
+    const character={
+      id:uid(),
+      ...scopedItem(val('charScope')),
+      name,
+      role:normalizeCharacterRole(val('charRole')),
+      species:val('charSpecies'),
+      photo:'',
+      basicInfo:val('charBasicInfo'),
+      description:val('charDescription'),
+      personality:val('charPersonality'),
+      backstory:val('charBackstory'),
+      wound:val('charWound'),
+      bookArcs,
+      arc:'',
+      voice:val('charVoice'),
+      secrets:val('charSecrets'),
+      quotes:val('charQuotes'),
+      customSections:[...(characterCustomSectionDrafts||[])],
+      created:new Date().toISOString()
+    };
+    data.characters.push(character);
+    data.selectedCharacterId=character.id;
+    saveData(true,true);
+    clearCharacterCreatorAfterSave();
+    hideAddForm('characterAddForm');
+    setView('characterDetail',character.id);
+    showStatus?.('Character saved.');
+    if(photoFile) uploadCharacterPhotoInBackground(character.id, photoFile);
+  }catch(err){
+    console.error('Add Character failed:',err);
+    alert('The character could not be saved. Check the browser console for details.');
+  }finally{
+    if(saveBtn){saveBtn.disabled=false; saveBtn.textContent=oldText;}
+  }
+}
+
+/* Patch: character detail back button + richer textarea tools */
+(function(){
+  function focusAndSignal(el){
+    if(!el) return;
+    el.focus();
+    el.dispatchEvent(new Event('input', {bubbles:true}));
+    el.dispatchEvent(new Event('change', {bubbles:true}));
+  }
+  function getLineStart(value, pos){
+    const idx = value.lastIndexOf('\n', Math.max(0, pos - 1));
+    return idx < 0 ? 0 : idx + 1;
+  }
+  function currentLinePrefix(el){
+    const lineStart = getLineStart(el.value, el.selectionStart || 0);
+    const line = el.value.slice(lineStart, el.selectionStart || 0);
+    const match = line.match(/^\s*(?:[-*•]\s+)/);
+    return match ? match[0] : '';
+  }
+  function insertText(el, text){
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    el.value = el.value.slice(0,start) + text + el.value.slice(end);
+    el.selectionStart = el.selectionEnd = start + text.length;
+    focusAndSignal(el);
+  }
+  function wrapSelection(el, before, after){
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    const selected = el.value.slice(start,end);
+    const insert = selected ? before + selected + after : before + after;
+    el.value = el.value.slice(0,start) + insert + el.value.slice(end);
+    if(selected){
+      el.selectionStart = start;
+      el.selectionEnd = start + insert.length;
+    } else {
+      el.selectionStart = el.selectionEnd = start + before.length;
+    }
+    focusAndSignal(el);
+  }
+  function bulletizeRich(text){
+    const lines = (text || '').split(/\n/);
+    return lines.map(line => {
+      if(!line.trim()) return line;
+      return /^\s*(?:[-*•])\s+/.test(line) ? line : `• ${line}`;
+    }).join('\n');
+  }
+  window.addBulletToTextarea = function(target){
+    const el = typeof target === 'string' ? document.getElementById(target) : target;
+    if(!el) return;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    const before = el.value.slice(0,start);
+    const selected = el.value.slice(start,end);
+    const after = el.value.slice(end);
+    const insert = selected ? bulletizeRich(selected) : '• ';
+    el.value = before + insert + after;
+    el.selectionStart = el.selectionEnd = before.length + insert.length;
+    focusAndSignal(el);
+  };
+  function setToolbarActive(toolbar, btn){
+    if(!toolbar || !btn) return;
+    btn.classList.add('format-active');
+    setTimeout(()=>btn.classList.remove('format-active'), 350);
+  }
+  function handleFormat(el, toolbar, type, btn){
+    if(type === 'bullet') window.addBulletToTextarea(el);
+    if(type === 'bold') wrapSelection(el, '**', '**');
+    if(type === 'italic') wrapSelection(el, '*', '*');
+    if(type === 'underline') wrapSelection(el, '<u>', '</u>');
+    setToolbarActive(toolbar, btn);
+  }
+  function attachTextareaShortcuts(t, toolbar){
+    if(t.dataset.richShortcutsReady) return;
+    t.dataset.richShortcutsReady = '1';
+    t.addEventListener('keydown', function(e){
+      const key = (e.key || '').toLowerCase();
+      if((e.ctrlKey || e.metaKey) && ['b','i','u'].includes(key)){
+        e.preventDefault();
+        const type = key === 'b' ? 'bold' : key === 'i' ? 'italic' : 'underline';
+        const btn = toolbar?.querySelector(`[data-format="${type}"]`);
+        handleFormat(t, toolbar, type, btn);
+        return;
+      }
+      if(e.key === 'Enter'){
+        const prefix = currentLinePrefix(t);
+        if(prefix){
+          const lineStart = getLineStart(t.value, t.selectionStart || 0);
+          const currentLine = t.value.slice(lineStart, t.selectionStart || 0);
+          if(/^\s*(?:[-*•])\s*$/.test(currentLine)){
+            e.preventDefault();
+            const start = t.selectionStart || 0;
+            const end = t.selectionEnd || start;
+            t.value = t.value.slice(0,lineStart) + t.value.slice(end);
+            t.selectionStart = t.selectionEnd = lineStart;
+            focusAndSignal(t);
+          } else {
+            e.preventDefault();
+            insertText(t, '\n' + prefix);
+          }
+        }
+      }
+    });
+  }
+  window.addBulletButtons = function(container=document){
+    container.querySelectorAll('textarea').forEach(t=>{
+      if(t.dataset.richToolbarReady){
+        const toolbar = t.previousElementSibling?.classList?.contains('rich-text-toolbar') ? t.previousElementSibling : null;
+        attachTextareaShortcuts(t, toolbar);
+        return;
+      }
+      t.dataset.richToolbarReady = '1';
+      if(t.previousElementSibling?.classList?.contains('bullet-helper')) t.previousElementSibling.remove();
+      if(t.previousElementSibling?.classList?.contains('rich-text-toolbar')) return;
+      const toolbar = document.createElement('div');
+      toolbar.className = 'rich-text-toolbar';
+      toolbar.innerHTML = `
+        <button type="button" data-format="bullet" title="Bullet list">• Bullet</button>
+        <button type="button" data-format="bold" title="Bold (Ctrl+B)">B</button>
+        <button type="button" data-format="italic" title="Italic (Ctrl+I)">I</button>
+        <button type="button" data-format="underline" title="Underline (Ctrl+U)">U</button>`;
+      toolbar.querySelectorAll('button').forEach(btn=>{
+        btn.addEventListener('click', function(e){
+          e.preventDefault();
+          handleFormat(t, toolbar, btn.dataset.format, btn);
+        });
+      });
+      t.insertAdjacentElement('beforebegin', toolbar);
+      attachTextareaShortcuts(t, toolbar);
+    });
+  };
+  const oldRenderCharacterDetail = window.renderCharacterDetail;
+  if(typeof oldRenderCharacterDetail === 'function'){
+    window.renderCharacterDetail = function(){
+      oldRenderCharacterDetail.apply(this, arguments);
+      const el = document.getElementById('characterDetailContent');
+      if(el && !el.querySelector('.character-detail-backbar')){
+        const bar = document.createElement('div');
+        bar.className = 'character-detail-backbar';
+        bar.innerHTML = '<button type="button" class="ghost-btn back-btn" onclick="setView(\'characters\')">← Back to Characters</button>';
+        el.prepend(bar);
+      }
+      window.addBulletButtons?.(el || document);
+    };
+  }
+})();
