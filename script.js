@@ -3465,84 +3465,9 @@ function updateCharacterArcBook(characterId, arcId, bookId){
   saveData(true); renderSeriesArcs(); renderCharacterDetail(); renderSeriesTools();
 }
 
-/* === Optimized textarea auto-grow patch ===
-   Replaces the earlier multi-observer version that was causing slow typing/rendering.
-   Uses one delegated input listener and one lightweight post-render hook. */
-(function(){
-  function canGrow(el){
-    return el && el.tagName === 'TEXTAREA' && el.id !== 'rawData' && !el.closest('.textarea-modal') && el.dataset.noAutogrow !== 'true' && !el.classList.contains('compact-textarea');
-  }
-  function grow(el){
-    if(!canGrow(el)) return;
-    const min = parseInt(getComputedStyle(el).minHeight, 10) || 220;
-    el.style.overflowY = 'hidden';
-    el.style.height = 'auto';
-    el.style.height = Math.max(min, el.scrollHeight + 8) + 'px';
-  }
-  function growAll(root=document){
-    const base = root && root.querySelectorAll ? root : document;
-    base.querySelectorAll('textarea').forEach(grow);
-  }
-  function addExpandButton(el){
-    if(!canGrow(el) || el.dataset.expandReady === 'true') return;
-    el.dataset.expandReady = 'true';
-    const wrap = document.createElement('div');
-    wrap.className = 'inline-textarea-tools';
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'textarea-expand-btn';
-    btn.textContent = '⤢ Expand';
-    btn.addEventListener('click', () => openTextareaModal(el));
-    wrap.appendChild(btn);
-    el.insertAdjacentElement('beforebegin', wrap);
-  }
-  function enhanceAll(root=document){
-    const base = root && root.querySelectorAll ? root : document;
-    base.querySelectorAll('textarea').forEach(el => { addExpandButton(el); grow(el); });
-  }
-  function openTextareaModal(source){
-    const backdrop = document.createElement('div');
-    backdrop.className = 'textarea-modal-backdrop';
-    backdrop.innerHTML = `<div class="textarea-modal"><textarea></textarea><div class="textarea-modal-actions"><button type="button" class="modalCancel">Cancel</button><button type="button" class="modalSave">Save</button></div></div>`;
-    const area = backdrop.querySelector('textarea');
-    area.value = source.value || '';
-    backdrop.querySelector('.modalCancel').onclick = () => backdrop.remove();
-    backdrop.querySelector('.modalSave').onclick = () => {
-      source.value = area.value;
-      source.dispatchEvent(new Event('input', { bubbles:true }));
-      source.dispatchEvent(new Event('change', { bubbles:true }));
-      grow(source);
-      backdrop.remove();
-    };
-    document.body.appendChild(backdrop);
-    area.focus();
-  }
-  function scheduleEnhance(root=document){
-    cancelAnimationFrame(scheduleEnhance._raf || 0);
-    scheduleEnhance._raf = requestAnimationFrame(() => enhanceAll(root));
-  }
-  window.growPlotPalsTextarea = grow;
-  window.growAllPlotPalsTextareas = enhanceAll;
-  window.enhanceTextareas = enhanceAll;
-
-  document.addEventListener('input', e => { if(canGrow(e.target)) requestAnimationFrame(() => grow(e.target)); }, true);
-  document.addEventListener('focusin', e => { if(canGrow(e.target)) requestAnimationFrame(() => grow(e.target)); }, true);
-
-  const originalSetHTML = window.setHTML;
-  if(typeof originalSetHTML === 'function' && !originalSetHTML.__textareaOptimized){
-    const wrapped = function(id, html){
-      const result = originalSetHTML.apply(this, arguments);
-      const target = document.getElementById(id) || document;
-      scheduleEnhance(target);
-      return result;
-    };
-    wrapped.__textareaOptimized = true;
-    window.setHTML = wrapped;
-  }
-
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => scheduleEnhance(document));
-  else scheduleEnhance(document);
-})();
+/* === Larger textarea performance patch ===
+   Auto-grow was removed because it caused lag on large dynamic forms.
+   Textareas are now larger by default and can be manually resized by the user. */
 
 /* === Add Character Save Button Reliability Fix ===
    Keeps the Character Creator save flow working even when the optional image upload fails.

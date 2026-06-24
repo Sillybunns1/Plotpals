@@ -1182,16 +1182,19 @@ body.light .global-music-inner{background:rgba(255,255,255,.94);}
 /* === Larger writing text boxes usability patch === */
 textarea{
   min-height:220px;
-  line-height:1.55;
+  line-height:1.6;
   resize:vertical;
-  overflow-y:hidden;
+  overflow-y:auto;
+  box-sizing:border-box;
 }
 .form-grid textarea,
 .custom-section-builder textarea,
 .book-arc-row textarea,
 .field-stack textarea,
-.lookup-detail-body textarea{
-  min-height:240px;
+.lookup-detail-body textarea,
+.tracker-card textarea,
+.panel textarea{
+  min-height:300px;
 }
 textarea.large-textarea,
 #seriesSynopsisEdit,
@@ -1204,82 +1207,23 @@ textarea.large-textarea,
 #charArcText,
 .editArcText,
 #structureBeatNotes,
-#chapterGoal{
-  min-height:280px;
-}
-#rawData{
-  min-height:360px;
-  overflow-y:auto;
-}
-.inline-textarea-tools{display:flex;justify-content:flex-end;margin:-4px 0 8px;}
-.textarea-expand-btn{font-size:.8rem;padding:6px 9px;border-radius:10px;}
-.textarea-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;display:flex;align-items:center;justify-content:center;padding:22px;}
-.textarea-modal{width:min(980px,96vw);height:min(760px,88vh);background:var(--panel);border:1px solid var(--border);border-radius:22px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;}
-.textarea-modal textarea{flex:1;min-height:0;overflow-y:auto;font-size:1rem;line-height:1.65;}
-.textarea-modal-actions{display:flex;justify-content:flex-end;gap:10px;}
-
-/* === Stronger auto-growing textarea fix === */
-textarea:not(#rawData):not(.textarea-modal textarea){
-  min-height:260px !important;
-  height:auto;
-  resize:vertical;
-  overflow-y:hidden !important;
-  box-sizing:border-box;
-}
-.form-grid textarea:not(#rawData),
-.custom-section-builder textarea:not(#rawData),
-.book-arc-row textarea:not(#rawData),
-.field-stack textarea:not(#rawData),
-.lookup-detail-body textarea:not(#rawData){
-  min-height:300px !important;
-}
-#charArcText,
-.editArcText,
-textarea.large-textarea{
-  min-height:340px !important;
-}
-.inline-textarea-tools + textarea{
-  margin-top:0;
-}
-
-/* === Global form textarea auto-grow polish === */
-/* Applies to every form area: Characters, World Building, Plot, Series, Relationships, Music notes, etc. */
-textarea:not(#rawData):not(.textarea-modal textarea){
-  width:100%;
-  min-height:320px !important;
-  height:auto;
-  max-height:none !important;
-  resize:vertical;
-  overflow-y:hidden !important;
-  line-height:1.65;
-  box-sizing:border-box;
-  white-space:pre-wrap;
-}
-
-/* Smaller utility textareas may opt out by adding data-no-autogrow="true" or the compact-textarea class. */
-textarea.compact-textarea,
-textarea[data-no-autogrow="true"]{
-  min-height:95px !important;
-  overflow-y:auto !important;
-}
-
-/* Extra room for true long-form writing/reference fields. */
-.form-grid textarea:not(#rawData):not(.textarea-modal textarea),
-.field-stack textarea:not(#rawData):not(.textarea-modal textarea),
-.custom-section-builder textarea:not(#rawData):not(.textarea-modal textarea),
-.book-arc-row textarea:not(#rawData):not(.textarea-modal textarea),
-.tracker-card textarea:not(#rawData):not(.textarea-modal textarea),
-.panel textarea:not(#rawData):not(.textarea-modal textarea){
-  min-height:340px !important;
-}
-
-#charArcText,
-.editArcText,
-textarea.large-textarea,
+#chapterGoal,
 textarea[id*="Backstory"],
 textarea[id*="Description"],
 textarea[id*="History"],
 textarea[id*="Notes"],
 textarea[id*="Summary"]{
-  min-height:380px !important;
+  min-height:360px;
 }
+textarea.compact-textarea,
+textarea[data-no-autogrow="true"]{
+  min-height:95px;
+}
+#rawData{
+  min-height:360px;
+  overflow-y:auto;
+}
+.textarea-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;display:flex;align-items:center;justify-content:center;padding:22px;}
+.textarea-modal{width:min(980px,96vw);height:min(760px,88vh);background:var(--panel);border:1px solid var(--border);border-radius:22px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;}
+.textarea-modal textarea{flex:1;min-height:0;overflow-y:auto;font-size:1rem;line-height:1.65;}
+.textarea-modal-actions{display:flex;justify-content:flex-end;gap:10px;}
