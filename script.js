@@ -377,7 +377,7 @@ function activeBook(){return data.books.find(b=>b.id===data.activeBookId && notD
 function activeChapter(){const b=activeBook(); return (b?.manuscript||[]).find(c=>c.id===data.activeChapterId)||null}
 function activeScene(){const ch=activeChapter(); return (ch?.scenes||[]).find(s=>s.id===data.activeSceneId)||null}
 function isSeriesProject(){return (activeSeries()?.type||"series")==="series"}
-function ensureCollections(){["series","books","characters","relationships","timeline","chapterPlans","threads","scenes","world","locations","magicSystems","organizations","mysteries","foreshadowing","plotArcs","plotCards","structureBeats","seriesArcs","themeTracks","bookHandoffs","seriesMilestones"].forEach(k=>{if(!data[k])data[k]=[]}); if(!data.music)data.music={}; if(!data.worldCategories)data.worldCategories=[]; if(!data.trash)data.trash=[]; if(!data.backups)data.backups=[]; if(!data.searchFilter)data.searchFilter='all'; if(!data.characterRoleFilter)data.characterRoleFilter='all'; if(data.characterRoleFilter!=="all")data.characterRoleFilter=normalizeCharacterRole(data.characterRoleFilter); if(!data.theme)data.theme="dark"; if(!data.libraryView)data.libraryView="stories"; if(!data.currentView)data.currentView="projectDashboard"; if(!data.editorCollapsedChapters)data.editorCollapsedChapters={}; if(typeof data.manuscriptSidebarCollapsed!=="boolean")data.manuscriptSidebarCollapsed=false; if(!data.sprint)data.sprint={goalWords:500,minutes:25,running:false,startedAt:null,pausedRemaining:null,startWords:0}; migrateCharacterRoles(); }
+function ensureCollections(){["series","books","characters","relationships","timeline","chapterPlans","threads","scenes","world","locations","magicSystems","organizations","mysteries","foreshadowing","plotArcs","plotCards","structureBeats","seriesArcs","themeTracks","bookHandoffs","seriesMilestones"].forEach(k=>{if(!data[k])data[k]=[]}); if(!data.music)data.music={}; if(!data.worldCategories)data.worldCategories=[]; if(!data.trash)data.trash=[]; if(!data.backups)data.backups=[]; if(!data.searchFilter)data.searchFilter='all'; if(!data.characterRoleFilter)data.characterRoleFilter='all'; if(data.characterRoleFilter!=="all")data.characterRoleFilter=normalizeCharacterRole(data.characterRoleFilter); if(!data.theme)data.theme="dark"; if(!data.libraryView)data.libraryView="stories"; if(!data.currentView)data.currentView="projectDashboard"; if(!data.editorCollapsedChapters)data.editorCollapsedChapters={}; if(typeof data.manuscriptSidebarCollapsed!=="boolean")data.manuscriptSidebarCollapsed=false; if(!data.sprint)data.sprint={goalWords:500,minutes:25,running:false,startedAt:null,pausedRemaining:null,startWords:0}; migrateCharacterRoles(); (data.characters||[]).forEach(c=>{ if(!c.seriesId && c.bookId){ const b=(data.books||[]).find(book=>book.id===c.bookId); if(b) c.seriesId=b.seriesId; } }); (data.world||[]).forEach(w=>normalizeWorldEntryCategory(w,w.category||"Other")); }
 function ensureProject(){ensureCollections(); const b=activeBook(); if(b){if(!b.manuscript)b.manuscript=[]; if(!b.manuscript.length){const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],locationIds:[],plotCardId:"",created:new Date().toISOString()}; const ch={id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()}; b.manuscript.push(ch); data.activeChapterId=ch.id; data.activeSceneId=scene.id} b.manuscript.forEach(ch=>{if(!ch.scenes){ch.scenes=[{id:uid(),title:ch.title||"Scene 1",content:ch.content||"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],locationIds:[],plotCardId:"",created:ch.created||new Date().toISOString()}]; delete ch.content} (ch.scenes||[]).forEach(sc=>{if(!Array.isArray(sc.characterIds))sc.characterIds=[]; if(!Array.isArray(sc.organizationIds))sc.organizationIds=[]; if(!Array.isArray(sc.magicSystemIds))sc.magicSystemIds=[]; if(!Array.isArray(sc.itemArtifactIds))sc.itemArtifactIds=[]; if(!Array.isArray(sc.floraFaunaIds))sc.floraFaunaIds=[]; if(!Array.isArray(sc.locationIds))sc.locationIds=[]; if(sc.locationId && !sc.locationIds.includes(sc.locationId))sc.locationIds.unshift(sc.locationId); if(typeof sc.plotCardId!=="string")sc.plotCardId="";});}); if(!data.activeChapterId)data.activeChapterId=b.manuscript[0]?.id||null; if(!data.activeSceneId)data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null}}
 
 function switchAuthMode(mode){authMode=mode;document.getElementById("loginTab").classList.toggle("active",mode==="login");document.getElementById("signupTab").classList.toggle("active",mode==="signup");document.getElementById("authSubmitBtn").textContent=mode==="login"?"Login":"Create Account";setLoginMessage("")}
@@ -1304,7 +1304,7 @@ function renderNestedNav(){
   const timeline=(data.timeline||[]).filter(seriesScope);
   const rels=(data.relationships||[]).filter(seriesScope);
   const roles=CHARACTER_ROLES;
-  const charsByRole=role=>data.characters.filter(c=>seriesScope(c)&&normalizeCharacterRole(c.role)===role);
+  const charsByRole=role=>activeProjectCharacters().filter(c=>normalizeCharacterRole(c.role)===role);
   const seriesOnly=isSeriesProject();
 
   nav.innerHTML=`
@@ -1394,7 +1394,7 @@ function renderNestedNav(){
       </button>
       <div class="menu-content">
         <button class="story-nav nav-parent" onclick="setView('characters')">
-          <span>👥 All Characters</span><span class="nav-count">${data.characters.filter(seriesScope).length}</span>
+          <span>👥 All Characters</span><span class="nav-count">${activeProjectCharacters().length}</span>
         </button>
         ${roles.map(role=>`
           <button class="story-nav nav-child ${data.characterRoleFilter===role?"active":""}" onclick="setCharacterRoleFilter('${escapeAttr(role)}')">
@@ -1545,6 +1545,22 @@ function updateEditorStats(){const scene=activeScene(); const text=stripHTML(sce
 function scopedItem(scope){return scope==="series"?{scope,seriesId:data.activeSeriesId,bookId:null}:{scope,seriesId:data.activeSeriesId,bookId:data.activeBookId}}
 function visibleByScope(item){return notDeleted(item)&&item.seriesId===data.activeSeriesId&&(item.scope==="series"||item.bookId===data.activeBookId)}
 function seriesScope(item){return notDeleted(item)&&item.seriesId===data.activeSeriesId}
+function characterInActiveProject(c){
+  if(!notDeleted(c)) return false;
+  if(!data.activeSeriesId) return true;
+  if(c.seriesId===data.activeSeriesId) return true;
+  if(!c.seriesId && c.bookId){
+    const b=(data.books||[]).find(book=>book.id===c.bookId);
+    return !b || b.seriesId===data.activeSeriesId;
+  }
+  // Legacy characters created before series scoping should still appear in All Characters.
+  if(!c.seriesId && !c.bookId) return true;
+  return false;
+}
+function activeProjectCharacters(){
+  migrateCharacterRoles();
+  return (data.characters||[]).filter(characterInActiveProject);
+}
 function characterName(id){return data.characters.find(c=>c.id===id)?.name||"Unknown"}
 function locationName(id){return data.locations.find(l=>l.id===id)?.name||""}
 function characterRelationships(characterId){return data.relationships.filter(r=>seriesScope(r)&&(r.a===characterId||r.b===characterId))}
@@ -1777,6 +1793,9 @@ function worldCategoryFormConfig(category="Other"){
   const label=worldCategoryLabel(category);
   const key=canonicalWorldCategory(label);
   const configs={
+    "locations":{singular:"Location",intro:"Create places, regions, landmarks, kingdoms, cities, and important story settings.",name:"Location name",fields:[["population","Population","Population size, residents, or who lives here"],["culture","Culture","Culture, customs, mood, reputation, social rules"],["description","Description","What this place looks and feels like"],["history","History","Past events, origin, ownership, or changes over time"],["notes","Notes","Important canon details, scene uses, warnings, or reminders"],["plotRelevance","Plot Relevance","How this location matters to the story"]]},
+    "organizations":{singular:"Organization",intro:"Create guilds, factions, councils, kingdoms, companies, orders, clubs, and power groups.",name:"Organization name",fields:[["type","Type","Guild, kingdom, school, faction, council, company, order, etc."],["description","Description","Purpose, reputation, beliefs, role in the world"],["members","Members","Leaders, members, ranks, allies, enemies"],["history","History / Influence","How it began, major events, political power, influence"],["plotRelevance","Plot Relevance","How this organization affects the plot or characters"]]},
+    "magic-systems":{singular:"Magic System",intro:"Create power systems, supernatural rules, magical sources, limitations, costs, and known users.",name:"Magic system name",fields:[["source","Source","Where the power comes from and who can access it"],["rules","Rules","How it works, required conditions, structure, schools/types"],["limits","Limitations","What it cannot do, weaknesses, restrictions"],["costs","Costs","Physical, emotional, spiritual, social, or magical cost"],["examples","Examples / Users","Known users, spells, abilities, organizations, artifacts"],["plotRelevance","Plot Relevance","How this system matters to the story"]]},
     "religions":{singular:"Religion",intro:"Build faith systems, gods, rituals, holy places, and belief conflicts.",name:"Religion name",fields:[['basicInfo','Basic Information','Name, type of religion, founder, symbol, sacred text, leadership'],['description','Core Beliefs','What followers believe, moral rules, afterlife, creation myth'],['history','Deities / Sacred Figures','Gods, saints, prophets, spirits, divine beings, sacred figures'],['culture','Rituals / Practices','Worship, prayers, ceremonies, holidays, taboos, offerings'],['rules','Holy Sites / Followers','Temples, pilgrimage sites, major regions, who follows it'],['plotRelevance','Plot Relevance','How this religion affects characters, conflict, society, or story events']]},
     "races-species":{singular:"Race / Species",intro:"Create peoples, creatures, ancestries, biology, culture, strengths, and weaknesses.",name:"Race or species name",fields:[['basicInfo','Basic Information','Classification, origin, lifespan, homeland, rarity'],['description','Physical Appearance','Body traits, coloring, size, anatomy, distinctive features'],['history','Biology','Reproduction, aging, senses, needs, instincts, abilities'],['culture','Culture','Values, traditions, language, social norms, settlements'],['rules','Strengths / Weaknesses','Powers, limits, vulnerabilities, advantages, disadvantages'],['plotRelevance','Plot Relevance','How this race/species matters to the story']]},
     "governments":{singular:"Government",intro:"Track political systems, rulers, laws, territories, and power conflicts.",name:"Government name",fields:[['basicInfo','Basic Information','Name, type of rule, capital, current ruler, founding date'],['description','Structure','Branches, hierarchy, councils, noble houses, agencies'],['history','Leaders / Important Figures','Rulers, heirs, advisors, generals, political rivals'],['culture','Laws / Policies','Major laws, punishments, rights, restrictions, social expectations'],['rules','Territory / Allies / Enemies','Controlled lands, allies, enemies, rebellions, treaties'],['plotRelevance','Plot Relevance','How this government affects the story or characters']]},
@@ -1800,29 +1819,69 @@ function worldDetailBlocks(w){
 
 function worldCategoryItems(category){
   const key=canonicalWorldCategory(category);
-  return (data.world||[]).filter(w=>seriesScope(w)&&canonicalWorldCategory(w.category||"Other")===key);
+  const inScope=item=>{
+    if(!notDeleted(item))return false;
+    if(item.seriesId && item.seriesId!==data.activeSeriesId)return false;
+    if(item.scope==="series")return item.seriesId===data.activeSeriesId || !item.seriesId;
+    if(item.scope==="book")return item.bookId===data.activeBookId || !item.bookId;
+    return !item.seriesId || item.seriesId===data.activeSeriesId;
+  };
+  if(key==="locations"){
+    return (data.locations||[]).filter(inScope).map(item=>({...item,category:"Locations",__detailView:"locationDetail",__kind:"location"}));
+  }
+  if(key==="organizations"){
+    return (data.organizations||[]).filter(inScope).map(item=>({...item,category:"Organizations",__detailView:"organizationDetail",__kind:"organization"}));
+  }
+  if(key==="magic-systems"){
+    return (data.magicSystems||[]).filter(inScope).map(item=>({...item,category:"Magic Systems",__detailView:"magicDetail",__kind:"magic"}));
+  }
+  return (data.world||[])
+    .filter(w=>notDeleted(w))
+    .filter(w=>{
+      if(w.seriesId && w.seriesId!==data.activeSeriesId)return false;
+      if(w.scope==="series")return w.seriesId===data.activeSeriesId || !w.seriesId;
+      if(w.scope==="book")return w.bookId===data.activeBookId || !w.bookId;
+      return !w.seriesId || w.seriesId===data.activeSeriesId;
+    })
+    .filter(w=>canonicalWorldCategory(w.category||"Other")===key)
+    .map(w=>({...w,__detailView:"worldDetail",__kind:"world"}));
+}
+function normalizeWorldEntryCategory(entry, fallbackCategory){
+  const label=worldCategoryLabel(entry.category||entry.categoryKey||fallbackCategory||"Other");
+  entry.category=label;
+  entry.categoryKey=canonicalWorldCategory(label);
+  if(!entry.seriesId)entry.seriesId=data.activeSeriesId;
+  if(!entry.scope)entry.scope=entry.bookId?"book":"series";
+  return entry;
 }
 function showWorldCategory(category){
   const key=canonicalWorldCategory(category);
-  if(key==="locations")return setView('locations');
-  if(key==="organizations")return setView('organizations');
-  if(key==="magic-systems")return setView('magic');
   return setView('worldCategory', key);
 }
 function worldSidebarEntries(category){
-  const key=canonicalWorldCategory(category);
-  const entries=[];
-  if(key==="locations")entries.push(...(data.locations||[]).filter(seriesScope).map(item=>({id:item.id,name:item.name||"Location",view:"locationDetail",kind:"location"})));
-  if(key==="organizations")entries.push(...(data.organizations||[]).filter(seriesScope).map(item=>({id:item.id,name:item.name||"Organization",view:"organizationDetail",kind:"organization"})));
-  if(key==="magic-systems")entries.push(...(data.magicSystems||[]).filter(seriesScope).map(item=>({id:item.id,name:item.name||"Magic System",view:"magicDetail",kind:"magic"})));
-  entries.push(...worldCategoryItems(category).map(item=>({id:item.id,name:item.name||category,view:"worldDetail",kind:"world"})));
-  return entries;
+  return worldCategoryItems(category).map(item=>({
+    id:item.id,
+    name:item.name||category,
+    view:item.__detailView||"worldDetail",
+    kind:item.__kind||"world"
+  }));
 }
 function renderWorldBuildingSidebarCategories(){
   return worldCategories().map(cat=>{
     const entries=worldSidebarEntries(cat);
-    return `<button class="story-nav nav-parent" onclick="showWorldCategory('${escapeAttr(cat)}')"><span>${worldCategoryIcon(cat)} ${escapeHTML(cat)}</span><span class="nav-count">${entries.length}</span></button>${entries.map(entry=>`<button class="story-nav nav-grandchild" onclick="setView('${entry.view}','${entry.id}')">${escapeHTML(entry.name)}</button>`).join("")}`;
+    return `<button class="story-nav nav-parent" onclick="showWorldCategory('${escapeAttr(cat)}')"><span>${worldCategoryIcon(cat)} ${escapeHTML(cat)}</span><span class="nav-count">${entries.length}</span></button>${entries.map(entry=>`<button class="story-nav nav-grandchild" onclick="setView('${entry.view}','${entry.id}')" oncontextmenu="return sidebarEntryContextMenu(event,'${entry.kind}','${entry.id}','${escapeAttr(entry.name)}')" title="Right-click to delete">${escapeHTML(entry.name)}</button>`).join("")}`;
   }).join("");
+}
+
+function sidebarEntryContextMenu(event,kind,id,name){
+  event.preventDefault();
+  event.stopPropagation();
+  const label=name||"this entry";
+  if(!confirm(`Delete "${label}"?\n\nThis will move it to Trash.`))return false;
+  const map={world:'world',location:'locations',organization:'organizations',magic:'magicSystems'};
+  const collection=map[kind]||kind;
+  deleteItem(collection,id);
+  return false;
 }
 function worldTrackingKeyForCategory(category){
   const c=String(category||"").toLowerCase();
@@ -1836,15 +1895,51 @@ function addWorldCustomSectionDraft(){const title=val("worldCustomTitle").trim()
 function renderWorldCustomDraftList(){const el=document.getElementById("worldCustomDraftList"); if(!el)return; el.innerHTML=worldCustomSectionDrafts.map(sec=>`<div class="custom-section-chip"><strong>${escapeHTML(sec.title)}</strong><button type="button" onclick="removeWorldCustomSectionDraft('${sec.id}')">Remove</button></div>`).join("");}
 function removeWorldCustomSectionDraft(id){worldCustomSectionDrafts=worldCustomSectionDrafts.filter(s=>s.id!==id); renderWorldCustomDraftList();}
 function addWorldFromCurrentCategory(){
-  const key=data.selectedWorldCategory||"other";
+  const key=canonicalWorldCategory(data.selectedWorldCategory||"other");
   const label=worldCategoryLabel(key);
-  const categorySelect=document.getElementById("worldCategory");
-  const customCategory=document.getElementById("worldCustomCategory");
-  if(categorySelect)categorySelect.innerHTML=`<option>${escapeHTML(label)}</option>`;
-  if(categorySelect)categorySelect.value=label;
-  if(customCategory)customCategory.value=canonicalWorldCategory(label)==="other"?"Other":"";
-  addWorld();
+  const cfg=worldCategoryFormConfig(label);
+  const formId=`worldCategoryAddForm_${key}`;
+  const form=document.getElementById(formId)||document;
+  const scopedVal=id=>{
+    const el=form.querySelector(`#${CSS.escape(id)}`)||document.getElementById(id);
+    return (el?.value||"").trim();
+  };
+  const input=form.querySelector("#worldImage")||document.getElementById("worldImage");
+  const file=input?.files?.[0];
+  const finish=image=>{
+    const entryName=scopedVal("worldName");
+    const base={id:uid(),...scopedItem(scopedVal("worldScope")||"series"),name:entryName||`Untitled ${cfg.singular||"Entry"}`,image,customSections:[...worldCustomSectionDrafts],created:new Date().toISOString()};
+    (cfg.fields||[]).forEach(([field])=>{
+      const id="world"+field.charAt(0).toUpperCase()+field.slice(1);
+      base[field]=scopedVal(id);
+    });
+    let collection="world", detailView="worldDetail", selectedKey="selectedWorldId";
+    if(key==="locations"){collection="locations"; detailView="locationDetail"; selectedKey="selectedLocationId";}
+    else if(key==="organizations"){collection="organizations"; detailView="organizationDetail"; selectedKey="selectedOrganizationId";}
+    else if(key==="magic-systems"){collection="magicSystems"; detailView="magicDetail"; selectedKey="selectedMagicId";}
+    if(collection==="world"){
+      base.category=label;
+      normalizeWorldEntryCategory(base,label);
+      data.world.push(base);
+    }else{
+      data[collection]=data[collection]||[];
+      data[collection].push(base);
+    }
+    data[selectedKey]=base.id;
+    data.selectedWorldCategory=key;
+    ["worldName","worldCustomTitle","worldCustomText",...(cfg.fields||[]).map(([field])=>"world"+field.charAt(0).toUpperCase()+field.slice(1))].forEach(id=>{const el=form.querySelector(`#${CSS.escape(id)}`); if(el)el.value="";});
+    worldCustomSectionDrafts=[];
+    renderWorldCustomDraftList();
+    if(input)input.value="";
+    clearOverviewImagePreview("worldImagePreview");
+    hideAddForm(formId);
+    saveData(true);
+    setView('worldCategory', key);
+  };
+  if(!file)return finish("");
+  readImageUpload(input,finish);
 }
+
 
 function updateWorldImage(worldId,input){const w=data.world.find(x=>x.id===worldId); if(!w)return; readImageUpload(input,(src)=>{w.image=src; saveData(true)})}
 function triggerWorldImageUpload(worldId,event){clickHiddenFileInput(`worldImageUpload_${worldId}`,event)}
@@ -1890,7 +1985,7 @@ function renderWorldDetail(){
   const custom=Array.isArray(w.customSections)?w.customSections:[];
   el.innerHTML=`<div class="panel character-detail-grid"><div>${w.image?`<img class="character-photo" src="${w.image}" alt="${escapeHTML(w.name)}"><input id="worldImageUpload_${w.id}" type="file" accept="image/*" class="hidden" onchange="updateWorldImage('${w.id}',this)"><button type="button" class="wide" onclick="triggerWorldImageUpload('${w.id}',event)">Change Image</button>`:`<div class="character-photo panel photo-placeholder"><p>No Image</p><input id="worldImageUpload_${w.id}" type="file" accept="image/*" class="hidden" onchange="updateWorldImage('${w.id}',this)"><button type="button" class="wide" onclick="triggerWorldImageUpload('${w.id}',event)">+ Add Image</button></div>`}<button class="wide" onclick="startWorldDetailEdit()">Edit ${escapeHTML(cfg.singular||"Worldbuilding Entry")}</button><button class="wide" onclick="addCustomSectionToWorld('${w.id}')">+ Add Custom Section</button></div><div><h3>${escapeHTML(w.name||"Untitled Entry")}</h3><span class="tag">${escapeHTML(w.category||"Other")}</span><span class="tag">${escapeHTML(w.scope||"book")}</span>${worldDetailBlocks(w)}${custom.map(sec=>`<section class="character-section custom-character-section"><h4>${escapeHTML(sec.title||"Untitled Section")}</h4><p>${formatMultiline(sec.text||"")}</p><button class="delete-btn" onclick="deleteCustomSectionFromWorld('${w.id}','${sec.id}')">Delete Section</button></section>`).join("")}${renderSharedAppearanceLog("world",w.id)}</div></div>`;
 }
-function renderWorldByCategory(){renderWorldCategorySelect(); renderWorldCustomDraftList(); const el=document.getElementById("worldCategoryGroups"); if(!el)return; const cats=worldCategories(); el.innerHTML=cats.map(cat=>{const group=worldCategoryItems(cat); return `<div class="role-group" id="worldcat_${worldCategorySlug(cat)}"><h3>${worldCategoryIcon(cat)} ${escapeHTML(cat)}</h3><div class="card-grid">${group.length?group.map(w=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(w.name||"Untitled Entry")}</h3><button class="delete-btn" onclick="deleteItem('world','${w.id}')">Delete</button></div>${w.image?`<img class="character-photo" src="${w.image}" alt="${escapeHTML(w.name||"")}">`:""}<div class="card-body"><span class="tag">${escapeHTML(w.category||"Other")}</span>${detail("Description",w.description)}${detail("Plot Relevance",w.plotRelevance)}<button onclick="setView('worldDetail','${w.id}')">Open Entry</button></div></article>`).join(""):`<p class="muted">No ${escapeHTML(cat)} entries yet.</p>`}</div></div>`}).join("");}
+function renderWorldByCategory(){renderWorldCategorySelect(); renderWorldCustomDraftList(); const el=document.getElementById("worldCategoryGroups"); if(!el)return; const cats=worldCategories(); el.innerHTML=cats.map(cat=>{const group=worldCategoryItems(cat); return `<div class="role-group" id="worldcat_${worldCategorySlug(cat)}"><h3>${worldCategoryIcon(cat)} ${escapeHTML(cat)}</h3><div class="card-grid">${group.length?group.map(w=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(w.name||"Untitled Entry")}</h3><button class="delete-btn" onclick="deleteItem('world','${w.id}')">Delete</button></div>${w.image?`<img class="character-photo" src="${w.image}" alt="${escapeHTML(w.name||"")}">`:""}<div class="card-body"><span class="tag">${escapeHTML(w.category||"Other")}</span>${detail("Description",w.description)}${detail("Plot Relevance",w.plotRelevance)}<button onclick="setView('${w.__detailView||"worldDetail"}','${w.id}')">Open Entry</button></div></article>`).join(""):`<p class="muted">No ${escapeHTML(cat)} entries yet.</p>`}</div></div>`}).join("");}
 function worldCategorySortValue(key){return val(`worldCategorySort_${canonicalWorldCategory(key)}`)||"az"}
 function worldCategorySearchValue(key){return (val(`worldCategorySearch_${canonicalWorldCategory(key)}`)||"").trim().toLowerCase()}
 function sortWorldCategoryItems(category,items){
@@ -1902,6 +1997,19 @@ function sortWorldCategoryItems(category,items){
   if(sort==="oldest")return items.sort(byDate);
   return items.sort(byName);
 }
+function worldEntryCard(w,label,primaryField){
+  const summary=w.description||w.basicInfo||w.history||w.culture||w.rules||w.plotRelevance||"";
+  return `<article class="item-card compact-entry-card world-entry-card" onclick="setView('${w.__detailView||"worldDetail"}','${w.id}')">
+    ${w.image?`<img class="compact-card-photo" src="${w.image}" alt="${escapeHTML(w.name||"")}">`:`<div class="compact-card-photo photo-placeholder">No Image</div>`}
+    <div class="compact-card-body">
+      <h3>${escapeHTML(w.name||"Untitled Entry")}</h3>
+      <span class="tag">${escapeHTML(w.category||label||"Other")}</span>
+      ${summary?`<div class="basic-info-stack"><strong>${escapeHTML(primaryField||"Summary")}</strong><span>${escapeHTML(summary).slice(0,180)}${summary.length>180?"…":""}</span></div>`:""}
+      ${w.plotRelevance?`<div class="basic-info-stack"><strong>Plot Relevance</strong><span>${escapeHTML(w.plotRelevance).slice(0,120)}${w.plotRelevance.length>120?"…":""}</span></div>`:""}
+    </div>
+  </article>`;
+}
+
 function renderWorldCategoryPage(){
   const el=document.getElementById("worldCategoryContent"); if(!el)return;
   const key=data.selectedWorldCategory||"other";
@@ -1949,7 +2057,7 @@ function renderWorldCategoryPage(){
       </div>
       <button onclick="addWorldFromCurrentCategory()">Save ${escapeHTML(singular)}</button>
     </div>
-    <div class="card-grid">${items.length?items.map(w=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(w.name||"Untitled Entry")}</h3><button class="delete-btn" onclick="deleteItem('world','${w.id}')">Delete</button></div>${w.image?`<img class="character-photo" src="${w.image}" alt="${escapeHTML(w.name||"")}">`:`<div class="photo-placeholder small-placeholder">No Image</div>`}<div class="card-body"><span class="tag">${escapeHTML(w.category||label)}</span>${detail(primaryField,w.description||w.basicInfo||w.history||w.culture||w.rules)}${detail("Plot Relevance",w.plotRelevance)}<button onclick="setView('worldDetail','${w.id}')">Open Detail Page</button></div></article>`).join(""):search?`<p class="muted">No ${escapeHTML(label)} entries match your search.</p>`:`<p class="muted">No ${escapeHTML(label)} entries yet.</p>`}</div>`;
+    <div class="card-grid compact-world-grid">${items.length?items.map(w=>worldEntryCard(w,label,primaryField)).join(""):search?`<p class="muted">No ${escapeHTML(label)} entries match your search.</p>`:`<p class="muted">No ${escapeHTML(label)} entries yet.</p>`}</div>`;
   setVal(`worldCategorySort_${categoryKey}`, worldCategorySortValue(label));
   renderWorldCustomDraftList(); addBulletButtons(el);
 }
@@ -1966,7 +2074,7 @@ function updateRelationshipViewLabels(){
 }
 function addRelationship(){data.relationships.push({id:uid(),...scopedItem(val("relScope")),a:val("relA"),b:val("relB"),type:val("relType"),status:val("relStatus"),history:val("relHistory"),moments:val("relMoments"),arc:val("relArc"),aView:val("relAView"),bView:val("relBView"),created:new Date().toISOString()}); clearFields(["relType","relStatus","relHistory","relMoments","relArc","relAView","relBView"]); updateRelationshipViewLabels(); hideAddForm("relationshipAddForm"); saveData()}
 function addTimeline(){data.timeline.push({id:uid(),...scopedItem(val("timeScope")),when:val("timeWhen"),event:val("timeEvent"),impact:val("timeImpact"),created:new Date().toISOString()}); clearFields(["timeWhen","timeEvent","timeImpact"]); saveData()}
-function addWorld(){const customCategory=val("worldCustomCategory").trim(); const category=customCategory||val("worldCategory")||worldCategoryLabel(data.selectedWorldCategory||"Other"); if(customCategory){if(!data.worldCategories)data.worldCategories=[]; if(!data.worldCategories.includes(customCategory))data.worldCategories.push(customCategory)} const input=document.getElementById("worldImage"); const file=input?.files?.[0]; const finish=image=>{const item={id:uid(),...scopedItem(val("worldScope")||"series"),name:val("worldName"),category,image,basicInfo:val("worldBasicInfo"),description:val("worldDescription"),history:val("worldHistory"),culture:val("worldCulture"),rules:val("worldRules"),plotRelevance:val("worldPlotRelevance"),customSections:[...worldCustomSectionDrafts],created:new Date().toISOString()}; data.world.push(item); data.selectedWorldId=item.id; data.selectedWorldCategory=canonicalWorldCategory(category); clearFields(["worldName","worldCustomCategory","worldBasicInfo","worldDescription","worldHistory","worldCulture","worldRules","worldPlotRelevance","worldCustomTitle","worldCustomText"]); worldCustomSectionDrafts=[]; renderWorldCustomDraftList(); if(input)input.value=""; clearOverviewImagePreview("worldImagePreview"); hideAddForm(`worldCategoryAddForm_${canonicalWorldCategory(category)}`); hideAddForm("worldAddForm"); saveData(true); setView("worldDetail",item.id)}; if(!file)return finish(""); readImageUpload(input,finish)}
+function addWorld(){const customCategory=val("worldCustomCategory").trim(); const rawCategory=customCategory||val("worldCategory")||worldCategoryLabel(data.selectedWorldCategory||"Other"); const category=worldCategoryLabel(rawCategory); if(customCategory){if(!data.worldCategories)data.worldCategories=[]; if(!data.worldCategories.includes(customCategory))data.worldCategories.push(customCategory)} const input=document.getElementById("worldImage"); const file=input?.files?.[0]; const finish=image=>{const item=normalizeWorldEntryCategory({id:uid(),...scopedItem(val("worldScope")||"series"),name:val("worldName")||"Untitled Entry",category,image,basicInfo:val("worldBasicInfo"),description:val("worldDescription"),history:val("worldHistory"),culture:val("worldCulture"),rules:val("worldRules"),plotRelevance:val("worldPlotRelevance"),customSections:[...worldCustomSectionDrafts],created:new Date().toISOString()},category); data.world.push(item); data.selectedWorldId=item.id; data.selectedWorldCategory=canonicalWorldCategory(category); clearFields(["worldName","worldCustomCategory","worldBasicInfo","worldDescription","worldHistory","worldCulture","worldRules","worldPlotRelevance","worldCustomTitle","worldCustomText"]); worldCustomSectionDrafts=[]; renderWorldCustomDraftList(); if(input)input.value=""; clearOverviewImagePreview("worldImagePreview"); hideAddForm(`worldCategoryAddForm_${canonicalWorldCategory(category)}`); hideAddForm("worldAddForm"); saveData(true); setView("worldDetail",item.id)}; if(!file)return finish(""); readImageUpload(input,finish)}
 function addLocation(){const input=document.getElementById("locationImage"); const file=input?.files?.[0]; const finish=image=>{data.locations.push({id:uid(),...scopedItem(val("locationScope")),name:val("locationName"),population:val("locationPopulation"),culture:val("locationCulture"),image,description:val("locationDescription"),history:val("locationHistory"),notes:val("locationNotes"),created:new Date().toISOString()}); clearFields(["locationName","locationPopulation","locationCulture","locationDescription","locationHistory","locationNotes"]); if(input)input.value=""; clearOverviewImagePreview("locationImagePreview"); hideAddForm("locationAddForm"); saveData()}; if(!file)return finish(""); readImageUpload(input,finish)}
 function addMagic(){const input=document.getElementById("magicImage"); const file=input?.files?.[0]; const item={id:uid(),...scopedItem("series"),name:val("magicName"),source:val("magicSource"),rules:val("magicRules"),limits:val("magicLimits"),costs:val("magicCosts"),examples:val("magicExamples"),customSections:[],created:new Date().toISOString()}; const finish=()=>{data.magicSystems.push(item); data.selectedMagicId=item.id; clearFields(["magicName","magicSource","magicRules","magicLimits","magicCosts","magicExamples"]); if(input)input.value=""; clearOverviewImagePreview("magicImagePreview"); hideAddForm("magicAddForm"); saveData(true); setView("magicDetail",item.id)}; if(file){readImageUpload(input,(src)=>{item.image=src; finish()})}else finish()}
 function addOrganization(){const input=document.getElementById("orgImage"); const file=input?.files?.[0]; const item={id:uid(),...scopedItem("series"),name:val("orgName"),type:val("orgType"),description:val("orgDescription"),members:val("orgMembers"),history:val("orgHistory"),customSections:[],created:new Date().toISOString()}; const finish=()=>{data.organizations.push(item); data.selectedOrganizationId=item.id; clearFields(["orgName","orgType","orgDescription","orgMembers","orgHistory"]); if(input)input.value=""; clearOverviewImagePreview("orgImagePreview"); hideAddForm("organizationAddForm"); saveData(true); setView("organizationDetail",item.id)}; if(file){readImageUpload(input,(src)=>{item.image=src; finish()})}else finish()}
@@ -1985,7 +2093,7 @@ function entitySortValue(kind){return val(`${kind}Sort`)||"az"}
 function entitySearchValue(kind){return (val(`${kind}Search`)||"").trim().toLowerCase()}
 function updateEntityCategoryCount(kind,count){const el=document.getElementById(`${kind}CategoryCount`); if(el)el.textContent=`(${count})`}
 function sortEntityItems(kind,items){const sort=entitySortValue(kind); const byName=(a,b)=>(a.name||"").localeCompare(b.name||""); const byDate=(a,b)=>(a.created||"").localeCompare(b.created||""); if(sort==="za")return items.sort((a,b)=>byName(b,a)); if(sort==="newest")return items.sort((a,b)=>byDate(b,a)); if(sort==="oldest")return items.sort(byDate); return items.sort(byName)}
-function renderEntityList(kind){const cfg=getEntityConfig(kind), el=document.getElementById(cfg.listId); if(!el)return; const search=entitySearchValue(kind); let items=(data[cfg.collection]||[]).filter(seriesScope); const total=items.length; if(search){items=items.filter(item=>JSON.stringify(item).toLowerCase().includes(search));} sortEntityItems(kind,items); updateEntityCategoryCount(kind,total); el.innerHTML=items.length?items.map(item=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(item.name||cfg.label)}</h3></div><div class="card-body">${item.image?`<img class="location-photo" src="${item.image}">`:`<div class="photo-placeholder small-placeholder">No Image</div>`}${cfg.fields.slice(0,3).map(([key,label])=>detail(label,item[key])).join("")}</div><button type="button" onclick="setView('${cfg.detailView}','${item.id}')">Open Detail Page</button><button class="delete-btn" onclick="deleteItem('${cfg.collection}','${item.id}')">Delete</button></article>`).join(""):search?`<p class='muted'>No ${escapeHTML(cfg.label.toLowerCase())} entries match your search.</p>`:"<p class='muted'>No entries yet.</p>"}
+function renderEntityList(kind){const cfg=getEntityConfig(kind), el=document.getElementById(cfg.listId); if(!el)return; const search=entitySearchValue(kind); let items=(data[cfg.collection]||[]).filter(seriesScope); const total=items.length; if(search){items=items.filter(item=>JSON.stringify(item).toLowerCase().includes(search));} sortEntityItems(kind,items); updateEntityCategoryCount(kind,total); el.innerHTML=items.length?items.map(item=>{const primary=cfg.fields.find(([key])=>item[key])||cfg.fields[0]||[]; const summary=primary[0]?item[primary[0]]:""; return `<article class="item-card compact-entry-card world-entry-card" onclick="setView('${cfg.detailView}','${item.id}')">${item.image?`<img class="compact-card-photo" src="${item.image}" alt="${escapeHTML(item.name||cfg.label)}">`:`<div class="compact-card-photo photo-placeholder">No Image</div>`}<div class="compact-card-body"><h3>${escapeHTML(item.name||cfg.label)}</h3><span class="tag">${escapeHTML(cfg.label)}</span>${summary?`<div class="basic-info-stack"><strong>${escapeHTML(primary[1]||"Summary")}</strong><span>${escapeHTML(summary).slice(0,180)}${summary.length>180?"…":""}</span></div>`:""}</div></article>`}).join(""):search?`<p class='muted'>No ${escapeHTML(cfg.label.toLowerCase())} entries match your search.</p>`:"<p class='muted'>No entries yet.</p>"}
 function updateEntityImage(kind,id,input){const item=getEntity(kind,id); if(!item)return; readImageUpload(input,(src)=>{item.image=src; saveData(true)})}
 function triggerEntityImageUpload(kind,id,event){clickHiddenFileInput(`${kind}ImageUpload_${id}`,event)}
 function startEntityDetailEdit(kind){setEntityEditMode(kind,true); renderEntityDetail(kind)}
@@ -2415,9 +2523,10 @@ function renderCharactersByRole(){
   const roles=CHARACTER_ROLES;
   const activeFilter=data.characterRoleFilter||"all";
   const visibleRoles=activeFilter==="all"?roles:roles.filter(role=>role===normalizeCharacterRole(activeFilter));
+  const allChars=activeProjectCharacters();
   const filterBar=`<div class="character-filter-bar"><button type="button" class="tag ${activeFilter==="all"?"active-filter":""}" onclick="clearCharacterRoleFilter()">All Characters</button>${roles.map(role=>`<button type="button" class="tag ${activeFilter===role?"active-filter":""}" onclick="setCharacterRoleFilter('${escapeAttr(role)}')">${escapeHTML(role)}</button>`).join("")}</div>`;
   el.innerHTML=filterBar+visibleRoles.map(role=>{
-    const chars=data.characters.filter(c=>seriesScope(c)&&normalizeCharacterRole(c.role)===role);
+    const chars=allChars.filter(c=>normalizeCharacterRole(c.role)===role);
     return `<div class="role-group character-role-group"><div class="role-group-header"><h3>${role}</h3><span class="tag">${chars.length}</span></div><div class="character-directory-grid">${chars.length?chars.map(c=>`<article class="item-card character-mini-card character-directory-card clickable-card" onclick="setView('characterDetail','${c.id}')" title="Open ${escapeAttr(c.name||'Character')}"><div class="card-header compact-card-header"><h3>${escapeHTML(c.name||'Unnamed Character')}</h3><button class="delete-btn compact-delete-btn" onclick="event.stopPropagation(); deleteItem('characters','${c.id}')">Delete</button></div>${renderCharacterPhotoMini(c)}<div class="card-body character-mini-basic">${characterMiniBasicInfo(c)}</div></article>`).join(""):`<p class="muted">No ${role} characters yet.</p>`}</div></div>`
   }).join("")
 }
@@ -2472,7 +2581,7 @@ function renderStoryBible(){
   const srs=activeSeries(); if(!srs){el.innerHTML='<div class="panel"><p>No project selected.</p></div>'; return;}
   const books=(data.books||[]).filter(b=>b.seriesId===srs.id && notDeleted(b));
   const section=(title,items,fn)=>`<div class="panel story-bible-section"><h3>${escapeHTML(title)} <span class="muted">(${items.length})</span></h3>${items.length?items.map(fn).join(''):'<p class="muted">None yet.</p>'}</div>`;
-  el.innerHTML=`<div class="panel"><h2>${escapeHTML(srs.title||'Project')} Story Bible</h2><p>${escapeHTML(srs.synopsis||'')}</p><div class="grid stats-grid"><div class="stat-card"><span>${books.length}</span><p>Books</p></div><div class="stat-card"><span>${data.characters.filter(seriesScope).length}</span><p>Characters</p></div><div class="stat-card"><span>${data.world.filter(seriesScope).length+data.locations.filter(seriesScope).length+data.organizations.filter(seriesScope).length+data.magicSystems.filter(seriesScope).length}</span><p>World Items</p></div><div class="stat-card"><span>${data.relationships.filter(seriesScope).length}</span><p>Relationships</p></div></div></div>`+
+  el.innerHTML=`<div class="panel"><h2>${escapeHTML(srs.title||'Project')} Story Bible</h2><p>${escapeHTML(srs.synopsis||'')}</p><div class="grid stats-grid"><div class="stat-card"><span>${books.length}</span><p>Books</p></div><div class="stat-card"><span>${activeProjectCharacters().length}</span><p>Characters</p></div><div class="stat-card"><span>${data.world.filter(seriesScope).length+data.locations.filter(seriesScope).length+data.organizations.filter(seriesScope).length+data.magicSystems.filter(seriesScope).length}</span><p>World Items</p></div><div class="stat-card"><span>${data.relationships.filter(seriesScope).length}</span><p>Relationships</p></div></div></div>`+
   section('Books',books,b=>`<div class="bible-entry"><h4>${escapeHTML(b.title||'Untitled Book')}</h4><p>${escapeHTML(b.summary||'')}</p></div>`)+
   section('Characters',data.characters.filter(seriesScope),c=>`<div class="bible-entry"><h4>${escapeHTML(c.name||'Unnamed')}</h4><p><strong>${escapeHTML(normalizeCharacterRole(c.role))}</strong> ${escapeHTML(c.species||'')}</p><p>${escapeHTML(c.basicInfo||c.description||'')}</p>${renderSharedAppearanceLog('character',c.id)}</div>`)+
   section('Relationships',data.relationships.filter(seriesScope),r=>`<div class="bible-entry"><h4>${escapeHTML(characterName(r.a))} + ${escapeHTML(characterName(r.b))}</h4><p>${escapeHTML(r.type||'')}</p>${detail('Status',r.status)}${detail('Arc',r.arc)}</div>`)+
