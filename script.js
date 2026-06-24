@@ -1,3 +1,28 @@
+// PWA repair patch: guarantee showStatus exists globally even when older cached code calls it.
+(function(){
+  if (typeof globalThis.showStatus !== 'function') {
+    globalThis.showStatus = function(message, duration){
+      try {
+        const text = String(message || '').trim();
+        if (!text || typeof document === 'undefined') return;
+        let el = document.getElementById('plotpalsStatusToast');
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'plotpalsStatusToast';
+          el.className = 'status-toast';
+          el.setAttribute('role', 'status');
+          el.setAttribute('aria-live', 'polite');
+          document.body.appendChild(el);
+        }
+        el.textContent = text;
+        el.classList.add('show');
+        clearTimeout(globalThis.showStatus._timer);
+        globalThis.showStatus._timer = setTimeout(() => el.classList.remove('show'), duration || 2600);
+      } catch (err) { console.info(message); }
+    };
+  }
+})();
+
 const STORAGE_KEY = "plotpals"; // Legacy local project-data key, used only for one-time migration.
 const UI_STORAGE_KEY = "plotpals_ui_preferences";
 const CLOUD_TABLE = "writer_vaults";
@@ -26,6 +51,8 @@ function showStatus(message, duration=2600){
     console.info(message);
   }
 }
+
+window.showStatus = showStatus;
 
 const defaultData = {
   activeSeriesId: null, activeBookId: null, activeChapterId: null, activeSceneId: null, selectedCharacterId: null,

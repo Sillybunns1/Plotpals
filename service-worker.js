@@ -1,9 +1,10 @@
-const CACHE_NAME = 'plotpals-pwa-v2';
+const CACHE_NAME = 'plotpals-pwa-v4';
 const APP_SHELL = [
   './',
   './index.html',
   './styles.css',
   './script.js',
+  './pwa.js',
   './favicon.svg',
   './manifest.webmanifest',
   './icon-192.png',
@@ -35,7 +36,23 @@ self.addEventListener('fetch', event => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('./index.html'))
+      fetch(request).then(response => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put('./index.html', clone));
+        return response;
+      }).catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  const isFreshAsset = /\.(js|css|html|webmanifest)$/i.test(url.pathname);
+  if (isFreshAsset) {
+    event.respondWith(
+      fetch(request).then(response => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+        return response;
+      }).catch(() => caches.match(request))
     );
     return;
   }
@@ -45,6 +62,6 @@ self.addEventListener('fetch', event => {
       const responseClone = response.clone();
       caches.open(CACHE_NAME).then(cache => cache.put(request, responseClone));
       return response;
-    }).catch(() => cached))
+    }))
   );
 });

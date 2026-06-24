@@ -54,7 +54,7 @@
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./service-worker.js').catch(error => {
+      navigator.serviceWorker.register('./service-worker.js?v=4').catch(error => {
         console.warn('PlotPals service worker registration failed:', error);
       });
     });
