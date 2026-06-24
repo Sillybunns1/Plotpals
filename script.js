@@ -38,7 +38,9 @@ const CHARACTER_ROLE_ALIASES = {
   "historical character": "Historical Character",
   "minor": "Minor Character",
   "minor character": "Minor Character",
-  "side character": "Minor Character"
+  "side": "Major Supporting Character",
+  "side character": "Major Supporting Character",
+  "other": "Minor Character"
 };
 
 function normalizeCharacterRole(role){
@@ -47,6 +49,45 @@ function normalizeCharacterRole(role){
   const exact = CHARACTER_ROLES.find(r => r.toLowerCase() === raw.toLowerCase());
   if(exact) return exact;
   return CHARACTER_ROLE_ALIASES[raw.toLowerCase()] || "Minor Character";
+}
+
+function migrateCharacterRoles(){
+  let changed=false;
+  (data.characters||[]).forEach(c=>{
+    const normalized=normalizeCharacterRole(c.role);
+    if(c.role!==normalized){c.role=normalized; changed=true;}
+  });
+  if(data.characterRoleFilter && data.characterRoleFilter!=="all"){
+    const normalizedFilter=normalizeCharacterRole(data.characterRoleFilter);
+    if(!CHARACTER_ROLES.includes(data.characterRoleFilter)){
+      data.characterRoleFilter=normalizedFilter;
+      changed=true;
+    }
+  }
+  return changed;
+}
+
+function setCharacterRoleFilter(role){
+  data.characterRoleFilter=normalizeCharacterRole(role);
+  data.currentView="characters";
+  const el=document.getElementById("characters");
+  if(el){
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+    el.classList.add("active");
+    setText("viewTitle","Characters");
+  }
+  renderAll();
+}
+function clearCharacterRoleFilter(){
+  data.characterRoleFilter="all";
+  data.currentView="characters";
+  const el=document.getElementById("characters");
+  if(el){
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+    el.classList.add("active");
+    setText("viewTitle","Characters");
+  }
+  renderAll();
 }
 
 function characterRoleOptions(selected=""){
@@ -335,7 +376,7 @@ function activeBook(){return data.books.find(b=>b.id===data.activeBookId && notD
 function activeChapter(){const b=activeBook(); return (b?.manuscript||[]).find(c=>c.id===data.activeChapterId)||null}
 function activeScene(){const ch=activeChapter(); return (ch?.scenes||[]).find(s=>s.id===data.activeSceneId)||null}
 function isSeriesProject(){return (activeSeries()?.type||"series")==="series"}
-function ensureCollections(){["series","books","characters","relationships","timeline","chapterPlans","threads","scenes","world","locations","magicSystems","organizations","mysteries","foreshadowing","plotArcs","plotCards","structureBeats","seriesArcs","themeTracks","bookHandoffs","seriesMilestones"].forEach(k=>{if(!data[k])data[k]=[]}); if(!data.music)data.music={}; if(!data.worldCategories)data.worldCategories=[]; if(!data.trash)data.trash=[]; if(!data.backups)data.backups=[]; if(!data.searchFilter)data.searchFilter='all'; if(!data.characterRoleFilter)data.characterRoleFilter='all'; if(!data.theme)data.theme="dark"; if(!data.libraryView)data.libraryView="stories"; if(!data.currentView)data.currentView="projectDashboard"; if(!data.editorCollapsedChapters)data.editorCollapsedChapters={}; if(typeof data.manuscriptSidebarCollapsed!=="boolean")data.manuscriptSidebarCollapsed=false; if(!data.sprint)data.sprint={goalWords:500,minutes:25,running:false,startedAt:null,pausedRemaining:null,startWords:0}; }
+function ensureCollections(){["series","books","characters","relationships","timeline","chapterPlans","threads","scenes","world","locations","magicSystems","organizations","mysteries","foreshadowing","plotArcs","plotCards","structureBeats","seriesArcs","themeTracks","bookHandoffs","seriesMilestones"].forEach(k=>{if(!data[k])data[k]=[]}); if(!data.music)data.music={}; if(!data.worldCategories)data.worldCategories=[]; if(!data.trash)data.trash=[]; if(!data.backups)data.backups=[]; if(!data.searchFilter)data.searchFilter='all'; if(!data.characterRoleFilter)data.characterRoleFilter='all'; if(data.characterRoleFilter!=="all")data.characterRoleFilter=normalizeCharacterRole(data.characterRoleFilter); if(!data.theme)data.theme="dark"; if(!data.libraryView)data.libraryView="stories"; if(!data.currentView)data.currentView="projectDashboard"; if(!data.editorCollapsedChapters)data.editorCollapsedChapters={}; if(typeof data.manuscriptSidebarCollapsed!=="boolean")data.manuscriptSidebarCollapsed=false; if(!data.sprint)data.sprint={goalWords:500,minutes:25,running:false,startedAt:null,pausedRemaining:null,startWords:0}; migrateCharacterRoles(); }
 function ensureProject(){ensureCollections(); const b=activeBook(); if(b){if(!b.manuscript)b.manuscript=[]; if(!b.manuscript.length){const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],locationIds:[],plotCardId:"",created:new Date().toISOString()}; const ch={id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()}; b.manuscript.push(ch); data.activeChapterId=ch.id; data.activeSceneId=scene.id} b.manuscript.forEach(ch=>{if(!ch.scenes){ch.scenes=[{id:uid(),title:ch.title||"Scene 1",content:ch.content||"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],locationIds:[],plotCardId:"",created:ch.created||new Date().toISOString()}]; delete ch.content} (ch.scenes||[]).forEach(sc=>{if(!Array.isArray(sc.characterIds))sc.characterIds=[]; if(!Array.isArray(sc.organizationIds))sc.organizationIds=[]; if(!Array.isArray(sc.magicSystemIds))sc.magicSystemIds=[]; if(!Array.isArray(sc.itemArtifactIds))sc.itemArtifactIds=[]; if(!Array.isArray(sc.floraFaunaIds))sc.floraFaunaIds=[]; if(!Array.isArray(sc.locationIds))sc.locationIds=[]; if(sc.locationId && !sc.locationIds.includes(sc.locationId))sc.locationIds.unshift(sc.locationId); if(typeof sc.plotCardId!=="string")sc.plotCardId="";});}); if(!data.activeChapterId)data.activeChapterId=b.manuscript[0]?.id||null; if(!data.activeSceneId)data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null}}
 
 function switchAuthMode(mode){authMode=mode;document.getElementById("loginTab").classList.toggle("active",mode==="login");document.getElementById("signupTab").classList.toggle("active",mode==="signup");document.getElementById("authSubmitBtn").textContent=mode==="login"?"Login":"Create Account";setLoginMessage("")}
@@ -3295,4 +3336,46 @@ function seriesArcBookSelect(item){
 }
 function characterArcItemsFromCharacters(){
   return data.characters.filter(seriesScope).flatMap(c=>normalizeCharacterBookArcs(c).filter(a=>a.text).map((a,i)=>({id:`${c.id}_${a.id}`,arcId:a.id,title:`${c.name||'Unnamed Character'} — ${characterArcBookLabel(a,i)}`,characterId:c.id,bookId:a.bookId,bookLabel:characterArcBookLabel(a,i),text:a.text,isImpactArc:!!a.isImpactArc,source:'character'})));
+}
+
+/* === Final Character Arc Count Fix: count every arc entry, including real-book arcs ===
+   Example: Entry 1 = Book 1, Entry 2 = Book 2, Entry 3 = Book 3.
+   Placeholder labels now follow the row/entry number instead of only counting placeholders. */
+function normalizeArcPlaceholders(arcs=[]){
+  return (arcs||[]).map((arc,i)=>{
+    const a={...arc};
+    const entryNumber=i+1;
+    if(!a.bookId || isPlaceholderBookId(a.bookId)){
+      a.bookId=arcPlaceholderId(entryNumber);
+      a.bookLabel=`Book #${entryNumber}`;
+    }else{
+      a.bookLabel='';
+    }
+    return a;
+  });
+}
+function nextPlaceholderBookIdForArcs(arcs=[]){
+  return arcPlaceholderId((arcs||[]).filter(Boolean).length+1);
+}
+function characterArcBookLabel(arc, fallbackIndex=0){
+  const b=seriesBooks().find(x=>x.id===(arc||{}).bookId);
+  if(b)return b.title||'Untitled Book';
+  const fallbackNumber=fallbackIndex+1;
+  if(isPlaceholderBookId((arc||{}).bookId)){
+    const n=placeholderNumberFromId(arc.bookId);
+    return `Book #${n || fallbackNumber}`;
+  }
+  if((arc||{}).bookLabel)return arc.bookLabel;
+  return `Book #${fallbackNumber}`;
+}
+function renumberEditBookArcRows(){
+  const rows=[...document.querySelectorAll('#editBookArcsList .book-arc-row')];
+  rows.forEach((row,i)=>{
+    const sel=row.querySelector('.editArcBook'); if(!sel)return;
+    if(!sel.value || isPlaceholderBookId(sel.value)){
+      const next=arcPlaceholderId(i+1);
+      sel.innerHTML=seriesBookOptions(next,data.selectedCharacterId||'',row.dataset.arcId||'');
+      sel.value=next;
+    }
+  });
 }
