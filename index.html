@@ -605,7 +605,7 @@
             <select id="charScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
             <select id="charRole"><option>Protagonist</option><option>Major Supporting Character</option><option>Love Interest</option><option>Mentor</option><option>Antagonist</option><option>Historical Character</option><option>Minor Character</option></select>
             <input id="charSpecies" placeholder="Species / identity" />
-            <label class="file-label inline-file">Upload Character Photo <input id="charPhoto" type="file" accept="image/*" /></label>
+            <div class="upload-control"><button type="button" class="file-label inline-file" onclick="triggerOverviewImageUpload('charPhoto', event)">Upload Character Image</button><input id="charPhoto" type="file" accept="image/*" class="hidden" onchange="previewOverviewImage('charPhoto','charPhotoPreview')" /><div id="charPhotoPreview" class="upload-preview muted">No image selected.</div></div>
             <textarea id="charBasicInfo" placeholder="Basic Information"></textarea>
             <textarea id="charDescription" placeholder="Physical Appearance"></textarea>
             <textarea id="charPersonality" placeholder="Personality"></textarea>

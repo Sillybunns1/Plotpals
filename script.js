@@ -276,7 +276,8 @@ async function readImageUpload(input,onDone){
     if(input) input.value="";
     return;
   }catch(err){
-    alert("This image could not be uploaded. Please try a different file.");
+    console.error("Image upload failed:", err);
+    alert("This image could not be uploaded to Supabase Storage. Check the plotpals-media bucket and storage policies, then try again.");
   }
   if(input) input.value="";
 }
@@ -1909,7 +1910,7 @@ function renderWorldCategoryPage(){
   renderWorldCustomDraftList(); addBulletButtons(el);
 }
 
-function addCharacter(){const input=document.getElementById("charPhoto"); const file=input?.files?.[0]; const finish=photo=>{data.characters.push({id:uid(),...scopedItem(val("charScope")),name:val("charName"),role:normalizeCharacterRole(val("charRole")),species:val("charSpecies"),photo,basicInfo:val("charBasicInfo"),description:val("charDescription"),personality:val("charPersonality"),backstory:val("charBackstory"),wound:val("charWound"),arc:val("charArc"),voice:val("charVoice"),secrets:val("charSecrets"),quotes:val("charQuotes"),customSections:[...characterCustomSectionDrafts],created:new Date().toISOString()}); clearFields(["charName","charSpecies","charBasicInfo","charDescription","charPersonality","charBackstory","charWound","charArc","charVoice","charSecrets","charQuotes","charCustomTitle","charCustomText"]); characterCustomSectionDrafts=[]; renderCharacterCustomDraftList(); if(input)input.value=""; clearOverviewImagePreview("worldImagePreview"); hideAddForm("characterAddForm"); saveData()}; if(!file)return finish(""); readImageUpload(input,finish)}
+function addCharacter(){const input=document.getElementById("charPhoto"); const file=input?.files?.[0]; const finish=photo=>{data.characters.push({id:uid(),...scopedItem(val("charScope")),name:val("charName"),role:normalizeCharacterRole(val("charRole")),species:val("charSpecies"),photo,basicInfo:val("charBasicInfo"),description:val("charDescription"),personality:val("charPersonality"),backstory:val("charBackstory"),wound:val("charWound"),arc:val("charArc"),voice:val("charVoice"),secrets:val("charSecrets"),quotes:val("charQuotes"),customSections:[...characterCustomSectionDrafts],created:new Date().toISOString()}); clearFields(["charName","charSpecies","charBasicInfo","charDescription","charPersonality","charBackstory","charWound","charArc","charVoice","charSecrets","charQuotes","charCustomTitle","charCustomText"]); characterCustomSectionDrafts=[]; renderCharacterCustomDraftList(); if(input)input.value=""; clearOverviewImagePreview("charPhotoPreview"); hideAddForm("characterAddForm"); saveData()}; if(!file)return finish(""); readImageUpload(input,finish)}
 function relationshipViewLabel(characterId,fallback){const name=characterName(characterId); return name&&name!=="Unknown"?`${name}'s View`:fallback;}
 function updateRelationshipViewLabels(){
   const a=val("relA"), b=val("relB");
@@ -2688,7 +2689,7 @@ function renderSelects(){
 }
 function addCharacter(){
   const input=document.getElementById("charPhoto"); const file=input?.files?.[0];
-  const finish=photo=>{data.characters.push({id:uid(),...scopedItem(val("charScope")),name:val("charName"),role:normalizeCharacterRole(val("charRole")),species:val("charSpecies"),photo,basicInfo:val("charBasicInfo"),description:val("charDescription"),personality:val("charPersonality"),backstory:val("charBackstory"),wound:val("charWound"),bookArcs:collectCharacterArcDrafts(),voice:val("charVoice"),secrets:val("charSecrets"),quotes:val("charQuotes"),customSections:[...characterCustomSectionDrafts],created:new Date().toISOString()}); clearFields(["charName","charSpecies","charBasicInfo","charDescription","charPersonality","charBackstory","charWound","charArcText","charVoice","charSecrets","charQuotes","charCustomTitle","charCustomText"]); characterCustomSectionDrafts=[]; characterArcDrafts=[]; renderCharacterCustomDraftList(); renderCharacterArcDraftList(); if(input)input.value=""; clearOverviewImagePreview("worldImagePreview"); hideAddForm("characterAddForm"); saveData()};
+  const finish=photo=>{data.characters.push({id:uid(),...scopedItem(val("charScope")),name:val("charName"),role:normalizeCharacterRole(val("charRole")),species:val("charSpecies"),photo,basicInfo:val("charBasicInfo"),description:val("charDescription"),personality:val("charPersonality"),backstory:val("charBackstory"),wound:val("charWound"),bookArcs:collectCharacterArcDrafts(),voice:val("charVoice"),secrets:val("charSecrets"),quotes:val("charQuotes"),customSections:[...characterCustomSectionDrafts],created:new Date().toISOString()}); clearFields(["charName","charSpecies","charBasicInfo","charDescription","charPersonality","charBackstory","charWound","charArcText","charVoice","charSecrets","charQuotes","charCustomTitle","charCustomText"]); characterCustomSectionDrafts=[]; characterArcDrafts=[]; renderCharacterCustomDraftList(); renderCharacterArcDraftList(); if(input)input.value=""; clearOverviewImagePreview("charPhotoPreview"); hideAddForm("characterAddForm"); saveData()};
   if(!file)return finish(""); readImageUpload(input,finish)
 }
 function renderCharacterEditForm(c){
@@ -3581,4 +3582,75 @@ function updateCharacterArcBook(characterId, arcId, bookId){
       return result;
     };
   }
+})();
+
+/* === Global all-form textarea auto-grow patch === */
+(function(){
+  function canGrow(el){
+    return el && el.tagName === 'TEXTAREA' && el.id !== 'rawData' && !el.closest('.textarea-modal') && el.dataset.noAutogrow !== 'true' && !el.classList.contains('compact-textarea');
+  }
+  function grow(el){
+    if(!canGrow(el)) return;
+    const min = parseInt(getComputedStyle(el).minHeight, 10) || 320;
+    el.style.overflowY = 'hidden';
+    el.style.height = 'auto';
+    const nextHeight = Math.max(min, el.scrollHeight + 14);
+    el.style.height = nextHeight + 'px';
+  }
+  function growAll(root=document){
+    const base = root && root.querySelectorAll ? root : document;
+    base.querySelectorAll('textarea').forEach(grow);
+  }
+  window.growAllPlotPalsTextareas = growAll;
+  window.growPlotPalsTextarea = grow;
+
+  ['input','change','keyup','paste','cut'].forEach(evt => {
+    document.addEventListener(evt, function(e){
+      if(canGrow(e.target)) requestAnimationFrame(() => grow(e.target));
+    }, true);
+  });
+
+  document.addEventListener('focusin', function(e){
+    if(canGrow(e.target)) requestAnimationFrame(() => grow(e.target));
+  }, true);
+
+  function runSoon(root=document){
+    requestAnimationFrame(() => growAll(root));
+    setTimeout(() => growAll(root), 80);
+    setTimeout(() => growAll(root), 300);
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => runSoon(document));
+  else runSoon(document);
+
+  const observer = new MutationObserver(mutations => {
+    const targets = new Set();
+    mutations.forEach(m => {
+      if(m.type === 'childList'){
+        m.addedNodes.forEach(n => {
+          if(n.nodeType === 1) targets.add(n);
+        });
+      }
+      if(m.type === 'attributes' && m.target?.tagName === 'TEXTAREA') targets.add(m.target);
+    });
+    if(targets.size){
+      targets.forEach(t => runSoon(t));
+    }
+  });
+  const start = () => observer.observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['class','style','value']});
+  if(document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+
+  // Re-grow after common render/navigation calls without needing to edit each individual form renderer.
+  ['setView','renderAll','renderCharacterDetail','renderWorldCategory','renderWorldDetail','renderPlotBoard','renderPlotThreads','renderSeriesTools','renderRelationships','renderManuscript'].forEach(name => {
+    const original = window[name];
+    if(typeof original === 'function' && !original.__autogrowWrapped){
+      const wrapped = function(){
+        const result = original.apply(this, arguments);
+        runSoon(document);
+        return result;
+      };
+      wrapped.__autogrowWrapped = true;
+      window[name] = wrapped;
+    }
+  });
 })();

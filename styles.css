@@ -1241,3 +1241,45 @@ textarea.large-textarea{
 .inline-textarea-tools + textarea{
   margin-top:0;
 }
+
+/* === Global form textarea auto-grow polish === */
+/* Applies to every form area: Characters, World Building, Plot, Series, Relationships, Music notes, etc. */
+textarea:not(#rawData):not(.textarea-modal textarea){
+  width:100%;
+  min-height:320px !important;
+  height:auto;
+  max-height:none !important;
+  resize:vertical;
+  overflow-y:hidden !important;
+  line-height:1.65;
+  box-sizing:border-box;
+  white-space:pre-wrap;
+}
+
+/* Smaller utility textareas may opt out by adding data-no-autogrow="true" or the compact-textarea class. */
+textarea.compact-textarea,
+textarea[data-no-autogrow="true"]{
+  min-height:95px !important;
+  overflow-y:auto !important;
+}
+
+/* Extra room for true long-form writing/reference fields. */
+.form-grid textarea:not(#rawData):not(.textarea-modal textarea),
+.field-stack textarea:not(#rawData):not(.textarea-modal textarea),
+.custom-section-builder textarea:not(#rawData):not(.textarea-modal textarea),
+.book-arc-row textarea:not(#rawData):not(.textarea-modal textarea),
+.tracker-card textarea:not(#rawData):not(.textarea-modal textarea),
+.panel textarea:not(#rawData):not(.textarea-modal textarea){
+  min-height:340px !important;
+}
+
+#charArcText,
+.editArcText,
+textarea.large-textarea,
+textarea[id*="Backstory"],
+textarea[id*="Description"],
+textarea[id*="History"],
+textarea[id*="Notes"],
+textarea[id*="Summary"]{
+  min-height:380px !important;
+}
