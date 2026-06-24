@@ -3654,3 +3654,86 @@ function updateCharacterArcBook(characterId, arcId, bookId){
     }
   });
 })();
+
+
+/* === Add Character Save Button Reliability Fix ===
+   Keeps the Character Creator save flow working even when the optional image upload fails.
+   This final definition intentionally overrides earlier patch definitions. */
+async function readOptionalCharacterCreatorPhoto(){
+  const input=document.getElementById("charPhoto");
+  const file=input?.files?.[0];
+  if(!file) return "";
+  if(!file.type || !file.type.startsWith("image/")){
+    alert("Please choose an image file for the character photo.");
+    if(input) input.value="";
+    clearOverviewImagePreview("charPhotoPreview");
+    return "";
+  }
+  try{
+    const uploadFile=await compressImageFile(file);
+    if(!supabaseMediaReady()){
+      alert("Character saved without a photo because Supabase Storage is not ready. Log in and check the plotpals-media bucket/policies to upload images.");
+      return "";
+    }
+    const uploaded=await uploadMediaToSupabase(uploadFile,"images");
+    return uploaded?.url || "";
+  }catch(err){
+    console.error("Character image upload failed:",err);
+    alert("Character saved without a photo because the image could not upload to Supabase Storage.");
+    return "";
+  }finally{
+    if(input) input.value="";
+  }
+}
+
+async function addCharacter(){
+  const name=val("charName");
+  if(!name){
+    alert("Please enter a character name before saving.");
+    document.getElementById("charName")?.focus();
+    return;
+  }
+  const saveBtn=[...document.querySelectorAll('button')].find(btn=>btn.getAttribute('onclick')==='addCharacter()' && btn.closest('#characterAddForm'));
+  const oldText=saveBtn?.textContent;
+  if(saveBtn){saveBtn.disabled=true; saveBtn.textContent="Saving Character...";}
+  try{
+    const photo=await readOptionalCharacterCreatorPhoto();
+    const bookArcs=typeof collectCharacterArcDrafts==="function" ? collectCharacterArcDrafts() : [];
+    const character={
+      id:uid(),
+      ...scopedItem(val("charScope")),
+      name,
+      role:normalizeCharacterRole(val("charRole")),
+      species:val("charSpecies"),
+      photo,
+      basicInfo:val("charBasicInfo"),
+      description:val("charDescription"),
+      personality:val("charPersonality"),
+      backstory:val("charBackstory"),
+      wound:val("charWound"),
+      bookArcs,
+      arc:"",
+      voice:val("charVoice"),
+      secrets:val("charSecrets"),
+      quotes:val("charQuotes"),
+      customSections:[...characterCustomSectionDrafts],
+      created:new Date().toISOString()
+    };
+    data.characters.push(character);
+    clearFields(["charName","charSpecies","charBasicInfo","charDescription","charPersonality","charBackstory","charWound","charArcText","charVoice","charSecrets","charQuotes","charCustomTitle","charCustomText"]);
+    characterCustomSectionDrafts=[];
+    if(typeof characterArcDrafts!=="undefined") characterArcDrafts=[];
+    renderCharacterCustomDraftList?.();
+    renderCharacterArcDraftList?.();
+    clearOverviewImagePreview("charPhotoPreview");
+    hideAddForm("characterAddForm");
+    data.selectedCharacterId=character.id;
+    saveData(true,true);
+    setView("characterDetail",character.id);
+  }catch(err){
+    console.error("Add Character failed:",err);
+    alert("The character could not be saved. Check the browser console for details.");
+  }finally{
+    if(saveBtn){saveBtn.disabled=false; saveBtn.textContent=oldText||"Add Character";}
+  }
+}
