@@ -2568,3 +2568,442 @@ function renderSeriesArcs(){
   const manualHtml=manual.map(a=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(a.title||'Untitled Arc')}</h3><button class="delete-btn" onclick="deleteItem('seriesArcs','${a.id}')">Delete</button></div><div class="card-body"><span class="tag">${escapeHTML(a.characterId?characterName(a.characterId):'Series Arc')}</span>${detail('Book 1',a.book1)}${detail('Book 2',a.book2)}${detail('Book 3',a.book3)}${detail('Notes',a.notes)}</div></article>`).join('');
   el.innerHTML=(autoHtml||manualHtml)?`<div class="panel"><h3>Synced Character Arcs</h3>${autoHtml||'<p class="muted">No character-page arcs yet.</p>'}</div><div class="panel"><h3>Manual Series Arcs</h3>${manualHtml||'<p class="muted">No manual series arcs yet.</p>'}</div>`:'<p class="muted">No series arcs yet.</p>';
 }
+
+/* === Book Placeholder Character Arc + Grouped Series Arc Tracker Patch === */
+function arcPlaceholderId(n){return `__book_${Math.max(1,Number(n)||1)}`;}
+function isPlaceholderBookId(bookId){return typeof bookId==='string' && bookId.startsWith('__book_');}
+function placeholderNumberFromId(bookId){const m=String(bookId||'').match(/__book_(\d+)/); return m?Number(m[1]):1;}
+function characterArcBookLabel(arc, fallbackIndex=0){
+  const b=seriesBooks().find(x=>x.id===(arc||{}).bookId);
+  if(b)return b.title||'Untitled Book';
+  if(isPlaceholderBookId((arc||{}).bookId))return `Book #${placeholderNumberFromId(arc.bookId)}`;
+  if((arc||{}).bookLabel)return arc.bookLabel;
+  return `Book #${fallbackIndex+1}`;
+}
+function nextPlaceholderBookIdForArcs(arcs=[]){
+  const nums=(arcs||[]).map(a=>isPlaceholderBookId(a.bookId)?placeholderNumberFromId(a.bookId):0).filter(Boolean);
+  const next=Math.max((arcs||[]).length+1, nums.length?Math.max(...nums)+1:1);
+  return arcPlaceholderId(next);
+}
+function realBookIdsUsedByArcs(arcs=[], ignoreArcId=''){
+  return new Set((arcs||[]).filter(a=>a.id!==ignoreArcId && a.bookId && !isPlaceholderBookId(a.bookId)).map(a=>a.bookId));
+}
+function seriesBookOptions(selected='', characterId='', arcId='', draftMode=false){
+  const books=seriesBooks();
+  let used=new Set();
+  if(characterId){
+    const c=data.characters.find(x=>x.id===characterId);
+    used=realBookIdsUsedByArcs(normalizeCharacterBookArcs(c||{}), arcId);
+  }else if(draftMode){
+    used=realBookIdsUsedByArcs(characterArcDrafts||[], arcId);
+  }
+  const available=books.filter(b=>b.id===selected || !used.has(b.id));
+  const placeholderSelected=isPlaceholderBookId(selected);
+  const placeholder=placeholderSelected?selected:arcPlaceholderId((draftMode?(characterArcDrafts||[]).length:0)+1);
+  const options=available.map(b=>`<option value="${b.id}" ${b.id===selected?'selected':''}>${escapeHTML(b.title||'Untitled Book')}</option>`).join('');
+  if(options && !placeholderSelected) return `<option value="">Select book</option>${options}<option value="${placeholder}">Book #${placeholderNumberFromId(placeholder)}</option>`;
+  return `${options}<option value="${placeholder}" ${placeholderSelected||!selected?'selected':''}>Book #${placeholderNumberFromId(placeholder)}</option>`;
+}
+function renderCharacterArcDraftList(){
+  const el=document.getElementById('charArcDraftList'); if(!el)return;
+  el.innerHTML=characterArcDrafts.length?characterArcDrafts.map((a,i)=>`<div class="custom-section-chip"><strong>${escapeHTML(characterArcBookLabel(a,i))}</strong><button type="button" onclick="removeCharacterArcDraft('${a.id}')">Remove</button></div>`).join(''):`<p class="muted">No book arcs added yet.</p>`;
+}
+function populateCharacterArcCreator(){
+  const sel=document.getElementById('charArcBook');
+  if(sel){
+    const selected=sel.value||data.activeBookId||'';
+    sel.innerHTML=seriesBookOptions(selected,'','',true);
+  }
+  renderCharacterArcDraftList();
+}
+function addCharacterArcDraft(){
+  let bookId=val('charArcBook')||data.activeBookId;
+  const text=val('charArcText').trim();
+  if(!bookId) bookId=nextPlaceholderBookIdForArcs(characterArcDrafts);
+  if(!text && !bookId)return;
+  characterArcDrafts.push({id:uid(),bookId,bookLabel:isPlaceholderBookId(bookId)?`Book #${placeholderNumberFromId(bookId)}`:'',text});
+  clearFields(['charArcText']);
+  populateCharacterArcCreator();
+}
+function collectCharacterArcDrafts(){
+  const arcs=[...characterArcDrafts];
+  let bookId=val('charArcBook')||data.activeBookId;
+  const text=val('charArcText').trim();
+  if(text){
+    if(!bookId) bookId=nextPlaceholderBookIdForArcs(arcs);
+    arcs.push({id:uid(),bookId,bookLabel:isPlaceholderBookId(bookId)?`Book #${placeholderNumberFromId(bookId)}`:'',text});
+  }
+  return arcs.filter(a=>a.bookId||a.text).map((a,i)=>({...a,id:a.id||uid(),bookId:a.bookId||arcPlaceholderId(i+1),bookLabel:a.bookLabel||(isPlaceholderBookId(a.bookId)?`Book #${placeholderNumberFromId(a.bookId)}`:'')}));
+}
+function normalizeCharacterBookArcs(c){
+  if(!c)return [];
+  if(!Array.isArray(c.bookArcs)){
+    c.bookArcs=[];
+    if((c.arc||'').trim()) c.bookArcs.push({id:uid(),bookId:c.bookId||data.activeBookId||arcPlaceholderId(1),text:c.arc});
+  }
+  c.bookArcs=c.bookArcs.map((a,i)=>({id:a.id||uid(),bookId:a.bookId||arcPlaceholderId(i+1),bookLabel:a.bookLabel||(isPlaceholderBookId(a.bookId)?`Book #${placeholderNumberFromId(a.bookId)}`:''),text:a.text||''}));
+  return c.bookArcs;
+}
+function renderCharacterBookArcs(c){
+  const arcs=normalizeCharacterBookArcs(c).filter(a=>a.text);
+  if(!arcs.length)return '';
+  return `<section class="character-section"><h4>Character Arc by Book</h4><div class="arc-stage-list">${arcs.map((a,i)=>`<div class="arc-stage-card"><h4>${escapeHTML(characterArcBookLabel(a,i))}</h4><p>${formatMultiline(a.text||'')}</p></div>`).join('')}</div></section>`;
+}
+function addEditBookArcRow(bookId='',text=''){
+  const wrap=document.getElementById('editBookArcsList'); if(!wrap)return;
+  const characterId=data.selectedCharacterId||'';
+  const existing=collectEditBookArcs();
+  if(!bookId){
+    const used=realBookIdsUsedByArcs(existing);
+    const avail=seriesBooks().find(b=>!used.has(b.id));
+    bookId=avail?.id || nextPlaceholderBookIdForArcs(existing);
+  }
+  const id=uid();
+  const div=document.createElement('div');
+  div.className='book-arc-row';
+  div.dataset.arcRow='true';
+  div.dataset.arcId=id;
+  div.innerHTML=`<select class="editArcBook">${seriesBookOptions(bookId,characterId,id)}</select><textarea class="editArcText" placeholder="Character arc for this book">${escapeHTML(text||'')}</textarea><div class="arc-row-actions"><button type="button" class="delete-btn" onclick="this.closest('.book-arc-row').remove()">Remove Arc</button></div>`;
+  wrap.appendChild(div);
+}
+function renderEditBookArcs(c){
+  const arcs=normalizeCharacterBookArcs(c);
+  return `<div class="full-span custom-section-builder"><h4>Book Specific Character Arcs</h4><div id="editBookArcsList">${arcs.map((a,i)=>`<div class="book-arc-row" data-arc-row="true" data-arc-id="${a.id}"><select class="editArcBook">${seriesBookOptions(a.bookId||arcPlaceholderId(i+1),c.id,a.id)}</select><textarea class="editArcText" placeholder="Character arc for this book">${escapeHTML(a.text||'')}</textarea><div class="arc-row-actions"><button type="button" class="delete-btn" onclick="this.closest('.book-arc-row').remove()">Remove Arc</button></div></div>`).join('')}</div><button type="button" onclick="addEditBookArcRow()">+ Add Another Character Arc</button></div>`;
+}
+function collectEditBookArcs(){
+  return [...document.querySelectorAll('#editBookArcsList .book-arc-row')].map((row,i)=>{
+    let bookId=row.querySelector('.editArcBook')?.value||'';
+    if(!bookId) bookId=arcPlaceholderId(i+1);
+    return {id:row.dataset.arcId||uid(),bookId,bookLabel:isPlaceholderBookId(bookId)?`Book #${placeholderNumberFromId(bookId)}`:'',text:row.querySelector('.editArcText')?.value||''};
+  }).filter(a=>a.bookId||a.text);
+}
+function characterArcItemsFromCharacters(){
+  return data.characters.filter(seriesScope).flatMap(c=>normalizeCharacterBookArcs(c).filter(a=>a.text).map((a,i)=>({id:`${c.id}_${a.id}`,arcId:a.id,title:`${c.name||'Unnamed Character'} — ${characterArcBookLabel(a,i)}`,characterId:c.id,bookId:a.bookId,bookLabel:characterArcBookLabel(a,i),text:a.text,source:'character'})));
+}
+function updateCharacterArcBook(characterId, arcId, bookId){
+  const c=data.characters.find(x=>x.id===characterId); if(!c)return;
+  const arcs=normalizeCharacterBookArcs(c); const arc=arcs.find(a=>a.id===arcId); if(!arc)return;
+  arc.bookId=bookId || arc.bookId;
+  arc.bookLabel=isPlaceholderBookId(arc.bookId)?`Book #${placeholderNumberFromId(arc.bookId)}`:'';
+  saveData(true); renderSeriesArcs(); renderCharacterDetail(); renderSeriesTools();
+}
+function seriesArcBookSelect(item){
+  const books=seriesBooks();
+  const opts=books.map(b=>`<option value="${b.id}" ${b.id===item.bookId?'selected':''}>${escapeHTML(b.title||'Untitled Book')}</option>`).join('');
+  const placeholder=isPlaceholderBookId(item.bookId)?`<option value="${item.bookId}" selected>${escapeHTML(item.bookLabel||characterArcBookLabel(item))}</option>`:'';
+  return `<select class="mini-select" onchange="updateCharacterArcBook('${item.characterId}','${item.arcId}',this.value)">${placeholder}<option value="">Tie to book...</option>${opts}</select>`;
+}
+function renderSeriesArcs(){
+  const el=document.getElementById('seriesArcList'); if(!el)return;
+  setHTML('seriesArcCharacter',`<option value="">No specific character</option>`+data.characters.filter(seriesScope).map(c=>`<option value="${c.id}">${escapeHTML(c.name||'Unnamed')}</option>`).join(''));
+  const auto=characterArcItemsFromCharacters();
+  const manual=(data.seriesArcs||[]).filter(seriesScope);
+  const groups=[];
+  seriesBooks().forEach(b=>groups.push({id:b.id,label:b.title||'Untitled Book',items:auto.filter(a=>a.bookId===b.id)}));
+  const placeholderItems=auto.filter(a=>!seriesBooks().some(b=>b.id===a.bookId));
+  const placeholderMap=new Map();
+  placeholderItems.forEach(a=>{const key=a.bookId||a.bookLabel||'unassigned'; if(!placeholderMap.has(key))placeholderMap.set(key,{id:key,label:a.bookLabel||characterArcBookLabel(a),items:[]}); placeholderMap.get(key).items.push(a);});
+  groups.push(...placeholderMap.values());
+  const groupedHtml=groups.filter(g=>g.items.length).map(g=>`<section class="panel"><h3>${escapeHTML(g.label)}</h3><div class="card-grid compact-grid">${g.items.sort((a,b)=>characterName(a.characterId).localeCompare(characterName(b.characterId))).map(a=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(characterName(a.characterId))}</h3><span class="tag">From Character Page</span></div><div class="card-body">${seriesArcBookSelect(a)}${detail('Arc',a.text)}<button class="ghost-btn" onclick="setView('characterDetail','${a.characterId}')">Edit on Character Page</button></div></article>`).join('')}</div></section>`).join('');
+  const manualHtml=manual.map(a=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(a.title||'Untitled Arc')}</h3><button class="delete-btn" onclick="deleteItem('seriesArcs','${a.id}')">Delete</button></div><div class="card-body"><span class="tag">${escapeHTML(a.characterId?characterName(a.characterId):'Series Arc')}</span>${detail('Book 1',a.book1)}${detail('Book 2',a.book2)}${detail('Book 3',a.book3)}${detail('Notes',a.notes)}</div></article>`).join('');
+  el.innerHTML=(groupedHtml||manualHtml)?`${groupedHtml||'<div class="panel"><p class="muted">No character-page arcs yet.</p></div>'}<div class="panel"><h3>Manual Series Arcs</h3>${manualHtml||'<p class="muted">No manual series arcs yet.</p>'}</div>`:'<p class="muted">No series arcs yet.</p>';
+}
+function renderSeriesTools(){
+  const warn=document.getElementById("seriesOnlyWarning"), content=document.getElementById("seriesToolsContent"); if(!warn||!content)return;
+  warn.innerHTML=""; content.classList.remove("hidden");
+  const books=seriesBooks(); const seriesWords=books.reduce((sum,b)=>sum+bookWordCount(b),0); const scenes=sceneRowsAcrossSeries(); const warnings=seriesContinuityWarnings(); const autoArcs=characterArcItemsFromCharacters();
+  const unresolved=(data.mysteries||[]).filter(m=>seriesScope(m)&&(m.status||'Open')!=='Resolved').length;
+  const openThreads=(data.threads||[]).filter(t=>seriesScope(t)&&(t.status||'Open')!=='Resolved').length;
+  const worldCount=data.world.filter(seriesScope).length+data.locations.filter(seriesScope).length+data.organizations.filter(seriesScope).length+data.magicSystems.filter(seriesScope).length;
+  setText("seriesBookCount",books.length); setText("seriesTotalWords",seriesWords); setText("seriesArcCount",autoArcs.length+(data.seriesArcs||[]).filter(seriesScope).length); setText("seriesWarningCount",warnings.length);
+  setHTML("seriesDashboardBooks", books.map(b=>`<article class="item-card clickable-card" onclick="openBookFromDashboard('${b.id}')"><div class="card-header"><h3>${escapeHTML(b.title||'Untitled Book')}</h3><span class="tag">${escapeHTML(b.status||'Drafting')}</span></div><div class="card-body"><p><strong>Words:</strong> ${bookWordCount(b)}</p><p><strong>Chapters:</strong> ${(b.manuscript||[]).length}</p><p><strong>Scenes:</strong> ${(b.manuscript||[]).flatMap(c=>c.scenes||[]).length}</p></div></article>`).join('')||'<p>No books yet.</p>');
+  setHTML("seriesBigPicture", `<p><strong>Characters:</strong> ${data.characters.filter(seriesScope).length}</p><p><strong>World Entries:</strong> ${worldCount}</p><p><strong>Unresolved Questions:</strong> ${unresolved}</p><p><strong>Open Threads:</strong> ${openThreads}</p><p><strong>Total Scenes:</strong> ${scenes.length}</p>`);
+  setHTML("seriesArcPreview", autoArcs.slice(0,6).map(a=>`<div class="chapter-stat-row"><span>${escapeHTML(a.title)}</span>${isPlaceholderBookId(a.bookId)?'<span class="tag">Needs book link</span>':''}<button class="ghost-btn" onclick="setView('characterDetail','${a.characterId}')">Open</button></div>`).join('')||'<p class="muted">Add book-specific character arcs on character pages to populate this preview.</p>');
+  setHTML("seriesNeedsAttention", warnings.slice(0,8).map(w=>`<p>⚠️ ${escapeHTML(w)}</p>`).join('')||'<p>No major issues found.</p>');
+}
+
+/* === Character Arc Effect/Impact Differentiation + Favicon Patch === */
+function characterArcTypeLabel(a){return a?.isImpactArc?'Effect / Impact Arc':'Character Arc';}
+function characterArcTypeTag(a){return `<span class="tag ${a?.isImpactArc?'warning-tag':''}">${escapeHTML(characterArcTypeLabel(a))}</span>`;}
+function characterArcImpactChecked(){return !!document.getElementById('charArcImpact')?.checked;}
+function clearCharacterArcCreatorFields(){clearFields(['charArcText']); const cb=document.getElementById('charArcImpact'); if(cb)cb.checked=false;}
+
+function renderCharacterArcDraftList(){
+  const el=document.getElementById('charArcDraftList'); if(!el)return;
+  el.innerHTML=characterArcDrafts.length?characterArcDrafts.map((a,i)=>`<div class="custom-section-chip"><strong>${escapeHTML(characterArcBookLabel(a,i))}</strong> ${characterArcTypeTag(a)}<button type="button" onclick="removeCharacterArcDraft('${a.id}')">Remove</button></div>`).join(''):`<p class="muted">No book arcs added yet.</p>`;
+}
+function addCharacterArcDraft(){
+  let bookId=val('charArcBook')||data.activeBookId;
+  const text=val('charArcText').trim();
+  if(!bookId) bookId=nextPlaceholderBookIdForArcs(characterArcDrafts);
+  if(!text && !bookId)return;
+  characterArcDrafts.push({id:uid(),bookId,bookLabel:isPlaceholderBookId(bookId)?`Book #${placeholderNumberFromId(bookId)}`:'',text,isImpactArc:characterArcImpactChecked()});
+  clearCharacterArcCreatorFields();
+  populateCharacterArcCreator();
+}
+function collectCharacterArcDrafts(){
+  const arcs=[...characterArcDrafts];
+  let bookId=val('charArcBook')||data.activeBookId;
+  const text=val('charArcText').trim();
+  if(text){
+    if(!bookId) bookId=nextPlaceholderBookIdForArcs(arcs);
+    arcs.push({id:uid(),bookId,bookLabel:isPlaceholderBookId(bookId)?`Book #${placeholderNumberFromId(bookId)}`:'',text,isImpactArc:characterArcImpactChecked()});
+  }
+  return arcs.filter(a=>a.bookId||a.text).map((a,i)=>({...a,id:a.id||uid(),bookId:a.bookId||arcPlaceholderId(i+1),bookLabel:a.bookLabel||(isPlaceholderBookId(a.bookId)?`Book #${placeholderNumberFromId(a.bookId)}`:''),isImpactArc:!!a.isImpactArc}));
+}
+function normalizeCharacterBookArcs(c){
+  if(!c)return [];
+  if(!Array.isArray(c.bookArcs)){
+    c.bookArcs=[];
+    if((c.arc||'').trim()) c.bookArcs.push({id:uid(),bookId:c.bookId||data.activeBookId||arcPlaceholderId(1),text:c.arc,isImpactArc:false});
+  }
+  c.bookArcs=c.bookArcs.map((a,i)=>({id:a.id||uid(),bookId:a.bookId||arcPlaceholderId(i+1),bookLabel:a.bookLabel||(isPlaceholderBookId(a.bookId)?`Book #${placeholderNumberFromId(a.bookId)}`:''),text:a.text||'',isImpactArc:!!a.isImpactArc}));
+  return c.bookArcs;
+}
+function renderCharacterBookArcs(c){
+  const arcs=normalizeCharacterBookArcs(c).filter(a=>a.text);
+  if(!arcs.length)return '';
+  return `<section class="character-section"><h4>Character Arc by Book</h4><div class="arc-stage-list">${arcs.map((a,i)=>`<div class="arc-stage-card"><h4>${escapeHTML(characterArcBookLabel(a,i))}</h4>${characterArcTypeTag(a)}<p>${formatMultiline(a.text||'')}</p></div>`).join('')}</div></section>`;
+}
+function addEditBookArcRow(bookId='',text='',isImpactArc=false){
+  const wrap=document.getElementById('editBookArcsList'); if(!wrap)return;
+  const characterId=data.selectedCharacterId||'';
+  const existing=collectEditBookArcs();
+  if(!bookId){
+    const used=realBookIdsUsedByArcs(existing);
+    const avail=seriesBooks().find(b=>!used.has(b.id));
+    bookId=avail?.id || nextPlaceholderBookIdForArcs(existing);
+  }
+  const id=uid();
+  const div=document.createElement('div');
+  div.className='book-arc-row';
+  div.dataset.arcRow='true';
+  div.dataset.arcId=id;
+  div.innerHTML=`<select class="editArcBook">${seriesBookOptions(bookId,characterId,id)}</select><label class="checkbox-line"><input class="editArcImpact" type="checkbox" ${isImpactArc?'checked':''}> Effect / impact arc</label><textarea class="editArcText" placeholder="Character arc or impact for this book">${escapeHTML(text||'')}</textarea><div class="arc-row-actions"><button type="button" class="delete-btn" onclick="this.closest('.book-arc-row').remove()">Remove Arc</button></div>`;
+  wrap.appendChild(div);
+}
+function renderEditBookArcs(c){
+  const arcs=normalizeCharacterBookArcs(c);
+  return `<div class="full-span custom-section-builder"><h4>Book Specific Character Arcs</h4><p class="muted">Use “Effect / impact arc” when this character is not directly present in that book, but their choices, legacy, or interactions still shape another book.</p><div id="editBookArcsList">${arcs.map((a,i)=>`<div class="book-arc-row" data-arc-row="true" data-arc-id="${a.id}"><select class="editArcBook">${seriesBookOptions(a.bookId||arcPlaceholderId(i+1),c.id,a.id)}</select><label class="checkbox-line"><input class="editArcImpact" type="checkbox" ${a.isImpactArc?'checked':''}> Effect / impact arc</label><textarea class="editArcText" placeholder="Character arc or impact for this book">${escapeHTML(a.text||'')}</textarea><div class="arc-row-actions"><button type="button" class="delete-btn" onclick="this.closest('.book-arc-row').remove()">Remove Arc</button></div></div>`).join('')}</div><button type="button" onclick="addEditBookArcRow()">+ Add Another Character Arc</button></div>`;
+}
+function collectEditBookArcs(){
+  return [...document.querySelectorAll('#editBookArcsList .book-arc-row')].map((row,i)=>{
+    let bookId=row.querySelector('.editArcBook')?.value||'';
+    if(!bookId) bookId=arcPlaceholderId(i+1);
+    return {id:row.dataset.arcId||uid(),bookId,bookLabel:isPlaceholderBookId(bookId)?`Book #${placeholderNumberFromId(bookId)}`:'',text:row.querySelector('.editArcText')?.value||'',isImpactArc:!!row.querySelector('.editArcImpact')?.checked};
+  }).filter(a=>a.bookId||a.text);
+}
+function characterArcItemsFromCharacters(){
+  return data.characters.filter(seriesScope).flatMap(c=>normalizeCharacterBookArcs(c).filter(a=>a.text).map((a,i)=>({id:`${c.id}_${a.id}`,arcId:a.id,title:`${c.name||'Unnamed Character'} — ${characterArcBookLabel(a,i)}`,characterId:c.id,bookId:a.bookId,bookLabel:characterArcBookLabel(a,i),text:a.text,isImpactArc:!!a.isImpactArc,source:'character'})));
+}
+function renderSeriesArcs(){
+  const el=document.getElementById('seriesArcList'); if(!el)return;
+  setHTML('seriesArcCharacter',`<option value="">No specific character</option>`+data.characters.filter(seriesScope).map(c=>`<option value="${c.id}">${escapeHTML(c.name||'Unnamed')}</option>`).join(''));
+  const auto=characterArcItemsFromCharacters();
+  const manual=(data.seriesArcs||[]).filter(seriesScope);
+  const groups=[];
+  seriesBooks().forEach(b=>groups.push({id:b.id,label:b.title||'Untitled Book',items:auto.filter(a=>a.bookId===b.id)}));
+  const placeholderItems=auto.filter(a=>!seriesBooks().some(b=>b.id===a.bookId));
+  const placeholderMap=new Map();
+  placeholderItems.forEach(a=>{const key=a.bookId||a.bookLabel||'unassigned'; if(!placeholderMap.has(key))placeholderMap.set(key,{id:key,label:a.bookLabel||characterArcBookLabel(a),items:[]}); placeholderMap.get(key).items.push(a);});
+  groups.push(...placeholderMap.values());
+  const groupedHtml=groups.filter(g=>g.items.length).map(g=>{
+    const own=g.items.filter(a=>!a.isImpactArc).sort((a,b)=>characterName(a.characterId).localeCompare(characterName(b.characterId)));
+    const impact=g.items.filter(a=>a.isImpactArc).sort((a,b)=>characterName(a.characterId).localeCompare(characterName(b.characterId)));
+    const block=(items,title)=>items.length?`<h4>${title}</h4><div class="card-grid compact-grid">${items.map(a=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(characterName(a.characterId))}</h3>${characterArcTypeTag(a)}</div><div class="card-body">${seriesArcBookSelect(a)}${detail(a.isImpactArc?'Effect / Impact':'Arc',a.text)}<button class="ghost-btn" onclick="setView('characterDetail','${a.characterId}')">Edit on Character Page</button></div></article>`).join('')}</div>`:'';
+    return `<section class="panel"><h3>${escapeHTML(g.label)}</h3>${block(own,'Character Arcs')}${block(impact,'Effect / Impact Arcs')}</section>`;
+  }).join('');
+  const manualHtml=manual.map(a=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(a.title||'Untitled Arc')}</h3><button class="delete-btn" onclick="deleteItem('seriesArcs','${a.id}')">Delete</button></div><div class="card-body"><span class="tag">${escapeHTML(a.characterId?characterName(a.characterId):'Series Arc')}</span>${detail('Book 1',a.book1)}${detail('Book 2',a.book2)}${detail('Book 3',a.book3)}${detail('Notes',a.notes)}</div></article>`).join('');
+  el.innerHTML=(groupedHtml||manualHtml)?`${groupedHtml||'<div class="panel"><p class="muted">No character-page arcs yet.</p></div>'}<div class="panel"><h3>Manual Series Arcs</h3>${manualHtml||'<p class="muted">No manual series arcs yet.</p>'}</div>`:'<p class="muted">No series arcs yet.</p>';
+}
+function renderSeriesTools(){
+  const warn=document.getElementById("seriesOnlyWarning"), content=document.getElementById("seriesToolsContent"); if(!warn||!content)return;
+  warn.innerHTML=""; content.classList.remove("hidden");
+  const books=seriesBooks(); const seriesWords=books.reduce((sum,b)=>sum+bookWordCount(b),0); const scenes=sceneRowsAcrossSeries(); const warnings=seriesContinuityWarnings(); const autoArcs=characterArcItemsFromCharacters();
+  const unresolved=(data.mysteries||[]).filter(m=>seriesScope(m)&&(m.status||'Open')!=='Resolved').length;
+  const openThreads=(data.threads||[]).filter(t=>seriesScope(t)&&(t.status||'Open')!=='Resolved').length;
+  const worldCount=data.world.filter(seriesScope).length+data.locations.filter(seriesScope).length+data.organizations.filter(seriesScope).length+data.magicSystems.filter(seriesScope).length;
+  setText("seriesBookCount",books.length); setText("seriesTotalWords",seriesWords); setText("seriesArcCount",autoArcs.length+(data.seriesArcs||[]).filter(seriesScope).length); setText("seriesWarningCount",warnings.length);
+  setHTML("seriesDashboardBooks", books.map(b=>`<article class="item-card clickable-card" onclick="openBookFromDashboard('${b.id}')"><div class="card-header"><h3>${escapeHTML(b.title||'Untitled Book')}</h3><span class="tag">${escapeHTML(b.status||'Drafting')}</span></div><div class="card-body"><p><strong>Words:</strong> ${bookWordCount(b)}</p><p><strong>Chapters:</strong> ${(b.manuscript||[]).length}</p><p><strong>Scenes:</strong> ${(b.manuscript||[]).flatMap(c=>c.scenes||[]).length}</p></div></article>`).join('')||'<p>No books yet.</p>');
+  setHTML("seriesBigPicture", `<p><strong>Characters:</strong> ${data.characters.filter(seriesScope).length}</p><p><strong>World Entries:</strong> ${worldCount}</p><p><strong>Unresolved Questions:</strong> ${unresolved}</p><p><strong>Open Threads:</strong> ${openThreads}</p><p><strong>Total Scenes:</strong> ${scenes.length}</p>`);
+  setHTML("seriesArcPreview", autoArcs.slice(0,6).map(a=>`<div class="chapter-stat-row"><span>${escapeHTML(a.title)}</span>${characterArcTypeTag(a)}${isPlaceholderBookId(a.bookId)?'<span class="tag">Needs book link</span>':''}<button class="ghost-btn" onclick="setView('characterDetail','${a.characterId}')">Open</button></div>`).join('')||'<p class="muted">Add book-specific character arcs on character pages to populate this preview.</p>');
+  setHTML("seriesNeedsAttention", warnings.slice(0,8).map(w=>`<p>⚠️ ${escapeHTML(w)}</p>`).join('')||'<p>No major issues found.</p>');
+}
+
+/* === Series automation, completed-book Story Bible, scene-level trackers, and handoff patch === */
+function seriesTrackerCollectionsReady(){
+  data.themeTracks=data.themeTracks||[];
+  data.foreshadowing=data.foreshadowing||[];
+  data.mysteries=data.mysteries||[];
+  data.seriesMilestones=data.seriesMilestones||[];
+  data.bookHandoffs=data.bookHandoffs||[];
+  data.seriesArcs=data.seriesArcs||[];
+}
+function bookStatusLabel(b){return b?.status||'Drafting'}
+function markBookStatus(bookId,status){
+  const b=(data.books||[]).find(x=>x.id===bookId); if(!b)return;
+  const old=b.status||''; b.status=status;
+  if(status==='Finished' && old!=='Finished') autoGenerateBookHandoff(bookId);
+  saveData(true);
+}
+function nextBookAfter(bookId){const books=seriesBooks(); const i=books.findIndex(b=>b.id===bookId); return i>=0?books[i+1]:null;}
+function lastSceneOfBook(book){
+  const chapters=book?.manuscript||[];
+  for(let i=chapters.length-1;i>=0;i--){const scenes=chapters[i].scenes||[]; if(scenes.length)return {chapter:chapters[i],scene:scenes[scenes.length-1],chapterIndex:i,sceneIndex:scenes.length-1};}
+  return null;
+}
+function autoGenerateBookHandoff(bookId){
+  seriesTrackerCollectionsReady();
+  const from=(data.books||[]).find(b=>b.id===bookId); if(!from)return;
+  const to=nextBookAfter(bookId);
+  const last=lastSceneOfBook(from);
+  const existing=(data.bookHandoffs||[]).find(h=>h.autoGenerated&&h.fromBook===bookId);
+  const chars=itemNamesFromIds(data.characters,last?.scene?.characterIds||[]);
+  if(last?.scene?.pov){const pov=characterName(last.scene.pov); if(pov&&pov!=='Unknown'&&!chars.includes(pov))chars.unshift(`${pov} (POV)`);}
+  const unresolved=(data.mysteries||[]).filter(m=>seriesScope(m)&&(m.status||'Open')!=='Resolved');
+  const openForeshadow=(data.foreshadowing||[]).filter(f=>seriesScope(f)&&(f.status||'Planted')!=='Paid Off'&&(f.status||'')!=='Resolved');
+  const openThreads=(data.threads||[]).filter(t=>seriesScope(t)&&(t.status||'Open')!=='Resolved');
+  const status=[
+    `Finished book: ${from.title||'Untitled Book'}`,
+    last?`Final scene: ${(last.chapter.title||'Chapter')} → ${(last.scene.title||'Scene')}`:'No final scene found.',
+    chars.length?`Characters present in final scene: ${chars.join(', ')}`:'No characters marked in final scene.',
+    last?.scene?.locationId?`Final location: ${locationName(last.scene.locationId)}`:'',
+    last?.scene?.plotCardId?`Final plot point: ${plotCardName(last.scene.plotCardId)}`:'',
+    unresolved.length?`Open questions carrying forward: ${unresolved.map(q=>q.question||'Untitled Question').join('; ')}`:'No open questions marked.',
+    openThreads.length?`Open plot threads: ${openThreads.map(t=>t.title||'Untitled Thread').join('; ')}`:'',
+    openForeshadow.length?`Foreshadowing not paid off: ${openForeshadow.map(f=>f.hint||'Untitled Hint').join('; ')}`:''
+  ].filter(Boolean).join('\n');
+  const payload={id:existing?.id||uid(),...scopedItem('series'),fromBook:bookId,toBook:to?.id||'',status,notes:'Auto-generated when book was marked Finished. Edit this handoff as needed.',autoGenerated:true,updated:new Date().toISOString(),created:existing?.created||new Date().toISOString()};
+  if(existing) Object.assign(existing,payload); else data.bookHandoffs.unshift(payload);
+}
+function trackerRowTitle(row){return `${row.book?.title?row.book.title+' → ':''}${row.chapter?.title||'Chapter'} → ${row.scene?.title||'Scene'}`;}
+function sceneRowsWithTracker(key,id){return sceneRowsAcrossSeries().filter(r=>Array.isArray(r.scene?.[key])&&r.scene[key].includes(id));}
+function renderSceneSeriesTrackerCard(title,emptyText,key,items,extra=''){
+  const scene=activeScene(); const selected=sceneTrackedIds(scene,key);
+  return `<div class="tracker-card series-scene-tracker"><div class="tracker-heading"><strong>${escapeHTML(title)}</strong><span>Series-level tracker. These feed the Series tools automatically.</span></div>${extra}${items.length?`<div class="character-checkbox-grid">${items.map(item=>`<label class="character-check"><input type="checkbox" ${selected.includes(item.id)?'checked':''} onchange="toggleSceneTrackedItem('${key}','${item.id}',this.checked)"> <span>${escapeHTML(item.name||item.theme||item.hint||item.question||item.title||'Untitled')}</span></label>`).join('')}</div>`:`<p class="muted">${escapeHTML(emptyText)}</p>`}</div>`;
+}
+function renderSceneTracking(){
+  seriesTrackerCollectionsReady();
+  const chars=(data.characters||[]).filter(seriesScope);
+  const orgs=(data.organizations||[]).filter(seriesScope);
+  const magic=(data.magicSystems||[]).filter(seriesScope);
+  const artifacts=(data.world||[]).filter(w=>seriesScope(w)&&worldTrackingKeyForCategory(w.category)==='itemArtifactIds');
+  const floraFauna=(data.world||[]).filter(w=>seriesScope(w)&&worldTrackingKeyForCategory(w.category)==='floraFaunaIds');
+  const themes=(data.themeTracks||[]).filter(seriesScope).map(t=>({...t,name:t.theme||'Untitled Theme'}));
+  const foreshadows=(data.foreshadowing||[]).filter(seriesScope).map(f=>({...f,name:f.hint||'Untitled Foreshadowing'}));
+  const questions=(data.mysteries||[]).filter(seriesScope).map(q=>({...q,name:q.question||'Untitled Question'}));
+  const arcs=characterArcItemsFromCharacters().map(a=>({...a,id:a.id,name:a.title||'Untitled Arc'}));
+  const quickAdd=`<div class="tracker-quick-add"><button type="button" class="ghost-btn" onclick="quickAddThemeFromScene()">+ Theme</button><button type="button" class="ghost-btn" onclick="quickAddForeshadowFromScene()">+ Foreshadowing</button><button type="button" class="ghost-btn" onclick="quickAddQuestionFromScene()">+ Question</button></div>`;
+  const html=`
+    <div class="scene-tracker-group-title"><h3>Scene Appearance Tracking</h3><p class="muted">Mark what appears or matters after writing the scene.</p></div>
+    ${sceneTrackingCard('Characters in this scene','Create characters first, then they will appear here.','characterIds',chars)}
+    ${sceneTrackingCard('Organizations in this scene','Create organizations first, then they will appear here.','organizationIds',orgs)}
+    ${sceneTrackingCard('Magic / Systems in this scene','Create magic systems first, then they will appear here.','magicSystemIds',magic)}
+    ${sceneTrackingCard('Items / Artifacts in this scene','Create Items / Artifacts in World Building first, then they will appear here.','itemArtifactIds',artifacts)}
+    ${sceneTrackingCard('Flora & Fauna in this scene','Create Flora & Fauna entries in World Building first, then they will appear here.','floraFaunaIds',floraFauna)}
+    <div class="scene-tracker-group-title"><h3>Series-Level Scene Tracking</h3><p class="muted">These selections populate Series Dashboard, Story Bible, Theme Tracker, Foreshadowing, Questions, and Series Arc Tracker.</p></div>
+    ${quickAdd}
+    ${renderSceneSeriesTrackerCard('Themes in this scene','Create themes in Series → Theme Tracker, then they will appear here.','themeIds',themes)}
+    ${renderSceneSeriesTrackerCard('Foreshadowing in this scene','Create foreshadowing in Plot → Foreshadowing, then it will appear here.','foreshadowingIds',foreshadows)}
+    ${renderSceneSeriesTrackerCard('Questions in this scene','Create questions in Plot → Unresolved Questions, then they will appear here.','questionIds',questions)}
+    ${renderSceneSeriesTrackerCard('Series Arcs affected in this scene','Add book-specific character arcs on Character pages first.','seriesArcIds',arcs)}
+  `;
+  setHTML('sceneTrackingTop','');
+  setHTML('sceneTrackingBottom',html);
+}
+function quickAddThemeFromScene(){const name=prompt('Theme name:'); if(!name)return; data.themeTracks.push({id:uid(),...scopedItem('series'),theme:name,bookUse:'',scenes:'',notes:'Created from manuscript scene tracker.',created:new Date().toISOString()}); saveData(true);}
+function quickAddForeshadowFromScene(){const hint=prompt('Foreshadowing hint/name:'); if(!hint)return; data.foreshadowing.push({id:uid(),...scopedItem('series'),hint,appears:'',payoff:'',status:'Planted',notes:'Created from manuscript scene tracker.',created:new Date().toISOString()}); saveData(true);}
+function quickAddQuestionFromScene(){const question=prompt('Unresolved question:'); if(!question)return; data.mysteries.push({id:uid(),...scopedItem('series'),question,introduced:'',payoff:'',status:'Open',hints:'',answer:'',created:new Date().toISOString()}); saveData(true);}
+function sceneSeriesAppearancesHTML(scene){
+  const pairs=[
+    ['Themes',itemNamesFromIds((data.themeTracks||[]).map(t=>({...t,name:t.theme||'Untitled Theme'})),scene.themeIds)],
+    ['Foreshadowing',itemNamesFromIds((data.foreshadowing||[]).map(f=>({...f,name:f.hint||'Untitled Foreshadowing'})),scene.foreshadowingIds)],
+    ['Questions',itemNamesFromIds((data.mysteries||[]).map(q=>({...q,name:q.question||'Untitled Question'})),scene.questionIds)],
+    ['Series Arcs',itemNamesFromIds(characterArcItemsFromCharacters().map(a=>({...a,name:a.title})),scene.seriesArcIds)]
+  ].filter(([,vals])=>Array.isArray(vals)&&vals.length);
+  return pairs.length?`<section class="character-section"><h3>Series Trackers</h3>${pairs.map(([label,vals])=>`<p><strong>${escapeHTML(label)}:</strong> ${vals.map(escapeHTML).join(', ')}</p>`).join('')}</section>`:'';
+}
+const _oldSceneAppearancesHTML=sceneAppearancesHTML;
+sceneAppearancesHTML=function(scene){return _oldSceneAppearancesHTML(scene)+sceneSeriesAppearancesHTML(scene)};
+
+function compactSceneDatabaseCard(row){
+  const sc=row.scene, words=countWords(stripHTML(sc.content||''));
+  const meta=[sc.pov?`POV: ${characterName(sc.pov)}`:'',sc.locationId?`Location: ${locationName(sc.locationId)}`:'',sc.plotCardId?`Plot: ${plotCardName(sc.plotCardId)}`:'',sc.mood?`Mood: ${sc.mood}`:'',`${words} words`].filter(Boolean);
+  return `<article class="item-card scene-database-card"><div class="card-header"><h3>${escapeHTML(sc.title||`Scene ${row.sceneIndex+1}`)}</h3><button class="ghost-btn" onclick="setView('write','${row.chapter.id}','${sc.id}')">Open Scene</button></div><div class="card-body"><p class="muted">${escapeHTML(row.book.title||'Book')} → ${escapeHTML(row.chapter.title||`Chapter ${row.chapterIndex+1}`)}</p><div class="tag-row">${meta.map(m=>`<span class="tag">${escapeHTML(m)}</span>`).join('')}</div>${sc.purpose?detail('Purpose',sc.purpose):''}<details class="appearance-log-toggle"><summary><span class="appearance-log-title">Appearances</span></summary>${sceneAppearancesHTML(sc)}</details></div></article>`;
+}
+function renderSceneDatabase(){
+  const el=document.getElementById('sceneList'); if(!el)return;
+  const book=activeBook(); if(!book){el.innerHTML='<p class="muted">Open a book to view its Scene Database.</p>';return;}
+  const rows=allScenesForBook(book);
+  el.classList.add('scene-database-clean');
+  el.innerHTML=rows.length?`<div class="category-page-header panel"><div><h2>🎬 Scene Database</h2><p class="muted">A clean reference list for this book. Click Open Scene to edit in Manuscript.</p></div><div class="category-tools"><span class="tag">${rows.length} scenes</span></div></div>`+rows.map(compactSceneDatabaseCard).join(''):'<p class="muted">No scenes yet.</p>';
+}
+
+function trackerSceneLinks(key,id){
+  const rows=sceneRowsWithTracker(key,id);
+  return renderAppearanceLogToggle('Scene Tracker Log',rows.map(r=>({...r,reasons:['selected in scene tracker']})),'Not selected in any scene yet.');
+}
+function renderThemeTracker(){
+  const el=document.getElementById('themeTrackList'); if(!el)return; seriesTrackerCollectionsReady();
+  const items=(data.themeTracks||[]).filter(seriesScope);
+  el.innerHTML=items.length?items.map(t=>{const rows=sceneRowsWithTracker('themeIds',t.id); return `<article class="item-card"><div class="card-header"><h3>${escapeHTML(t.theme||'Untitled Theme')}</h3><button class="delete-btn" onclick="deleteItem('themeTracks','${t.id}')">Delete</button></div><div class="card-body"><span class="tag">${rows.length} scene${rows.length===1?'':'s'}</span>${detail('Book Usage',t.bookUse)}${detail('Notes',t.notes)}${trackerSceneLinks('themeIds',t.id)}</div></article>`}).join(''):'<p class="muted">No themes tracked yet. Add one here or from the scene tracker.</p>';
+}
+function renderForeshadowingTracker(){
+  const el=document.getElementById('foreshadowingList'); if(!el)return;
+  const items=(data.foreshadowing||[]).filter(seriesScope);
+  el.innerHTML=items.length?items.map(f=>{const rows=sceneRowsWithTracker('foreshadowingIds',f.id); return `<article class="item-card"><div class="card-header"><h3>${escapeHTML(f.hint||'Untitled Foreshadowing')}</h3><button class="delete-btn" onclick="deleteItem('foreshadowing','${f.id}')">Delete</button></div><div class="card-body"><span class="tag">${escapeHTML(f.status||'Planted')}</span><span class="tag">${rows.length} scene${rows.length===1?'':'s'}</span>${detail('Appears',f.appears)}${detail('Payoff',f.payoff)}${detail('Notes',f.notes)}${trackerSceneLinks('foreshadowingIds',f.id)}</div></article>`}).join(''):'<p class="muted">No foreshadowing tracked yet.</p>';
+}
+function renderQuestionTracker(){
+  const el=document.getElementById('mysteryList'); if(!el)return;
+  const items=(data.mysteries||[]).filter(seriesScope);
+  el.innerHTML=items.length?items.map(q=>{const rows=sceneRowsWithTracker('questionIds',q.id); return `<article class="item-card"><div class="card-header"><h3>${escapeHTML(q.question||'Untitled Question')}</h3><button class="delete-btn" onclick="deleteItem('mysteries','${q.id}')">Delete</button></div><div class="card-body"><span class="tag">${escapeHTML(q.status||'Open')}</span><span class="tag">${rows.length} scene${rows.length===1?'':'s'}</span>${detail('Introduced',q.introduced)}${detail('Hints / False Leads',q.hints)}${detail('Answer',q.answer)}${detail('Payoff',q.payoff)}${trackerSceneLinks('questionIds',q.id)}</div></article>`}).join(''):'<p class="muted">No unresolved questions yet.</p>';
+}
+const _oldRenderAllListsSeries=renderAllLists;
+renderAllLists=function(){
+  _oldRenderAllListsSeries();
+  renderThemeTracker(); renderForeshadowingTracker(); renderQuestionTracker(); renderSeriesArcs(); renderStoryBible(); renderSeriesTools(); renderBookHandoffs(); renderSeriesMilestones(); renderSceneDatabase();
+};
+
+function completedBooks(){return seriesBooks().filter(b=>(b.status||'Drafting')==='Finished');}
+function storyBibleSection(title,html){return `<section class="panel story-bible-section"><h3>${escapeHTML(title)}</h3>${html||'<p class="muted">Nothing here yet.</p>'}</section>`;}
+function renderStoryBible(){
+  const el=document.getElementById('storyBibleContent'); if(!el)return; seriesTrackerCollectionsReady();
+  const srs=activeSeries()||{}; const books=seriesBooks(); const done=completedBooks(); const scenes=sceneRowsAcrossSeries();
+  const chars=data.characters.filter(seriesScope);
+  const characterHtml=chars.map(c=>{const rows=appearanceLogEntries('character',c.id); const arcs=normalizeCharacterBookArcs(c).filter(a=>a.text); return `<article class="item-card"><h4>${escapeHTML(c.name||'Unnamed Character')}</h4>${detail('Basic Information',c.basicInfo||c.bio)}${arcs.length?`<p><strong>Book Arcs:</strong></p>${arcs.map(a=>`<p><span class="tag">${escapeHTML(characterArcBookLabel(a))}</span> ${characterArcTypeTag(a)} ${escapeHTML(a.text||'')}</p>`).join('')}`:''}<p class="muted">Appears in ${rows.length} scene${rows.length===1?'':'s'}.</p></article>`}).join('');
+  const completedHtml=done.map(b=>{const rows=allScenesForBook(b); const last=lastSceneOfBook(b); return `<article class="item-card"><h4>${escapeHTML(b.title||'Untitled Book')}</h4><span class="tag">Finished</span><p><strong>Words:</strong> ${bookWordCount(b)} · <strong>Scenes:</strong> ${rows.length}</p>${last?`<p><strong>Final Scene:</strong> ${escapeHTML(last.chapter.title||'Chapter')} → ${escapeHTML(last.scene.title||'Scene')}</p>${sceneAppearancesHTML(last.scene)}`:''}</article>`}).join('');
+  const themeHtml=(data.themeTracks||[]).filter(seriesScope).map(t=>`<p><strong>${escapeHTML(t.theme||'Theme')}:</strong> ${sceneRowsWithTracker('themeIds',t.id).length} tracked scenes</p>`).join('');
+  const foreshadowHtml=(data.foreshadowing||[]).filter(seriesScope).map(f=>`<p><strong>${escapeHTML(f.hint||'Foreshadowing')}:</strong> ${escapeHTML(f.status||'Planted')} · ${sceneRowsWithTracker('foreshadowingIds',f.id).length} scenes</p>`).join('');
+  const questionHtml=(data.mysteries||[]).filter(seriesScope).map(q=>`<p><strong>${escapeHTML(q.question||'Question')}:</strong> ${escapeHTML(q.status||'Open')} · ${sceneRowsWithTracker('questionIds',q.id).length} scenes</p>`).join('');
+  el.innerHTML=`<div class="panel"><h2>${escapeHTML(srs.title||'Project')} Story Bible</h2><p class="muted">Living reference plus completed-book history. Mark books as Finished to lock them into the historical view.</p><div class="grid stats-grid"><div class="stat-card"><span>${books.length}</span><p>Books</p></div><div class="stat-card"><span>${done.length}</span><p>Finished</p></div><div class="stat-card"><span>${chars.length}</span><p>Characters</p></div><div class="stat-card"><span>${scenes.length}</span><p>Scenes</p></div></div></div>`+
+  storyBibleSection('Completed Book History',completedHtml)+storyBibleSection('Character Bible',characterHtml)+storyBibleSection('Themes',themeHtml)+storyBibleSection('Foreshadowing',foreshadowHtml)+storyBibleSection('Unresolved Questions',questionHtml);
+}
+
+function renderSeriesTools(){
+  const warn=document.getElementById('seriesOnlyWarning'), content=document.getElementById('seriesToolsContent'); if(!warn||!content)return;
+  seriesTrackerCollectionsReady(); warn.innerHTML=''; content.classList.remove('hidden');
+  const books=seriesBooks(), done=completedBooks(), scenes=sceneRowsAcrossSeries(), warnings=seriesContinuityWarnings();
+  const themeHits=(data.themeTracks||[]).filter(seriesScope).reduce((n,t)=>n+sceneRowsWithTracker('themeIds',t.id).length,0);
+  const foreshadowOpen=(data.foreshadowing||[]).filter(f=>seriesScope(f)&&(f.status||'Planted')!=='Paid Off'&&(f.status||'')!=='Resolved').length;
+  const unresolved=(data.mysteries||[]).filter(m=>seriesScope(m)&&(m.status||'Open')!=='Resolved').length;
+  const autoArcs=characterArcItemsFromCharacters();
+  setText('seriesBookCount',books.length); setText('seriesTotalWords',books.reduce((sum,b)=>sum+bookWordCount(b),0)); setText('seriesArcCount',autoArcs.length+(data.seriesArcs||[]).filter(seriesScope).length); setText('seriesWarningCount',warnings.length);
+  setHTML('seriesDashboardBooks',books.map(b=>`<article class="item-card clickable-card"><div class="card-header"><h3>${escapeHTML(b.title||'Untitled Book')}</h3><span class="tag">${escapeHTML(bookStatusLabel(b))}</span></div><div class="card-body"><p><strong>Words:</strong> ${bookWordCount(b)}</p><p><strong>Chapters:</strong> ${(b.manuscript||[]).length}</p><p><strong>Scenes:</strong> ${(b.manuscript||[]).flatMap(c=>c.scenes||[]).length}</p><div class="button-row"><button class="ghost-btn" onclick="openBookFromDashboard('${b.id}')">Open</button><button class="ghost-btn" onclick="markBookStatus('${b.id}','Planning')">Planning</button><button class="ghost-btn" onclick="markBookStatus('${b.id}','Drafting')">Drafting</button><button onclick="markBookStatus('${b.id}','Finished')">Mark Finished</button></div></div></article>`).join('')||'<p>No books yet.</p>');
+  setHTML('seriesBigPicture',`<p><strong>Finished Books:</strong> ${done.length} / ${books.length}</p><p><strong>Total Scenes:</strong> ${scenes.length}</p><p><strong>Theme Scene Hits:</strong> ${themeHits}</p><p><strong>Open Foreshadowing:</strong> ${foreshadowOpen}</p><p><strong>Unresolved Questions:</strong> ${unresolved}</p><p><strong>Auto Handoffs:</strong> ${(data.bookHandoffs||[]).filter(h=>seriesScope(h)&&h.autoGenerated).length}</p>`);
+  setHTML('seriesArcPreview',autoArcs.slice(0,8).map(a=>`<div class="chapter-stat-row"><span>${escapeHTML(a.title)}</span>${characterArcTypeTag(a)}${isPlaceholderBookId(a.bookId)?'<span class="tag">Needs book link</span>':''}<button class="ghost-btn" onclick="setView('characterDetail','${a.characterId}')">Open</button></div>`).join('')||'<p class="muted">Add book-specific character arcs on character pages to populate this preview.</p>');
+  setHTML('seriesNeedsAttention',warnings.slice(0,8).map(w=>`<p>⚠️ ${escapeHTML(w)}</p>`).join('')||'<p>No major issues found.</p>');
+}
+function renderBookHandoffs(){
+  const el=document.getElementById('bookHandoffList'); if(!el)return; const opts=seriesBooks().map(b=>`<option value="${b.id}">${escapeHTML(b.title||'Untitled Book')}</option>`).join(''); setHTML('handoffFromBook',opts); setHTML('handoffToBook',opts);
+  const items=(data.bookHandoffs||[]).filter(seriesScope);
+  const helper=`<div class="panel"><h3>Auto-generate Handoffs</h3><p class="muted">Mark a book as Finished on the Series Dashboard. PlotPals will create a handoff from that book’s final scene, open questions, open threads, and unpaid foreshadowing.</p></div>`;
+  el.innerHTML=helper+(items.length?items.map(h=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML((seriesBooks().find(b=>b.id===h.fromBook)?.title||'Book')+' → '+(seriesBooks().find(b=>b.id===h.toBook)?.title||'Next Book'))}</h3><button class="delete-btn" onclick="deleteItem('bookHandoffs','${h.id}')">Delete</button></div><div class="card-body">${h.autoGenerated?'<span class="tag">Auto-generated</span>':''}${detail('Ending / Starting Status',h.status)}${detail('Notes',h.notes)}</div></article>`).join(''):'<p class="muted">No book handoffs yet.</p>');
+}
+function renderSeriesMilestones(){
+  const el=document.getElementById('seriesMilestoneList'); if(!el)return; const items=(data.seriesMilestones||[]).filter(seriesScope);
+  const bookStatusMilestones=seriesBooks().map(b=>({title:`${b.title||'Untitled Book'} status`,status:b.status||'Drafting',date:'',notes:'Generated from Book Status.'}));
+  const all=[...bookStatusMilestones,...items];
+  el.innerHTML=all.length?all.map(m=>`<article class="item-card"><div class="card-header"><h3>${escapeHTML(m.title||'Untitled Milestone')}</h3>${m.id?`<button class="delete-btn" onclick="deleteItem('seriesMilestones','${m.id}')">Delete</button>`:''}</div><div class="card-body"><span class="tag">${escapeHTML(m.status||'Not Started')}</span>${detail('Target / Date',m.date)}${detail('Notes',m.notes)}</div></article>`).join(''):'<p class="muted">No milestones yet.</p>';
+}
+
+/* End series automation patch */

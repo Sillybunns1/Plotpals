@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PlotPals - Plan. Write. Build Worlds.</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -614,6 +615,7 @@
               <h4>Book Specific Character Arcs</h4>
               <select id="charArcBook"></select>
               <textarea id="charArcText" placeholder="Character arc for the selected book"></textarea>
+              <label class="checkbox-line"><input id="charArcImpact" type="checkbox" /> This is an effect/impact arc, not this character’s own arc</label>
               <button type="button" onclick="addCharacterArcDraft()">Add Character Arc</button>
               <div id="charArcDraftList" class="custom-section-list"></div>
             </div>
