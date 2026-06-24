@@ -3463,3 +3463,61 @@ function updateCharacterArcBook(characterId, arcId, bookId){
   c.bookArcs=normalizeArcPlaceholders(arcs);
   saveData(true); renderSeriesArcs(); renderCharacterDetail(); renderSeriesTools();
 }
+
+/* === Larger textareas + auto-grow + fullscreen editor patch === */
+(function(){
+  function autoGrow(el){
+    if(!el || el.dataset.noAutogrow==='true') return;
+    el.style.height='auto';
+    const min=parseInt(getComputedStyle(el).minHeight,10)||220;
+    el.style.height=Math.max(min, el.scrollHeight + 2)+'px';
+  }
+  function addExpandButton(el){
+    if(!el || el.dataset.expandReady==='true' || el.closest('.textarea-modal')) return;
+    if(el.id==='rawData') return;
+    el.dataset.expandReady='true';
+    const wrap=document.createElement('div');
+    wrap.className='inline-textarea-tools';
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='textarea-expand-btn';
+    btn.textContent='⤢ Expand';
+    btn.addEventListener('click',()=>openTextareaModal(el));
+    wrap.appendChild(btn);
+    el.insertAdjacentElement('beforebegin', wrap);
+  }
+  function openTextareaModal(source){
+    const backdrop=document.createElement('div');
+    backdrop.className='textarea-modal-backdrop';
+    backdrop.innerHTML=`<div class="textarea-modal"><textarea></textarea><div class="textarea-modal-actions"><button type="button" class="modalCancel">Cancel</button><button type="button" class="modalSave">Save</button></div></div>`;
+    const area=backdrop.querySelector('textarea');
+    area.value=source.value||'';
+    backdrop.querySelector('.modalCancel').onclick=()=>backdrop.remove();
+    backdrop.querySelector('.modalSave').onclick=()=>{
+      source.value=area.value;
+      source.dispatchEvent(new Event('input',{bubbles:true}));
+      source.dispatchEvent(new Event('change',{bubbles:true}));
+      autoGrow(source);
+      backdrop.remove();
+    };
+    document.body.appendChild(backdrop);
+    area.focus();
+  }
+  function enhanceTextareas(root=document){
+    root.querySelectorAll('textarea').forEach(el=>{
+      autoGrow(el);
+      el.addEventListener('input',()=>autoGrow(el));
+      addExpandButton(el);
+    });
+  }
+  window.enhanceTextareas=enhanceTextareas;
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>enhanceTextareas());
+  else enhanceTextareas();
+  const mo=new MutationObserver(muts=>muts.forEach(m=>m.addedNodes.forEach(n=>{
+    if(n.nodeType!==1)return;
+    if(n.matches?.('textarea')) enhanceTextareas(n.parentElement||document);
+    else if(n.querySelectorAll) enhanceTextareas(n);
+  })));
+  if(document.body) mo.observe(document.body,{childList:true,subtree:true});
+  else document.addEventListener('DOMContentLoaded',()=>mo.observe(document.body,{childList:true,subtree:true}));
+})();

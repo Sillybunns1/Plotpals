@@ -1178,3 +1178,42 @@ body.light .global-music-inner{background:rgba(255,255,255,.94);}
 .character-filter-bar .tag{cursor:pointer;background:rgba(255,255,255,.04)}
 .character-filter-bar .tag.active-filter{background:rgba(244,201,93,.18);border-color:rgba(244,201,93,.75);color:#ffe6a3}
 .story-nav.active{background:rgba(244,201,93,.18);border-color:rgba(244,201,93,.55)}
+
+/* === Larger writing text boxes usability patch === */
+textarea{
+  min-height:220px;
+  line-height:1.55;
+  resize:vertical;
+  overflow-y:hidden;
+}
+.form-grid textarea,
+.custom-section-builder textarea,
+.book-arc-row textarea,
+.field-stack textarea,
+.lookup-detail-body textarea{
+  min-height:240px;
+}
+textarea.large-textarea,
+#seriesSynopsisEdit,
+#seriesThemeEdit,
+#seriesMysteriesEdit,
+#seriesForeshadowingEdit,
+#bookSummaryEdit,
+#bookThemeEdit,
+#bookNotesEdit,
+#charArcText,
+.editArcText,
+#structureBeatNotes,
+#chapterGoal{
+  min-height:280px;
+}
+#rawData{
+  min-height:360px;
+  overflow-y:auto;
+}
+.inline-textarea-tools{display:flex;justify-content:flex-end;margin:-4px 0 8px;}
+.textarea-expand-btn{font-size:.8rem;padding:6px 9px;border-radius:10px;}
+.textarea-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;display:flex;align-items:center;justify-content:center;padding:22px;}
+.textarea-modal{width:min(980px,96vw);height:min(760px,88vh);background:var(--panel);border:1px solid var(--border);border-radius:22px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;}
+.textarea-modal textarea{flex:1;min-height:0;overflow-y:auto;font-size:1rem;line-height:1.65;}
+.textarea-modal-actions{display:flex;justify-content:flex-end;gap:10px;}
