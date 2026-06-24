@@ -1456,3 +1456,28 @@ body.light-mode .rich-text-toolbar button:active {
 .story-nav.nav-grandchild[title*="Right-click"]{position:relative;}
 .story-nav.nav-grandchild[title*="Right-click"]:hover::after{content:"⋯";position:absolute;right:12px;color:var(--gold);}
 @media(max-width:720px){.compact-world-grid{grid-template-columns:1fr}.compact-entry-card{min-height:auto}.compact-card-photo{width:72px;height:96px;flex-basis:72px}}
+
+/* PlotPals PWA install access */
+.pwa-install-btn {
+  border-color: rgba(247, 207, 74, .55);
+  background: linear-gradient(135deg, rgba(247,207,74,.18), rgba(216,107,167,.18));
+  color: var(--text);
+}
+.pwa-install-btn.installed,
+.pwa-install-btn:disabled {
+  opacity: .72;
+  cursor: default;
+  transform: none;
+}
+.hero-actions .pwa-install-btn {
+  white-space: nowrap;
+}
+@media(max-width:760px){
+  .hero-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .hero-actions button {
+    width: 100%;
+  }
+}

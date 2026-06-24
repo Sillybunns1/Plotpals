@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PlotPals - Plan. Write. Build Worlds.</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#15101f" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="PlotPals" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -33,6 +39,7 @@
       <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" />
       <button id="authSubmitBtn" class="wide glow" onclick="submitAuth()">Login</button>
       <button class="wide ghost-btn" onclick="sendPasswordResetFromLogin()">Reset Password</button>
+      <button type="button" class="wide pwa-install-btn" data-pwa-install onclick="installPlotPalsPwa()">📲 Get the App</button>
       <p id="loginMessage"></p>
     </div>
   </section>
@@ -87,6 +94,7 @@
           <div class="hero-actions">
             <button onclick="showCreateProjectPanel()" class="glow">+ New Book / Series</button>
             <button onclick="importDataFromDashboard()">⇧ Import</button>
+            <button type="button" class="pwa-install-btn" data-pwa-install onclick="installPlotPalsPwa()">📲 Get the App</button>
           </div>
         </section>
 
@@ -1071,5 +1079,6 @@
     window.PLOTPALS_SUPABASE_MEDIA_BUCKET = "plotpals-media";
   </script>
   <script src="script.js"></script>
+  <script src="pwa.js"></script>
 </body>
 </html>
