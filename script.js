@@ -9,6 +9,51 @@ const defaultData = {
   structureBeats: [], seriesArcs: [], themeTracks: [], bookHandoffs: [], seriesMilestones: [], music: {}, theme: 'dark', pinnedNote: '', libraryView: 'stories', lastOpened: null, currentView: 'projectDashboard', trash: [], backups: [], searchFilter: 'all', sprint: {goalWords:500, minutes:25, running:false, startedAt:null, pausedRemaining:null, startWords:0}
 };
 
+
+const CHARACTER_ROLES = [
+  "Protagonist",
+  "Major Supporting Character",
+  "Love Interest",
+  "Mentor",
+  "Antagonist",
+  "Historical Character",
+  "Minor Character"
+];
+
+const CHARACTER_ROLE_ALIASES = {
+  "main character": "Protagonist",
+  "main": "Protagonist",
+  "lead": "Protagonist",
+  "protagonist": "Protagonist",
+  "supporting": "Major Supporting Character",
+  "supporting character": "Major Supporting Character",
+  "major supporting": "Major Supporting Character",
+  "major supporting character": "Major Supporting Character",
+  "love interest": "Love Interest",
+  "romantic interest": "Love Interest",
+  "mentor": "Mentor",
+  "antagonist": "Antagonist",
+  "villain": "Antagonist",
+  "historical": "Historical Character",
+  "historical character": "Historical Character",
+  "minor": "Minor Character",
+  "minor character": "Minor Character",
+  "side character": "Minor Character"
+};
+
+function normalizeCharacterRole(role){
+  const raw = String(role || "").trim();
+  if(!raw) return "Minor Character";
+  const exact = CHARACTER_ROLES.find(r => r.toLowerCase() === raw.toLowerCase());
+  if(exact) return exact;
+  return CHARACTER_ROLE_ALIASES[raw.toLowerCase()] || "Minor Character";
+}
+
+function characterRoleOptions(selected=""){
+  const normalized = normalizeCharacterRole(selected);
+  return CHARACTER_ROLES.map(role => `<option value="${escapeAttr(role)}" ${role===normalized?"selected":""}>${escapeHTML(role)}</option>`).join("");
+}
+
 let supabaseClient = null;
 let data = loadData();
 let cloudSaveTimer = null;
