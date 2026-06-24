@@ -1173,3 +1173,8 @@ body.light .global-music-inner{background:rgba(255,255,255,.94);}
 .scene-database-card .tag-row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
 .story-bible-section{margin-bottom:14px}
 .button-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
+.character-filter-bar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px;padding:12px;border:1px solid rgba(244,201,93,.18);border-radius:16px;background:rgba(255,255,255,.03)}
+.character-filter-bar .tag{cursor:pointer;background:rgba(255,255,255,.04)}
+.character-filter-bar .tag.active-filter{background:rgba(244,201,93,.18);border-color:rgba(244,201,93,.75);color:#ffe6a3}
+.story-nav.active{background:rgba(244,201,93,.18);border-color:rgba(244,201,93,.55)}

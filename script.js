@@ -112,27 +112,6 @@ function supabaseMediaReady(){
   return !!(supabaseClient && data.user?.id && window.PLOTPALS_SUPABASE_MEDIA_BUCKET !== false);
 }
 function mediaBucketName(){ return window.PLOTPALS_SUPABASE_MEDIA_BUCKET || "plotpals-media"; }
-
-function describeSupabaseStorageError(err){
-  const raw = err || {};
-  const message = raw.message || raw.error_description || raw.error || String(raw);
-  const status = raw.status || raw.statusCode || raw.code || "";
-  const lower = String(message || "").toLowerCase();
-  if(lower.includes("bucket") && (lower.includes("not found") || lower.includes("does not exist"))){
-    return `Supabase Storage bucket "${mediaBucketName()}" was not found. Create a public bucket named "${mediaBucketName()}".`;
-  }
-  if(String(status)==="403" || lower.includes("row-level security") || lower.includes("rls") || lower.includes("violates")){
-    return `Supabase Storage rejected the upload because of bucket policies/RLS. Add authenticated INSERT/SELECT/UPDATE/DELETE policies for the "${mediaBucketName()}" bucket.`;
-  }
-  if(String(status)==="401" || lower.includes("jwt") || lower.includes("unauthorized")){
-    return "Supabase says you are not authorized. Log out/in again and confirm the anon/publishable key belongs to this Supabase project.";
-  }
-  if(lower.includes("failed to fetch") || lower.includes("network") || lower.includes("cors")){
-    return "The browser could not reach Supabase Storage. Check the Supabase URL/key, CORS/ad-blocker settings, and that the site is running over https or localhost.";
-  }
-  return `Supabase Storage error${status ? " ("+status+")" : ""}: ${message}`;
-}
-
 async function uploadMediaToSupabase(file, folder="media"){
   if(!supabaseMediaReady()) throw new Error("Supabase media storage is not configured or user is not logged in.");
   const bucket = mediaBucketName();
@@ -143,7 +122,7 @@ async function uploadMediaToSupabase(file, folder="media"){
     upsert: false,
     contentType: file.type || undefined
   });
-  if(error){ console.error("Supabase media upload failed", error); throw new Error(describeSupabaseStorageError(error)); }
+  if(error) throw error;
   const { data: publicData } = supabaseClient.storage.from(bucket).getPublicUrl(path);
   let url = publicData?.publicUrl || "";
   if(!url){
@@ -211,8 +190,7 @@ async function readImageUpload(input,onDone){
     if(input) input.value="";
     return;
   }catch(err){
-    console.error("Image upload failed", err);
-    alert(err?.message || "This image could not be uploaded. Please try a different file.");
+    alert("This image could not be uploaded. Please try a different file.");
   }
   if(input) input.value="";
 }
@@ -312,7 +290,7 @@ function activeBook(){return data.books.find(b=>b.id===data.activeBookId && notD
 function activeChapter(){const b=activeBook(); return (b?.manuscript||[]).find(c=>c.id===data.activeChapterId)||null}
 function activeScene(){const ch=activeChapter(); return (ch?.scenes||[]).find(s=>s.id===data.activeSceneId)||null}
 function isSeriesProject(){return (activeSeries()?.type||"series")==="series"}
-function ensureCollections(){["series","books","characters","relationships","timeline","chapterPlans","threads","scenes","world","locations","magicSystems","organizations","mysteries","foreshadowing","plotArcs","plotCards","structureBeats","seriesArcs","themeTracks","bookHandoffs","seriesMilestones"].forEach(k=>{if(!data[k])data[k]=[]}); if(!data.music)data.music={}; if(!data.worldCategories)data.worldCategories=[]; if(!data.trash)data.trash=[]; if(!data.backups)data.backups=[]; if(!data.searchFilter)data.searchFilter='all'; if(!data.theme)data.theme="dark"; if(!data.libraryView)data.libraryView="stories"; if(!data.currentView)data.currentView="projectDashboard"; if(!data.editorCollapsedChapters)data.editorCollapsedChapters={}; if(typeof data.manuscriptSidebarCollapsed!=="boolean")data.manuscriptSidebarCollapsed=false; if(!data.sprint)data.sprint={goalWords:500,minutes:25,running:false,startedAt:null,pausedRemaining:null,startWords:0}; }
+function ensureCollections(){["series","books","characters","relationships","timeline","chapterPlans","threads","scenes","world","locations","magicSystems","organizations","mysteries","foreshadowing","plotArcs","plotCards","structureBeats","seriesArcs","themeTracks","bookHandoffs","seriesMilestones"].forEach(k=>{if(!data[k])data[k]=[]}); if(!data.music)data.music={}; if(!data.worldCategories)data.worldCategories=[]; if(!data.trash)data.trash=[]; if(!data.backups)data.backups=[]; if(!data.searchFilter)data.searchFilter='all'; if(!data.characterRoleFilter)data.characterRoleFilter='all'; if(!data.theme)data.theme="dark"; if(!data.libraryView)data.libraryView="stories"; if(!data.currentView)data.currentView="projectDashboard"; if(!data.editorCollapsedChapters)data.editorCollapsedChapters={}; if(typeof data.manuscriptSidebarCollapsed!=="boolean")data.manuscriptSidebarCollapsed=false; if(!data.sprint)data.sprint={goalWords:500,minutes:25,running:false,startedAt:null,pausedRemaining:null,startWords:0}; }
 function ensureProject(){ensureCollections(); const b=activeBook(); if(b){if(!b.manuscript)b.manuscript=[]; if(!b.manuscript.length){const scene={id:uid(),title:"Scene 1",content:"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],locationIds:[],plotCardId:"",created:new Date().toISOString()}; const ch={id:uid(),title:"Chapter One",scenes:[scene],created:new Date().toISOString()}; b.manuscript.push(ch); data.activeChapterId=ch.id; data.activeSceneId=scene.id} b.manuscript.forEach(ch=>{if(!ch.scenes){ch.scenes=[{id:uid(),title:ch.title||"Scene 1",content:ch.content||"",pov:"",locationId:"",date:"",mood:"",purpose:"",characterIds:[],organizationIds:[],magicSystemIds:[],itemArtifactIds:[],floraFaunaIds:[],locationIds:[],plotCardId:"",created:ch.created||new Date().toISOString()}]; delete ch.content} (ch.scenes||[]).forEach(sc=>{if(!Array.isArray(sc.characterIds))sc.characterIds=[]; if(!Array.isArray(sc.organizationIds))sc.organizationIds=[]; if(!Array.isArray(sc.magicSystemIds))sc.magicSystemIds=[]; if(!Array.isArray(sc.itemArtifactIds))sc.itemArtifactIds=[]; if(!Array.isArray(sc.floraFaunaIds))sc.floraFaunaIds=[]; if(!Array.isArray(sc.locationIds))sc.locationIds=[]; if(sc.locationId && !sc.locationIds.includes(sc.locationId))sc.locationIds.unshift(sc.locationId); if(typeof sc.plotCardId!=="string")sc.plotCardId="";});}); if(!data.activeChapterId)data.activeChapterId=b.manuscript[0]?.id||null; if(!data.activeSceneId)data.activeSceneId=activeChapter()?.scenes?.[0]?.id||null}}
 
 function switchAuthMode(mode){authMode=mode;document.getElementById("loginTab").classList.toggle("active",mode==="login");document.getElementById("signupTab").classList.toggle("active",mode==="signup");document.getElementById("authSubmitBtn").textContent=mode==="login"?"Login":"Create Account";setLoginMessage("")}
@@ -751,7 +729,7 @@ async function uploadMusicTracks(event){
       added++;
     }catch(err){
       console.warn("Supabase audio upload failed.", err);
-      alert(`Could not upload ${file.name}. ${err?.message || "Check the plotpals-media bucket and storage policies."}`);
+      alert(`Could not upload ${file.name} to Supabase Storage. Check the plotpals-media bucket and storage policies.`);
     }
   }
   if(!music.playlists.length){
@@ -1200,8 +1178,8 @@ function renderNestedNav(){
   const magic=(data.magicSystems||[]).filter(seriesScope);
   const timeline=(data.timeline||[]).filter(seriesScope);
   const rels=(data.relationships||[]).filter(seriesScope);
-  const roles=["Main","Side","Love Interest","Antagonist","Mentor","Other"];
-  const charsByRole=role=>data.characters.filter(c=>seriesScope(c)&&(c.role||"Other")===role);
+  const roles=CHARACTER_ROLES;
+  const charsByRole=role=>data.characters.filter(c=>seriesScope(c)&&normalizeCharacterRole(c.role)===role);
   const seriesOnly=isSeriesProject();
 
   nav.innerHTML=`
@@ -1294,7 +1272,7 @@ function renderNestedNav(){
           <span>👥 All Characters</span><span class="nav-count">${data.characters.filter(seriesScope).length}</span>
         </button>
         ${roles.map(role=>`
-          <button class="story-nav nav-child" onclick="setView('characters')">
+          <button class="story-nav nav-child ${data.characterRoleFilter===role?"active":""}" onclick="setCharacterRoleFilter('${escapeAttr(role)}')">
             <span>${role}</span><span class="nav-count">${charsByRole(role).length}</span>
           </button>
           ${charsByRole(role).map(c=>`
@@ -1845,7 +1823,7 @@ function renderWorldCategoryPage(){
   renderWorldCustomDraftList(); addBulletButtons(el);
 }
 
-function addCharacter(){const input=document.getElementById("charPhoto"); const file=input?.files?.[0]; const finish=photo=>{data.characters.push({id:uid(),...scopedItem(val("charScope")),name:val("charName"),role:val("charRole"),species:val("charSpecies"),photo,basicInfo:val("charBasicInfo"),description:val("charDescription"),personality:val("charPersonality"),backstory:val("charBackstory"),wound:val("charWound"),arc:val("charArc"),voice:val("charVoice"),secrets:val("charSecrets"),quotes:val("charQuotes"),customSections:[...characterCustomSectionDrafts],created:new Date().toISOString()}); clearFields(["charName","charSpecies","charBasicInfo","charDescription","charPersonality","charBackstory","charWound","charArc","charVoice","charSecrets","charQuotes","charCustomTitle","charCustomText"]); characterCustomSectionDrafts=[]; renderCharacterCustomDraftList(); if(input)input.value=""; clearOverviewImagePreview("worldImagePreview"); hideAddForm("characterAddForm"); saveData()}; if(!file)return finish(""); readImageUpload(input,finish)}
+function addCharacter(){const input=document.getElementById("charPhoto"); const file=input?.files?.[0]; const finish=photo=>{data.characters.push({id:uid(),...scopedItem(val("charScope")),name:val("charName"),role:normalizeCharacterRole(val("charRole")),species:val("charSpecies"),photo,basicInfo:val("charBasicInfo"),description:val("charDescription"),personality:val("charPersonality"),backstory:val("charBackstory"),wound:val("charWound"),arc:val("charArc"),voice:val("charVoice"),secrets:val("charSecrets"),quotes:val("charQuotes"),customSections:[...characterCustomSectionDrafts],created:new Date().toISOString()}); clearFields(["charName","charSpecies","charBasicInfo","charDescription","charPersonality","charBackstory","charWound","charArc","charVoice","charSecrets","charQuotes","charCustomTitle","charCustomText"]); characterCustomSectionDrafts=[]; renderCharacterCustomDraftList(); if(input)input.value=""; clearOverviewImagePreview("worldImagePreview"); hideAddForm("characterAddForm"); saveData()}; if(!file)return finish(""); readImageUpload(input,finish)}
 function relationshipViewLabel(characterId,fallback){const name=characterName(characterId); return name&&name!=="Unknown"?`${name}'s View`:fallback;}
 function updateRelationshipViewLabels(){
   const a=val("relA"), b=val("relB");
@@ -2276,7 +2254,7 @@ function renderPlotBoard(){
 function characterMiniBasicInfo(c){
   const basic=(c.basicInfo||c.bio||"").trim();
   const facts=[];
-  if(c.role)facts.push(["Role",c.role]);
+  if(c.role)facts.push(["Role",normalizeCharacterRole(c.role)]);
   if(c.species)facts.push(["Species",c.species]);
   if(c.age)facts.push(["Age",c.age]);
   if(c.occupation)facts.push(["Occupation",c.occupation]);
@@ -2291,9 +2269,12 @@ function renderCharacterPhotoMini(c){
 }
 function renderCharactersByRole(){
   const el=document.getElementById("characterRoleGroups"); if(!el)return;
-  const roles=["Main","Side","Love Interest","Antagonist","Mentor","Other"];
-  el.innerHTML=roles.map(role=>{
-    const chars=data.characters.filter(c=>seriesScope(c)&&(c.role||"Other")===role);
+  const roles=CHARACTER_ROLES;
+  const activeFilter=data.characterRoleFilter||"all";
+  const visibleRoles=activeFilter==="all"?roles:roles.filter(role=>role===normalizeCharacterRole(activeFilter));
+  const filterBar=`<div class="character-filter-bar"><button type="button" class="tag ${activeFilter==="all"?"active-filter":""}" onclick="clearCharacterRoleFilter()">All Characters</button>${roles.map(role=>`<button type="button" class="tag ${activeFilter===role?"active-filter":""}" onclick="setCharacterRoleFilter('${escapeAttr(role)}')">${escapeHTML(role)}</button>`).join("")}</div>`;
+  el.innerHTML=filterBar+visibleRoles.map(role=>{
+    const chars=data.characters.filter(c=>seriesScope(c)&&normalizeCharacterRole(c.role)===role);
     return `<div class="role-group character-role-group"><div class="role-group-header"><h3>${role}</h3><span class="tag">${chars.length}</span></div><div class="character-directory-grid">${chars.length?chars.map(c=>`<article class="item-card character-mini-card character-directory-card clickable-card" onclick="setView('characterDetail','${c.id}')" title="Open ${escapeAttr(c.name||'Character')}"><div class="card-header compact-card-header"><h3>${escapeHTML(c.name||'Unnamed Character')}</h3><button class="delete-btn compact-delete-btn" onclick="event.stopPropagation(); deleteItem('characters','${c.id}')">Delete</button></div>${renderCharacterPhotoMini(c)}<div class="card-body character-mini-basic">${characterMiniBasicInfo(c)}</div></article>`).join(""):`<p class="muted">No ${role} characters yet.</p>`}</div></div>`
   }).join("")
 }
@@ -2301,7 +2282,7 @@ function startCharacterDetailEdit(){characterDetailEditMode=true; renderCharacte
 function cancelCharacterDetailEdit(){characterDetailEditMode=false; renderCharacterDetail()}
 function saveCharacterDetailEdit(characterId){
   const c=data.characters.find(x=>x.id===characterId); if(!c)return;
-  c.name=val("editCharName"); c.role=val("editCharRole"); c.species=val("editCharSpecies");
+  c.name=val("editCharName"); c.role=normalizeCharacterRole(val("editCharRole")); c.species=val("editCharSpecies");
   c.basicInfo=val("editCharBasicInfo"); c.description=val("editCharDescription"); c.personality=val("editCharPersonality");
   c.backstory=val("editCharBackstory"); c.wound=val("editCharWound"); c.arc=val("editCharArc"); c.voice=val("editCharVoice");
   c.secrets=val("editCharSecrets"); c.quotes=val("editCharQuotes");
@@ -2316,7 +2297,7 @@ function preserveCharacterDetailEditDraft(characterId){
   const c=data.characters.find(x=>x.id===characterId); if(!c)return null;
   const nameEl=document.getElementById("editCharName");
   if(nameEl){
-    c.name=val("editCharName"); c.role=val("editCharRole"); c.species=val("editCharSpecies");
+    c.name=val("editCharName"); c.role=normalizeCharacterRole(val("editCharRole")); c.species=val("editCharSpecies");
     c.basicInfo=val("editCharBasicInfo"); c.description=val("editCharDescription"); c.personality=val("editCharPersonality");
     c.backstory=val("editCharBackstory"); c.wound=val("editCharWound"); c.arc=val("editCharArc"); c.voice=val("editCharVoice");
     c.secrets=val("editCharSecrets"); c.quotes=val("editCharQuotes");
@@ -2336,9 +2317,9 @@ function addCharacterCustomSectionFromDetail(characterId){
 }
 function renderCharacterEditForm(c){
   const custom=Array.isArray(c.customSections)?c.customSections:[];
-  return `<div class="panel character-detail-grid"><div>${c.photo?`<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}"><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">Change Photo</button>`:`<div class="character-photo panel photo-placeholder"><p>No Photo</p><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">+ Add Character Photo</button></div>`}</div><div><h3>Edit Character Detail</h3><div class="form-grid"><input id="editCharName" placeholder="Character name" value="${escapeAttr(c.name||"")}"><select id="editCharRole"><option>Main</option><option>Side</option><option>Love Interest</option><option>Antagonist</option><option>Mentor</option><option>Other</option></select><input id="editCharSpecies" placeholder="Species / identity" value="${escapeAttr(c.species||"")}"><textarea id="editCharBasicInfo" placeholder="Basic Information">${escapeHTML(c.basicInfo||c.bio||"")}</textarea><textarea id="editCharDescription" placeholder="Physical Appearance">${escapeHTML(c.description||"")}</textarea><textarea id="editCharPersonality" placeholder="Personality">${escapeHTML(c.personality||"")}</textarea><textarea id="editCharBackstory" placeholder="Backstory">${escapeHTML(c.backstory||"")}</textarea><textarea id="editCharWound" placeholder="Psychology: Core Wound, Core Fear, Core Desire, Fatal Flaw">${escapeHTML(c.wound||"")}</textarea><textarea id="editCharArc" placeholder="Character Arc">${escapeHTML(c.arc||"")}</textarea><textarea id="editCharVoice" placeholder="Voice / speech patterns">${escapeHTML(c.voice||"")}</textarea><textarea id="editCharSecrets" placeholder="Secrets">${escapeHTML(c.secrets||"")}</textarea><textarea id="editCharQuotes" placeholder="Quotes">${escapeHTML(c.quotes||"")}</textarea></div><h3>Custom Sections</h3>${custom.map(sec=>`<div class="custom-section-builder"><input id="editCustomTitle_${sec.id}" placeholder="Section title" value="${escapeAttr(sec.title||"")}"><textarea id="editCustomText_${sec.id}" placeholder="Section notes">${escapeHTML(sec.text||"")}</textarea><button type="button" class="delete-btn" onclick="deleteCustomSectionFromCharacter('${c.id}','${sec.id}'); characterDetailEditMode=true">Delete Section</button></div>`).join("")||"<p class='muted'>No custom sections yet.</p>"}<button type="button" onclick="addCharacterCustomSectionFromDetail('${c.id}')">+ Add Custom Section</button><hr><button onclick="saveCharacterDetailEdit('${c.id}')">Save Changes</button><button class="ghost-btn" onclick="cancelCharacterDetailEdit()">Cancel</button></div></div>`
+  return `<div class="panel character-detail-grid"><div>${c.photo?`<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}"><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">Change Photo</button>`:`<div class="character-photo panel photo-placeholder"><p>No Photo</p><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">+ Add Character Photo</button></div>`}</div><div><h3>Edit Character Detail</h3><div class="form-grid"><input id="editCharName" placeholder="Character name" value="${escapeAttr(c.name||"")}"><select id="editCharRole">${characterRoleOptions(c.role)}</select><input id="editCharSpecies" placeholder="Species / identity" value="${escapeAttr(c.species||"")}"><textarea id="editCharBasicInfo" placeholder="Basic Information">${escapeHTML(c.basicInfo||c.bio||"")}</textarea><textarea id="editCharDescription" placeholder="Physical Appearance">${escapeHTML(c.description||"")}</textarea><textarea id="editCharPersonality" placeholder="Personality">${escapeHTML(c.personality||"")}</textarea><textarea id="editCharBackstory" placeholder="Backstory">${escapeHTML(c.backstory||"")}</textarea><textarea id="editCharWound" placeholder="Psychology: Core Wound, Core Fear, Core Desire, Fatal Flaw">${escapeHTML(c.wound||"")}</textarea><textarea id="editCharArc" placeholder="Character Arc">${escapeHTML(c.arc||"")}</textarea><textarea id="editCharVoice" placeholder="Voice / speech patterns">${escapeHTML(c.voice||"")}</textarea><textarea id="editCharSecrets" placeholder="Secrets">${escapeHTML(c.secrets||"")}</textarea><textarea id="editCharQuotes" placeholder="Quotes">${escapeHTML(c.quotes||"")}</textarea></div><h3>Custom Sections</h3>${custom.map(sec=>`<div class="custom-section-builder"><input id="editCustomTitle_${sec.id}" placeholder="Section title" value="${escapeAttr(sec.title||"")}"><textarea id="editCustomText_${sec.id}" placeholder="Section notes">${escapeHTML(sec.text||"")}</textarea><button type="button" class="delete-btn" onclick="deleteCustomSectionFromCharacter('${c.id}','${sec.id}'); characterDetailEditMode=true">Delete Section</button></div>`).join("")||"<p class='muted'>No custom sections yet.</p>"}<button type="button" onclick="addCharacterCustomSectionFromDetail('${c.id}')">+ Add Custom Section</button><hr><button onclick="saveCharacterDetailEdit('${c.id}')">Save Changes</button><button class="ghost-btn" onclick="cancelCharacterDetailEdit()">Cancel</button></div></div>`
 }
-function renderCharacterDetail(){const el=document.getElementById("characterDetailContent"); if(!el)return; const c=data.characters.find(x=>x.id===data.selectedCharacterId); if(!c){el.innerHTML=`<div class="panel"><p>Select a character from the sidebar.</p></div>`;return} if(characterDetailEditMode){el.innerHTML=renderCharacterEditForm(c); setVal("editCharRole",c.role||"Other"); return} const rels=characterRelationships(c.id), apps=characterAppearances(c.id), custom=Array.isArray(c.customSections)?c.customSections:[]; el.innerHTML=`<div class="panel character-detail-grid"><div>${c.photo?`<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}"><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">Change Photo</button>`:`<div class="character-photo panel photo-placeholder"><p>No Photo</p><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">+ Add Character Photo</button></div>`}<button class="wide" onclick="startCharacterDetailEdit()">Edit Character Detail</button><button class="wide" onclick="addCharacterCustomSectionFromDetail('${c.id}')">+ Add Custom Section</button></div><div><h3>${escapeHTML(c.name)}</h3><span class="tag">${escapeHTML(c.role||"")}</span><span class="tag">${escapeHTML(c.species||"")}</span>${detailBlock("Basic Information",c.basicInfo||c.bio)}${detailBlock("Physical Appearance",c.description)}${detailBlock("Personality",c.personality)}${detailBlock("Backstory",c.backstory)}${detailBlock("Psychology: Core Wound, Core Fear, Core Desire, Fatal Flaw",c.wound)}${detailBlock("Character Arc",c.arc)}${detailBlock("Voice / Speech Patterns",c.voice)}${detailBlock("Secrets",c.secrets)}${detailBlock("Quotes",c.quotes)}${custom.map(sec=>`<section class="character-section custom-character-section"><h4>${escapeHTML(sec.title||"Untitled Section")}</h4><p>${formatMultiline(sec.text||"")}</p><button class="delete-btn" onclick="deleteCustomSectionFromCharacter('${c.id}','${sec.id}')">Delete Section</button></section>`).join("")}<h3>Linked Relationships</h3>${rels.length?rels.map(r=>{const other=r.a===c.id?r.b:r.a; const ownView=r.a===c.id?r.aView:r.bView; const otherView=r.a===c.id?r.bView:r.aView; return `<p><strong>${escapeHTML(characterName(r.a))} + ${escapeHTML(characterName(r.b))}:</strong> ${escapeHTML(r.type||"")} — ${escapeHTML(r.status||"")}<br>${escapeHTML(r.history||r.arc||"")}${ownView?`<br><strong>${escapeHTML(c.name)}'s View:</strong> ${escapeHTML(ownView)}`:""}${otherView?`<br><strong>${escapeHTML(characterName(other))}'s View:</strong> ${escapeHTML(otherView)}`:""}</p>`}).join(""):"<p>No linked relationships yet.</p>"}${renderSharedAppearanceLog("character",c.id)}</div></div>`}
+function renderCharacterDetail(){const el=document.getElementById("characterDetailContent"); if(!el)return; const c=data.characters.find(x=>x.id===data.selectedCharacterId); if(!c){el.innerHTML=`<div class="panel"><p>Select a character from the sidebar.</p></div>`;return} if(characterDetailEditMode){el.innerHTML=renderCharacterEditForm(c); setVal("editCharRole",normalizeCharacterRole(c.role)); return} const rels=characterRelationships(c.id), apps=characterAppearances(c.id), custom=Array.isArray(c.customSections)?c.customSections:[]; el.innerHTML=`<div class="panel character-detail-grid"><div>${c.photo?`<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}"><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">Change Photo</button>`:`<div class="character-photo panel photo-placeholder"><p>No Photo</p><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">+ Add Character Photo</button></div>`}<button class="wide" onclick="startCharacterDetailEdit()">Edit Character Detail</button><button class="wide" onclick="addCharacterCustomSectionFromDetail('${c.id}')">+ Add Custom Section</button></div><div><h3>${escapeHTML(c.name)}</h3><span class="tag">${escapeHTML(normalizeCharacterRole(c.role))}</span><span class="tag">${escapeHTML(c.species||"")}</span>${detailBlock("Basic Information",c.basicInfo||c.bio)}${detailBlock("Physical Appearance",c.description)}${detailBlock("Personality",c.personality)}${detailBlock("Backstory",c.backstory)}${detailBlock("Psychology: Core Wound, Core Fear, Core Desire, Fatal Flaw",c.wound)}${detailBlock("Character Arc",c.arc)}${detailBlock("Voice / Speech Patterns",c.voice)}${detailBlock("Secrets",c.secrets)}${detailBlock("Quotes",c.quotes)}${custom.map(sec=>`<section class="character-section custom-character-section"><h4>${escapeHTML(sec.title||"Untitled Section")}</h4><p>${formatMultiline(sec.text||"")}</p><button class="delete-btn" onclick="deleteCustomSectionFromCharacter('${c.id}','${sec.id}')">Delete Section</button></section>`).join("")}<h3>Linked Relationships</h3>${rels.length?rels.map(r=>{const other=r.a===c.id?r.b:r.a; const ownView=r.a===c.id?r.aView:r.bView; const otherView=r.a===c.id?r.bView:r.aView; return `<p><strong>${escapeHTML(characterName(r.a))} + ${escapeHTML(characterName(r.b))}:</strong> ${escapeHTML(r.type||"")} — ${escapeHTML(r.status||"")}<br>${escapeHTML(r.history||r.arc||"")}${ownView?`<br><strong>${escapeHTML(c.name)}'s View:</strong> ${escapeHTML(ownView)}`:""}${otherView?`<br><strong>${escapeHTML(characterName(other))}'s View:</strong> ${escapeHTML(otherView)}`:""}</p>`}).join(""):"<p>No linked relationships yet.</p>"}${renderSharedAppearanceLog("character",c.id)}</div></div>`}
 function renderRelationships(){const map=document.getElementById("relationshipMap"), list=document.getElementById("relationshipList"); if(!map||!list)return; map.innerHTML=""; list.innerHTML=""; const rels=data.relationships.filter(seriesScope); if(!rels.length)map.innerHTML="<p>No relationships yet.</p>"; rels.forEach(item=>{const nameA=characterName(item.a), nameB=characterName(item.b); const node=document.createElement("div"); node.className="rel-node"; node.textContent=`${nameA} ↔ ${nameB} (${item.type||"connection"})`; map.appendChild(node); list.appendChild(makeCard(`${nameA} + ${nameB}`,`<span class="tag">${escapeHTML(item.status||"")}</span>${detail("Type",item.type)}${detail("History",item.history)}${detail("Important Moments",item.moments)}${detail("Arc / Future Changes",item.arc)}${detail(`${nameA}'s View`,item.aView)}${detail(`${nameB}'s View`,item.bView)}`,()=>deleteItem("relationships",item.id)))})}
 function renderSceneDatabase(){const el=document.getElementById("sceneList"); if(!el)return; const scenes=(activeBook()?.manuscript||[]).flatMap(ch=>(ch.scenes||[]).map(sc=>({...sc,chapterId:ch.id,chapterTitle:ch.title}))); el.innerHTML=scenes.length?scenes.map(sc=>`<article class="item-card clickable-card" onclick="setView('write','${sc.chapterId}','${sc.id}')"><div class="card-header"><h3>${escapeHTML(sc.title)}</h3><button type="button" onclick="event.stopPropagation(); setView('write','${sc.chapterId}','${sc.id}')">Open Scene</button></div><div class="card-body"><span class="tag">${escapeHTML(sc.chapterTitle)}</span>${detail("POV",characterName(sc.pov))}${detail("Location",locationName(sc.locationId))}${detail("Date",sc.date)}${detail("Mood",sc.mood)}${detail("Purpose",sc.purpose)}<p><strong>Words:</strong> ${countWords(stripHTML(sc.content||""))}</p>${sceneAppearancesHTML(sc)}</div></article>`).join(""):"<p>No scenes yet.</p>"}
 function renderTimeline(){const tl=document.getElementById("timelineList"); if(!tl)return; tl.innerHTML=""; data.timeline.filter(seriesScope).forEach(item=>{const div=document.createElement("article"); div.className="item-card timeline-item"; div.innerHTML=`<div class="card-header"><h3>${escapeHTML(item.when||"Unplaced Event")}</h3><button class="delete-btn">Delete</button></div><div class="card-body"><span class="tag">${escapeHTML(item.scope)}</span>${detail("Event",item.event)}${detail("Impact",item.impact)}</div>`; div.querySelector("button").onclick=()=>deleteItem("timeline",item.id); tl.appendChild(div)})}
@@ -2350,7 +2331,7 @@ function renderStoryBible(){
   const section=(title,items,fn)=>`<div class="panel story-bible-section"><h3>${escapeHTML(title)} <span class="muted">(${items.length})</span></h3>${items.length?items.map(fn).join(''):'<p class="muted">None yet.</p>'}</div>`;
   el.innerHTML=`<div class="panel"><h2>${escapeHTML(srs.title||'Project')} Story Bible</h2><p>${escapeHTML(srs.synopsis||'')}</p><div class="grid stats-grid"><div class="stat-card"><span>${books.length}</span><p>Books</p></div><div class="stat-card"><span>${data.characters.filter(seriesScope).length}</span><p>Characters</p></div><div class="stat-card"><span>${data.world.filter(seriesScope).length+data.locations.filter(seriesScope).length+data.organizations.filter(seriesScope).length+data.magicSystems.filter(seriesScope).length}</span><p>World Items</p></div><div class="stat-card"><span>${data.relationships.filter(seriesScope).length}</span><p>Relationships</p></div></div></div>`+
   section('Books',books,b=>`<div class="bible-entry"><h4>${escapeHTML(b.title||'Untitled Book')}</h4><p>${escapeHTML(b.summary||'')}</p></div>`)+
-  section('Characters',data.characters.filter(seriesScope),c=>`<div class="bible-entry"><h4>${escapeHTML(c.name||'Unnamed')}</h4><p><strong>${escapeHTML(c.role||'')}</strong> ${escapeHTML(c.species||'')}</p><p>${escapeHTML(c.basicInfo||c.description||'')}</p>${renderSharedAppearanceLog('character',c.id)}</div>`)+
+  section('Characters',data.characters.filter(seriesScope),c=>`<div class="bible-entry"><h4>${escapeHTML(c.name||'Unnamed')}</h4><p><strong>${escapeHTML(normalizeCharacterRole(c.role))}</strong> ${escapeHTML(c.species||'')}</p><p>${escapeHTML(c.basicInfo||c.description||'')}</p>${renderSharedAppearanceLog('character',c.id)}</div>`)+
   section('Relationships',data.relationships.filter(seriesScope),r=>`<div class="bible-entry"><h4>${escapeHTML(characterName(r.a))} + ${escapeHTML(characterName(r.b))}</h4><p>${escapeHTML(r.type||'')}</p>${detail('Status',r.status)}${detail('Arc',r.arc)}</div>`)+
   section('Locations',data.locations.filter(seriesScope),l=>`<div class="bible-entry"><h4>${escapeHTML(l.name||'Unnamed Location')}</h4><p>${escapeHTML(l.description||l.region||'')}</p>${renderSharedAppearanceLog('location',l.id)}</div>`)+
   section('Organizations',data.organizations.filter(seriesScope),o=>`<div class="bible-entry"><h4>${escapeHTML(o.name||'Unnamed Organization')}</h4><p>${escapeHTML(o.description||o.purpose||'')}</p>${renderSharedAppearanceLog('organization',o.id)}</div>`)+
@@ -2621,16 +2602,16 @@ function renderSelects(){
 }
 function addCharacter(){
   const input=document.getElementById("charPhoto"); const file=input?.files?.[0];
-  const finish=photo=>{data.characters.push({id:uid(),...scopedItem(val("charScope")),name:val("charName"),role:val("charRole"),species:val("charSpecies"),photo,basicInfo:val("charBasicInfo"),description:val("charDescription"),personality:val("charPersonality"),backstory:val("charBackstory"),wound:val("charWound"),bookArcs:collectCharacterArcDrafts(),voice:val("charVoice"),secrets:val("charSecrets"),quotes:val("charQuotes"),customSections:[...characterCustomSectionDrafts],created:new Date().toISOString()}); clearFields(["charName","charSpecies","charBasicInfo","charDescription","charPersonality","charBackstory","charWound","charArcText","charVoice","charSecrets","charQuotes","charCustomTitle","charCustomText"]); characterCustomSectionDrafts=[]; characterArcDrafts=[]; renderCharacterCustomDraftList(); renderCharacterArcDraftList(); if(input)input.value=""; clearOverviewImagePreview("worldImagePreview"); hideAddForm("characterAddForm"); saveData()};
+  const finish=photo=>{data.characters.push({id:uid(),...scopedItem(val("charScope")),name:val("charName"),role:normalizeCharacterRole(val("charRole")),species:val("charSpecies"),photo,basicInfo:val("charBasicInfo"),description:val("charDescription"),personality:val("charPersonality"),backstory:val("charBackstory"),wound:val("charWound"),bookArcs:collectCharacterArcDrafts(),voice:val("charVoice"),secrets:val("charSecrets"),quotes:val("charQuotes"),customSections:[...characterCustomSectionDrafts],created:new Date().toISOString()}); clearFields(["charName","charSpecies","charBasicInfo","charDescription","charPersonality","charBackstory","charWound","charArcText","charVoice","charSecrets","charQuotes","charCustomTitle","charCustomText"]); characterCustomSectionDrafts=[]; characterArcDrafts=[]; renderCharacterCustomDraftList(); renderCharacterArcDraftList(); if(input)input.value=""; clearOverviewImagePreview("worldImagePreview"); hideAddForm("characterAddForm"); saveData()};
   if(!file)return finish(""); readImageUpload(input,finish)
 }
 function renderCharacterEditForm(c){
   const custom=Array.isArray(c.customSections)?c.customSections:[];
-  return `<div class="panel character-detail-grid"><div>${c.photo?`<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}"><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">Change Photo</button>`:`<div class="character-photo panel photo-placeholder"><p>No Photo</p><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">+ Add Character Photo</button></div>`}</div><div><h3>Edit Character Detail</h3><div class="form-grid"><input id="editCharName" placeholder="Character name" value="${escapeAttr(c.name||"")}"><select id="editCharRole"><option>Main</option><option>Side</option><option>Love Interest</option><option>Antagonist</option><option>Mentor</option><option>Other</option></select><input id="editCharSpecies" placeholder="Species / identity" value="${escapeAttr(c.species||"")}"><textarea id="editCharBasicInfo" placeholder="Basic Information">${escapeHTML(c.basicInfo||c.bio||"")}</textarea><textarea id="editCharDescription" placeholder="Physical Appearance">${escapeHTML(c.description||"")}</textarea><textarea id="editCharPersonality" placeholder="Personality">${escapeHTML(c.personality||"")}</textarea><textarea id="editCharBackstory" placeholder="Backstory">${escapeHTML(c.backstory||"")}</textarea><textarea id="editCharWound" placeholder="Psychology: Core Wound, Core Fear, Core Desire, Fatal Flaw">${escapeHTML(c.wound||"")}</textarea>${renderEditBookArcs(c)}<textarea id="editCharVoice" placeholder="Voice / speech patterns">${escapeHTML(c.voice||"")}</textarea><textarea id="editCharSecrets" placeholder="Secrets">${escapeHTML(c.secrets||"")}</textarea><textarea id="editCharQuotes" placeholder="Quotes">${escapeHTML(c.quotes||"")}</textarea></div><h3>Custom Sections</h3>${custom.map(sec=>`<div class="custom-section-builder"><input id="editCustomTitle_${sec.id}" placeholder="Section title" value="${escapeAttr(sec.title||"")}"><textarea id="editCustomText_${sec.id}" placeholder="Section notes">${escapeHTML(sec.text||"")}</textarea><button type="button" class="delete-btn" onclick="deleteCustomSectionFromCharacter('${c.id}','${sec.id}'); characterDetailEditMode=true">Delete Section</button></div>`).join("")||"<p class='muted'>No custom sections yet.</p>"}<button type="button" onclick="addCharacterCustomSectionFromDetail('${c.id}')">+ Add Custom Section</button><hr><button onclick="saveCharacterDetailEdit('${c.id}')">Save Changes</button><button class="ghost-btn" onclick="cancelCharacterDetailEdit()">Cancel</button></div></div>`;
+  return `<div class="panel character-detail-grid"><div>${c.photo?`<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}"><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">Change Photo</button>`:`<div class="character-photo panel photo-placeholder"><p>No Photo</p><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">+ Add Character Photo</button></div>`}</div><div><h3>Edit Character Detail</h3><div class="form-grid"><input id="editCharName" placeholder="Character name" value="${escapeAttr(c.name||"")}"><select id="editCharRole">${characterRoleOptions(c.role)}</select><input id="editCharSpecies" placeholder="Species / identity" value="${escapeAttr(c.species||"")}"><textarea id="editCharBasicInfo" placeholder="Basic Information">${escapeHTML(c.basicInfo||c.bio||"")}</textarea><textarea id="editCharDescription" placeholder="Physical Appearance">${escapeHTML(c.description||"")}</textarea><textarea id="editCharPersonality" placeholder="Personality">${escapeHTML(c.personality||"")}</textarea><textarea id="editCharBackstory" placeholder="Backstory">${escapeHTML(c.backstory||"")}</textarea><textarea id="editCharWound" placeholder="Psychology: Core Wound, Core Fear, Core Desire, Fatal Flaw">${escapeHTML(c.wound||"")}</textarea>${renderEditBookArcs(c)}<textarea id="editCharVoice" placeholder="Voice / speech patterns">${escapeHTML(c.voice||"")}</textarea><textarea id="editCharSecrets" placeholder="Secrets">${escapeHTML(c.secrets||"")}</textarea><textarea id="editCharQuotes" placeholder="Quotes">${escapeHTML(c.quotes||"")}</textarea></div><h3>Custom Sections</h3>${custom.map(sec=>`<div class="custom-section-builder"><input id="editCustomTitle_${sec.id}" placeholder="Section title" value="${escapeAttr(sec.title||"")}"><textarea id="editCustomText_${sec.id}" placeholder="Section notes">${escapeHTML(sec.text||"")}</textarea><button type="button" class="delete-btn" onclick="deleteCustomSectionFromCharacter('${c.id}','${sec.id}'); characterDetailEditMode=true">Delete Section</button></div>`).join("")||"<p class='muted'>No custom sections yet.</p>"}<button type="button" onclick="addCharacterCustomSectionFromDetail('${c.id}')">+ Add Custom Section</button><hr><button onclick="saveCharacterDetailEdit('${c.id}')">Save Changes</button><button class="ghost-btn" onclick="cancelCharacterDetailEdit()">Cancel</button></div></div>`;
 }
 function saveCharacterDetailEdit(characterId){
   const c=data.characters.find(x=>x.id===characterId); if(!c)return;
-  c.name=val("editCharName"); c.role=val("editCharRole"); c.species=val("editCharSpecies");
+  c.name=val("editCharName"); c.role=normalizeCharacterRole(val("editCharRole")); c.species=val("editCharSpecies");
   c.basicInfo=val("editCharBasicInfo"); c.description=val("editCharDescription"); c.personality=val("editCharPersonality");
   c.backstory=val("editCharBackstory"); c.wound=val("editCharWound"); c.bookArcs=collectEditBookArcs(); c.arc=''; c.voice=val("editCharVoice");
   c.secrets=val("editCharSecrets"); c.quotes=val("editCharQuotes");
@@ -2641,7 +2622,7 @@ function preserveCharacterDetailEditDraft(characterId){
   const c=data.characters.find(x=>x.id===characterId); if(!c)return null;
   const nameEl=document.getElementById("editCharName");
   if(nameEl){
-    c.name=val("editCharName"); c.role=val("editCharRole"); c.species=val("editCharSpecies");
+    c.name=val("editCharName"); c.role=normalizeCharacterRole(val("editCharRole")); c.species=val("editCharSpecies");
     c.basicInfo=val("editCharBasicInfo"); c.description=val("editCharDescription"); c.personality=val("editCharPersonality");
     c.backstory=val("editCharBackstory"); c.wound=val("editCharWound"); c.bookArcs=collectEditBookArcs(); c.arc=''; c.voice=val("editCharVoice");
     c.secrets=val("editCharSecrets"); c.quotes=val("editCharQuotes");
@@ -2650,7 +2631,7 @@ function preserveCharacterDetailEditDraft(characterId){
   return c;
 }
 function renderCharacterDetail(){
-  const el=document.getElementById("characterDetailContent"); if(!el)return; const c=data.characters.find(x=>x.id===data.selectedCharacterId); if(!c){el.innerHTML=`<div class="panel"><p>Select a character from the sidebar.</p></div>`;return} if(characterDetailEditMode){el.innerHTML=renderCharacterEditForm(c); setVal("editCharRole",c.role||"Other"); return} const rels=characterRelationships(c.id), custom=Array.isArray(c.customSections)?c.customSections:[]; el.innerHTML=`<div class="panel character-detail-grid"><div>${c.photo?`<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}"><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">Change Photo</button>`:`<div class="character-photo panel photo-placeholder"><p>No Photo</p><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">+ Add Character Photo</button></div>`}<button class="wide" onclick="startCharacterDetailEdit()">Edit Character Detail</button><button class="wide" onclick="addCharacterCustomSectionFromDetail('${c.id}')">+ Add Custom Section</button></div><div><h3>${escapeHTML(c.name)}</h3><span class="tag">${escapeHTML(c.role||"")}</span><span class="tag">${escapeHTML(c.species||"")}</span>${detailBlock("Basic Information",c.basicInfo||c.bio)}${detailBlock("Physical Appearance",c.description)}${detailBlock("Personality",c.personality)}${detailBlock("Backstory",c.backstory)}${detailBlock("Psychology: Core Wound, Core Fear, Core Desire, Fatal Flaw",c.wound)}${renderCharacterBookArcs(c)}${detailBlock("Voice / Speech Patterns",c.voice)}${detailBlock("Secrets",c.secrets)}${detailBlock("Quotes",c.quotes)}${custom.map(sec=>`<section class="character-section custom-character-section"><h4>${escapeHTML(sec.title||"Untitled Section")}</h4><p>${formatMultiline(sec.text||"")}</p><button class="delete-btn" onclick="deleteCustomSectionFromCharacter('${c.id}','${sec.id}')">Delete Section</button></section>`).join("")}<h3>Linked Relationships</h3>${rels.length?rels.map(r=>{const other=r.a===c.id?r.b:r.a; const ownView=r.a===c.id?r.aView:r.bView; const otherView=r.a===c.id?r.bView:r.aView; return `<p><strong>${escapeHTML(characterName(r.a))} + ${escapeHTML(characterName(r.b))}:</strong> ${escapeHTML(r.type||"")} — ${escapeHTML(r.status||"")}<br>${escapeHTML(r.history||r.arc||"")}${ownView?`<br><strong>${escapeHTML(c.name)}'s View:</strong> ${escapeHTML(ownView)}`:""}${otherView?`<br><strong>${escapeHTML(characterName(other))}'s View:</strong> ${escapeHTML(otherView)}`:""}</p>`}).join(""):"<p>No linked relationships yet.</p>"}${renderSharedAppearanceLog("character",c.id)}</div></div>`;
+  const el=document.getElementById("characterDetailContent"); if(!el)return; const c=data.characters.find(x=>x.id===data.selectedCharacterId); if(!c){el.innerHTML=`<div class="panel"><p>Select a character from the sidebar.</p></div>`;return} if(characterDetailEditMode){el.innerHTML=renderCharacterEditForm(c); setVal("editCharRole",normalizeCharacterRole(c.role)); return} const rels=characterRelationships(c.id), custom=Array.isArray(c.customSections)?c.customSections:[]; el.innerHTML=`<div class="panel character-detail-grid"><div>${c.photo?`<img class="character-photo" src="${c.photo}" alt="${escapeHTML(c.name)}"><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">Change Photo</button>`:`<div class="character-photo panel photo-placeholder"><p>No Photo</p><input id="characterPhotoUpload_${c.id}" type="file" accept="image/*" class="hidden" onchange="updateCharacterPhoto('${c.id}',this)"><button type="button" class="wide" onclick="triggerCharacterPhotoUpload('${c.id}',event)">+ Add Character Photo</button></div>`}<button class="wide" onclick="startCharacterDetailEdit()">Edit Character Detail</button><button class="wide" onclick="addCharacterCustomSectionFromDetail('${c.id}')">+ Add Custom Section</button></div><div><h3>${escapeHTML(c.name)}</h3><span class="tag">${escapeHTML(normalizeCharacterRole(c.role))}</span><span class="tag">${escapeHTML(c.species||"")}</span>${detailBlock("Basic Information",c.basicInfo||c.bio)}${detailBlock("Physical Appearance",c.description)}${detailBlock("Personality",c.personality)}${detailBlock("Backstory",c.backstory)}${detailBlock("Psychology: Core Wound, Core Fear, Core Desire, Fatal Flaw",c.wound)}${renderCharacterBookArcs(c)}${detailBlock("Voice / Speech Patterns",c.voice)}${detailBlock("Secrets",c.secrets)}${detailBlock("Quotes",c.quotes)}${custom.map(sec=>`<section class="character-section custom-character-section"><h4>${escapeHTML(sec.title||"Untitled Section")}</h4><p>${formatMultiline(sec.text||"")}</p><button class="delete-btn" onclick="deleteCustomSectionFromCharacter('${c.id}','${sec.id}')">Delete Section</button></section>`).join("")}<h3>Linked Relationships</h3>${rels.length?rels.map(r=>{const other=r.a===c.id?r.b:r.a; const ownView=r.a===c.id?r.aView:r.bView; const otherView=r.a===c.id?r.bView:r.aView; return `<p><strong>${escapeHTML(characterName(r.a))} + ${escapeHTML(characterName(r.b))}:</strong> ${escapeHTML(r.type||"")} — ${escapeHTML(r.status||"")}<br>${escapeHTML(r.history||r.arc||"")}${ownView?`<br><strong>${escapeHTML(c.name)}'s View:</strong> ${escapeHTML(ownView)}`:""}${otherView?`<br><strong>${escapeHTML(characterName(other))}'s View:</strong> ${escapeHTML(otherView)}`:""}</p>`}).join(""):"<p>No linked relationships yet.</p>"}${renderSharedAppearanceLog("character",c.id)}</div></div>`;
 }
 function characterArcItemsFromCharacters(){
   return data.characters.filter(seriesScope).flatMap(c=>normalizeCharacterBookArcs(c).filter(a=>a.text).map(a=>({id:`${c.id}_${a.id}`,title:`${c.name||'Unnamed Character'} — ${seriesBooks().find(b=>b.id===a.bookId)?.title||'Book Arc'}`,characterId:c.id,bookId:a.bookId,text:a.text,source:'character'})));
@@ -3114,3 +3095,159 @@ function renderSeriesMilestones(){
 }
 
 /* End series automation patch */
+
+/* === Character Arc Book Placeholder Numbering Fix ===
+   Keeps Book # labels aligned to the number/order of arcs and still lets users
+   retie placeholder arcs to real books from the Series Arc Tracker. */
+function arcPlaceholderId(n){return `__book_${Math.max(1,Number(n)||1)}`;}
+function isPlaceholderBookId(bookId){return typeof bookId==='string' && bookId.startsWith('__book_');}
+function placeholderNumberFromId(bookId){const m=String(bookId||'').match(/__book_(\d+)/); return m?Number(m[1]):1;}
+function normalizeArcPlaceholders(arcs=[]){
+  let placeholderIndex=1;
+  return (arcs||[]).map((arc)=>{
+    const a={...arc};
+    if(!a.bookId || isPlaceholderBookId(a.bookId)){
+      a.bookId=arcPlaceholderId(placeholderIndex);
+      a.bookLabel=`Book #${placeholderIndex}`;
+      placeholderIndex++;
+    }else{
+      a.bookLabel='';
+    }
+    return a;
+  });
+}
+function characterArcBookLabel(arc, fallbackIndex=0){
+  const b=seriesBooks().find(x=>x.id===(arc||{}).bookId);
+  if(b)return b.title||'Untitled Book';
+  if(isPlaceholderBookId((arc||{}).bookId))return `Book #${placeholderNumberFromId(arc.bookId)}`;
+  if((arc||{}).bookLabel)return arc.bookLabel;
+  return `Book #${fallbackIndex+1}`;
+}
+function realBookIdsUsedByArcs(arcs=[], ignoreArcId=''){
+  return new Set((arcs||[]).filter(a=>a.id!==ignoreArcId && a.bookId && !isPlaceholderBookId(a.bookId)).map(a=>a.bookId));
+}
+function nextPlaceholderBookIdForArcs(arcs=[]){
+  return arcPlaceholderId((arcs||[]).filter(Boolean).length+1);
+}
+function availableRealBooksForArcs(arcs=[], selected='', ignoreArcId=''){
+  const used=realBookIdsUsedByArcs(arcs, ignoreArcId);
+  return seriesBooks().filter(b=>b.id===selected || !used.has(b.id));
+}
+function seriesBookOptions(selected='', characterId='', arcId='', draftMode=false){
+  let sourceArcs=[];
+  if(characterId){
+    const c=data.characters.find(x=>x.id===characterId);
+    sourceArcs=normalizeCharacterBookArcs(c||{});
+  }else if(draftMode){
+    sourceArcs=characterArcDrafts||[];
+  }
+  const normalized=normalizeArcPlaceholders(sourceArcs);
+  const placeholderSelected=isPlaceholderBookId(selected)||!selected;
+  const placeholderNumber=placeholderSelected
+    ? (isPlaceholderBookId(selected)?placeholderNumberFromId(selected):(normalized.length+1))
+    : (normalized.length+1);
+  const placeholder=arcPlaceholderId(placeholderNumber);
+  const realBooks=availableRealBooksForArcs(normalized, selected, arcId);
+  const realOptions=realBooks.map(b=>`<option value="${b.id}" ${b.id===selected?'selected':''}>${escapeHTML(b.title||'Untitled Book')}</option>`).join('');
+  const placeholderOption=`<option value="${placeholder}" ${placeholderSelected?'selected':''}>Book #${placeholderNumber}</option>`;
+  return `${placeholderOption}${realOptions?`<option disabled>──────────</option>${realOptions}`:''}`;
+}
+function populateCharacterArcCreator(){
+  const sel=document.getElementById('charArcBook');
+  if(sel){
+    const selected=sel.value || '';
+    sel.innerHTML=seriesBookOptions(selected,'','',true);
+  }
+  renderCharacterArcDraftList();
+}
+function renderCharacterArcDraftList(){
+  const el=document.getElementById('charArcDraftList'); if(!el)return;
+  characterArcDrafts=normalizeArcPlaceholders(characterArcDrafts||[]);
+  el.innerHTML=characterArcDrafts.length?characterArcDrafts.map((a,i)=>`<div class="custom-section-chip"><strong>${escapeHTML(characterArcBookLabel(a,i))}</strong> ${typeof characterArcTypeTag==='function'?characterArcTypeTag(a):''}<button type="button" onclick="removeCharacterArcDraft('${a.id}')">Remove</button></div>`).join(''):`<p class="muted">No book arcs added yet.</p>`;
+}
+function addCharacterArcDraft(){
+  let bookId=val('charArcBook');
+  const text=val('charArcText').trim();
+  if(!bookId) bookId=nextPlaceholderBookIdForArcs(characterArcDrafts||[]);
+  if(!text && !bookId)return;
+  characterArcDrafts=normalizeArcPlaceholders(characterArcDrafts||[]);
+  if(isPlaceholderBookId(bookId)) bookId=nextPlaceholderBookIdForArcs(characterArcDrafts);
+  characterArcDrafts.push({id:uid(),bookId,bookLabel:isPlaceholderBookId(bookId)?`Book #${placeholderNumberFromId(bookId)}`:'',text,isImpactArc:typeof characterArcImpactChecked==='function'?characterArcImpactChecked():false});
+  if(typeof clearCharacterArcCreatorFields==='function') clearCharacterArcCreatorFields(); else clearFields(['charArcText']);
+  populateCharacterArcCreator();
+}
+function collectCharacterArcDrafts(){
+  const arcs=normalizeArcPlaceholders([...(characterArcDrafts||[])]);
+  let bookId=val('charArcBook');
+  const text=val('charArcText').trim();
+  if(text){
+    if(!bookId || isPlaceholderBookId(bookId)) bookId=nextPlaceholderBookIdForArcs(arcs);
+    arcs.push({id:uid(),bookId,bookLabel:isPlaceholderBookId(bookId)?`Book #${placeholderNumberFromId(bookId)}`:'',text,isImpactArc:typeof characterArcImpactChecked==='function'?characterArcImpactChecked():false});
+  }
+  return normalizeArcPlaceholders(arcs).filter(a=>a.bookId||a.text).map(a=>({...a,isImpactArc:!!a.isImpactArc}));
+}
+function normalizeCharacterBookArcs(c){
+  if(!c)return [];
+  if(!Array.isArray(c.bookArcs)){
+    c.bookArcs=[];
+    if((c.arc||'').trim()) c.bookArcs.push({id:uid(),bookId:c.bookId||arcPlaceholderId(1),text:c.arc,isImpactArc:false});
+  }
+  c.bookArcs=normalizeArcPlaceholders(c.bookArcs.map(a=>({id:a.id||uid(),bookId:a.bookId||'',bookLabel:a.bookLabel||'',text:a.text||'',isImpactArc:!!a.isImpactArc})));
+  return c.bookArcs;
+}
+function addEditBookArcRow(bookId='',text='',isImpactArc=false){
+  const wrap=document.getElementById('editBookArcsList'); if(!wrap)return;
+  const characterId=data.selectedCharacterId||'';
+  const existing=collectEditBookArcs();
+  if(!bookId) bookId=nextPlaceholderBookIdForArcs(existing);
+  const id=uid();
+  const div=document.createElement('div');
+  div.className='book-arc-row';
+  div.dataset.arcRow='true';
+  div.dataset.arcId=id;
+  div.innerHTML=`<select class="editArcBook">${seriesBookOptions(bookId,characterId,id)}</select><label class="checkbox-line"><input class="editArcImpact" type="checkbox" ${isImpactArc?'checked':''}> Effect / impact arc</label><textarea class="editArcText" placeholder="Character arc or impact for this book">${escapeHTML(text||'')}</textarea><div class="arc-row-actions"><button type="button" class="delete-btn" onclick="this.closest('.book-arc-row').remove(); renumberEditBookArcRows();">Remove Arc</button></div>`;
+  wrap.appendChild(div);
+  renumberEditBookArcRows();
+}
+function renumberEditBookArcRows(){
+  const rows=[...document.querySelectorAll('#editBookArcsList .book-arc-row')];
+  rows.forEach((row,i)=>{
+    const sel=row.querySelector('.editArcBook'); if(!sel)return;
+    if(!sel.value || isPlaceholderBookId(sel.value)){
+      const next=arcPlaceholderId(i+1);
+      sel.innerHTML=seriesBookOptions(next,data.selectedCharacterId||'',row.dataset.arcId||'');
+      sel.value=next;
+    }
+  });
+}
+function renderEditBookArcs(c){
+  const arcs=normalizeCharacterBookArcs(c);
+  return `<div class="full-span custom-section-builder"><h4>Book Specific Character Arcs</h4><p class="muted">If no matching book exists yet, use Book # based on the arc order. You can later tie that placeholder to a real book in the Series Arc Tracker.</p><div id="editBookArcsList">${arcs.map((a,i)=>`<div class="book-arc-row" data-arc-row="true" data-arc-id="${a.id}"><select class="editArcBook">${seriesBookOptions(a.bookId||arcPlaceholderId(i+1),c.id,a.id)}</select><label class="checkbox-line"><input class="editArcImpact" type="checkbox" ${a.isImpactArc?'checked':''}> Effect / impact arc</label><textarea class="editArcText" placeholder="Character arc or impact for this book">${escapeHTML(a.text||'')}</textarea><div class="arc-row-actions"><button type="button" class="delete-btn" onclick="this.closest('.book-arc-row').remove(); renumberEditBookArcRows();">Remove Arc</button></div></div>`).join('')}</div><button type="button" onclick="addEditBookArcRow()">+ Add Another Character Arc</button></div>`;
+}
+function collectEditBookArcs(){
+  const rows=[...document.querySelectorAll('#editBookArcsList .book-arc-row')];
+  const raw=rows.map((row,i)=>{
+    let bookId=row.querySelector('.editArcBook')?.value||arcPlaceholderId(i+1);
+    if(isPlaceholderBookId(bookId)) bookId=arcPlaceholderId(i+1);
+    return {id:row.dataset.arcId||uid(),bookId,bookLabel:isPlaceholderBookId(bookId)?`Book #${placeholderNumberFromId(bookId)}`:'',text:row.querySelector('.editArcText')?.value||'',isImpactArc:!!row.querySelector('.editArcImpact')?.checked};
+  }).filter(a=>a.bookId||a.text);
+  return normalizeArcPlaceholders(raw);
+}
+function updateCharacterArcBook(characterId, arcId, bookId){
+  const c=data.characters.find(x=>x.id===characterId); if(!c)return;
+  const arcs=normalizeCharacterBookArcs(c); const arc=arcs.find(a=>a.id===arcId); if(!arc)return;
+  if(bookId){
+    arc.bookId=bookId;
+    arc.bookLabel=isPlaceholderBookId(bookId)?`Book #${placeholderNumberFromId(bookId)}`:'';
+  }
+  c.bookArcs=normalizeArcPlaceholders(arcs);
+  saveData(true); renderSeriesArcs(); renderCharacterDetail(); renderSeriesTools();
+}
+function seriesArcBookSelect(item){
+  const c=data.characters.find(x=>x.id===item.characterId);
+  const options=seriesBookOptions(item.bookId,item.characterId,item.arcId);
+  return `<label class="muted">Book link</label><select class="mini-select" onchange="updateCharacterArcBook('${item.characterId}','${item.arcId}',this.value)">${options}</select>`;
+}
+function characterArcItemsFromCharacters(){
+  return data.characters.filter(seriesScope).flatMap(c=>normalizeCharacterBookArcs(c).filter(a=>a.text).map((a,i)=>({id:`${c.id}_${a.id}`,arcId:a.id,title:`${c.name||'Unnamed Character'} — ${characterArcBookLabel(a,i)}`,characterId:c.id,bookId:a.bookId,bookLabel:characterArcBookLabel(a,i),text:a.text,isImpactArc:!!a.isImpactArc,source:'character'})));
+}
