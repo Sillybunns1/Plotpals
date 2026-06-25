@@ -1,64 +1,81 @@
 (function(){
-  let deferredInstallPrompt = null;
+  if (window.__plotpalsPwaSupport) return;
+  window.__plotpalsPwaSupport = true;
 
-  function isStandalone(){
-    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const STATUS_ONLINE = 'online';
+  const STATUS_OFFLINE = 'offline';
+  let deferredPrompt = null;
+
+  function show(msg, ms){
+    if (typeof window.showStatus === 'function') window.showStatus(msg, ms || 2600);
+    else console.info(msg);
   }
 
-  function updateInstallButtons(){
-    const buttons = document.querySelectorAll('[data-pwa-install]');
-    buttons.forEach(button => {
-      if (isStandalone()) {
-        button.textContent = '✓ PWA Installed';
-        button.disabled = true;
-        button.classList.add('installed');
-      } else if (!deferredInstallPrompt) {
-        button.textContent = '📲 Get the App';
-        button.disabled = false;
-      } else {
-        button.textContent = '📲 Install PlotPals App';
-        button.disabled = false;
-      }
-    });
+  function updateNetworkStatus(){
+    const status = navigator.onLine ? STATUS_ONLINE : STATUS_OFFLINE;
+    document.documentElement.dataset.networkStatus = status;
+    window.PLOTPALS_NETWORK_STATUS = status;
   }
 
-  function showInstallHelp(){
-    const message = 'To install PlotPals as an app, use your browser menu and choose “Install app,” “Add to Home Screen,” or “Create shortcut.” PlotPals still works normally in this browser.';
-    alert(message);
-  }
-
-  async function installPwa(){
-    if (isStandalone()) return;
-    if (!deferredInstallPrompt) {
-      showInstallHelp();
-      return;
+  async function registerServiceWorker(){
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      const registration = await navigator.serviceWorker.register('./service-worker.js', { scope: './' });
+      window.PLOTPALS_SERVICE_WORKER_READY = true;
+      registration.update().catch(() => {});
+    } catch (error) {
+      console.warn('PlotPals PWA service worker registration failed.', error);
     }
-    deferredInstallPrompt.prompt();
-    try { await deferredInstallPrompt.userChoice; } catch (error) { console.warn('PWA install prompt closed:', error); }
-    deferredInstallPrompt = null;
-    updateInstallButtons();
   }
 
-  window.installPlotPalsPwa = installPwa;
+  function ensureInstallButton(){
+    if (document.getElementById('plotpalsInstallAppButton')) return;
+    const btn = document.createElement('button');
+    btn.id = 'plotpalsInstallAppButton';
+    btn.type = 'button';
+    btn.className = 'ghost-btn plotpals-install-app-button hidden';
+    btn.textContent = 'Install App';
+    btn.addEventListener('click', async () => {
+      if (!deferredPrompt) {
+        show('Install is available from your browser menu if supported.');
+        return;
+      }
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice.catch(() => null);
+      deferredPrompt = null;
+      btn.classList.add('hidden');
+    });
+    document.body.appendChild(btn);
+  }
 
   window.addEventListener('beforeinstallprompt', event => {
     event.preventDefault();
-    deferredInstallPrompt = event;
-    updateInstallButtons();
+    deferredPrompt = event;
+    ensureInstallButton();
+    document.getElementById('plotpalsInstallAppButton')?.classList.remove('hidden');
   });
 
   window.addEventListener('appinstalled', () => {
-    deferredInstallPrompt = null;
-    updateInstallButtons();
+    deferredPrompt = null;
+    document.getElementById('plotpalsInstallAppButton')?.classList.add('hidden');
+    show('PlotPals installed.');
   });
 
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./service-worker.js?v=4').catch(error => {
-        console.warn('PlotPals service worker registration failed:', error);
-      });
-    });
-  }
+  window.addEventListener('online', () => {
+    updateNetworkStatus();
+    show('Back online. Supabase sync is available.');
+    if (typeof window.retryCloudSave === 'function') window.retryCloudSave();
+    else if (typeof window.scheduleCloudSave === 'function') window.scheduleCloudSave();
+  });
 
-  document.addEventListener('DOMContentLoaded', updateInstallButtons);
+  window.addEventListener('offline', () => {
+    updateNetworkStatus();
+    show('Offline mode: local writing is available. Supabase will sync when online.', 4200);
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    updateNetworkStatus();
+    ensureInstallButton();
+    registerServiceWorker();
+  });
 })();

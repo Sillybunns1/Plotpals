@@ -1,1084 +1,267 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PlotPals - Plan. Write. Build Worlds.</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="manifest" href="manifest.webmanifest?v=4" />
-  <meta name="theme-color" content="#15101f" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="PlotPals" />
-  <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body>
-  <section id="loginScreen" class="login-screen">
-    <div class="login-card">
-      <div class="brand center">
-        <div class="brand-mark">✦</div>
-        <div>
-          <h1>PlotPals</h1>
-          <p>Plan. Write. Build Worlds.</p>
-        </div>
-      </div>
-      <div class="feature-strip">
-        <span>📚 Plan</span>
-        <span>✍️ Write</span>
-        <span>🌙 Build Worlds</span>
-      </div>
-      <div class="login-tabs">
-        <button id="loginTab" class="active" onclick="switchAuthMode('login')">Login</button>
-        <button id="signupTab" onclick="switchAuthMode('signup')">Sign Up</button>
-      </div>
-      <label>Email</label>
-      <input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="email" />
-      <label>Password</label>
-      <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" />
-      <button id="authSubmitBtn" class="wide glow" onclick="submitAuth()">Login</button>
-      <button class="wide ghost-btn" onclick="sendPasswordResetFromLogin()">Reset Password</button>
-      <button type="button" class="wide pwa-install-btn" data-pwa-install onclick="installPlotPalsPwa()">📲 Get the App</button>
-      <p id="loginMessage"></p>
-    </div>
-  </section>
 
-  <section id="projectScreen" class="project-screen hidden">
-    <div class="story-dashboard">
-      <aside class="story-sidebar">
-        <div class="brand">
-          <div class="brand-mark">✦</div>
-          <div>
-            <h1>PlotPals</h1>
-            <p>Plan. Write. Build Worlds.</p>
-          </div>
-        </div>
-
-        <button class="wide glow" onclick="showCreateProjectPanel()">+ New Book / Series</button>
-
-        <div class="story-nav-group">
-          <h4>Library</h4>
-          <button class="story-nav active" data-library="stories" onclick="setLibraryView('stories')">📖 My Stories</button>
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><title>PlotPals - Plan. Write. Build Worlds.</title><link href="favicon.svg" rel="icon" type="image/svg+xml"/><link href="manifest.webmanifest" rel="manifest"/><link href="icon-192.png" rel="apple-touch-icon"/><meta content="#15101f" name="theme-color"/><link href="styles.min.css" rel="stylesheet"/> <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head><body><section class="login-screen" id="loginScreen"><div class="login-card"><div class="brand center"><div class="brand-mark">✦</div><div><h1>PlotPals</h1><p>Plan. Write. Build Worlds.</p></div></div><div class="feature-strip"><span>📚 Plan</span><span>✍️ Write</span><span>🌙 Build Worlds</span></div><div class="login-tabs"><button class="active" id="loginTab" onclick="switchAuthMode('login')">Login</button><button id="signupTab" onclick="switchAuthMode('signup')">Sign Up</button></div><label>Email</label><input autocomplete="email" id="loginEmail" placeholder="you@example.com" type="email"/><label>Password</label><input autocomplete="current-password" id="loginPassword" placeholder="Password" type="password"/><button class="wide glow" id="authSubmitBtn" onclick="submitAuth()">Login</button><button class="wide ghost-btn" onclick="sendPasswordResetFromLogin()">Reset Password</button><p id="loginMessage"></p></div></section><section class="project-screen hidden" id="projectScreen"><div class="story-dashboard"><aside class="story-sidebar"><div class="brand"><div class="brand-mark">✦</div><div><h1>PlotPals</h1><p>Plan. Write. Build Worlds.</p></div></div><div class="story-nav-group"><h4>Library</h4><button class="story-nav active" data-library="stories" onclick="setLibraryView('stories')">📖 My Stories</button><button class="story-nav" data-library="favorites" onclick="setLibraryView('favorites')">⭐ Favorites</button><button class="story-nav" data-library="recent" onclick="setLibraryView('recent')">🕘 Recently Opened</button><button class="story-nav" data-library="trash" onclick="setLibraryView('trash')">🗑️ Trash</button></div><div class="story-nav-group"><h4>Quick Links</h4><button class="story-nav" onclick="loadFromCloud()">☁️ Load Cloud</button><button class="story-nav" onclick="signOut()">🚪 Sign Out</button></div><button class="collapse-btn">‹ Collapse Sidebar</button></aside><main class="story-main"><header class="story-topbar"><div class="dashboard-search"> 🔍 <input id="projectSearch" oninput="renderProjectScreen()" placeholder="Search everything..."/></div><div class="dashboard-icons"><button onclick="toggleTheme()">☾</button><button onclick="signOut()">Sign Out</button></div></header><section class="welcome-hero"><div><h1>Welcome back, <span id="dashboardName">Writer</span> ✒</h1><p>What story will you tell today?</p></div><div class="hero-actions"><button onclick="importDataFromDashboard()">⇧ Import</button></div></section><section class="dashboard-section"><div class="section-title"><h2 id="dashboardLibraryTitle">My Stories</h2></div><div class="story-card-grid" id="dashboardStoryCards"></div></section><section class="dashboard-widgets"><div class="dashboard-panel continue-panel"><h3>📖 Continue Writing</h3><div id="continueWritingCard"></div></div><div class="dashboard-panel stats-panel"><div class="card-header"><h3>📈 Writing Stats</h3><span class="tag">This Project</span></div><div class="mini-stats"><div><strong id="dashWords">0</strong><span>Words</span></div><div><strong id="dashChapters">0</strong><span>Chapters</span></div><div><strong id="dashScenes">0</strong><span>Scenes</span></div><div><strong id="dashCharacters">0</strong><span>Characters</span></div></div><div class="fake-chart daily-word-chart" id="dashboardDailyWordChart"></div></div></section><section class="dashboard-widgets lower"><div class="dashboard-panel"><h3>↺ Recent Activity</h3><div id="recentActivity"></div></div><div class="dashboard-panel pinned-panel"><div class="card-header"><h3>📌 Pinned Notes</h3><button onclick="savePinnedNote()">Save</button></div><textarea id="dashboardPinnedNote" placeholder="Pin a quote, theme, reminder, or story note..."></textarea></div><div class="dashboard-panel"><h3>♫ Project Playlist</h3><div id="dashboardPlaylistPreview"></div></div></section><input accept="application/json" class="hidden" id="dashboardImportFile" onchange="importData(event)" type="file"/></main></div></section><div class="app-shell hidden" id="appShell"><aside class="sidebar story-sidebar workspace-sidebar" id="sidebar"><div class="brand"><div class="brand-mark">✦</div><div class="brand-text"><h1>PlotPals</h1><p id="sidebarProjectName">Project</p></div></div><button class="wide glow" onclick="backToProjects()">← Main Page</button><div class="nested-nav" id="nestedNav"></div><div class="account-card"><strong id="accountStatus">Signed in</strong><p id="syncStatus">Cloud auto-sync ready.</p></div><div class="sidebar-footer"><input id="globalSearch" placeholder="Search project..."/><small class="muted">Filter appears with results.</small></div></aside><main><header class="topbar"><div><h2 id="viewTitle">Overview</h2><p><span id="pageCrumb">Project Dashboard</span> · <span id="projectPath">No project selected.</span></p></div><div class="top-actions"><button class="ghost-btn" onclick="toggleTheme()">Theme</button><button class="ghost-btn" onclick="syncToCloud()">Retry Cloud Save</button><button class="ghost-btn" onclick="loadFromCloud()">Load Cloud</button><button class="ghost-btn" id="clearSearch">Clear Search</button></div></header><section class="search-results hidden" id="searchResults"></section><section class="view active" id="projectDashboard"><div class="overview-actions"><button class="ghost-btn" onclick="backToProjects()">← Back to Main Page</button><button class="glow" onclick="setView('write')">Continue Writing</button><button onclick="setView('overview')">Edit Overview</button></div><section class="welcome-hero project-landing-hero"><div><h1 id="projectDashboardTitle">Project Dashboard</h1><p id="projectDashboardSubtitle">All books in this project at a glance.</p></div><div class="hero-actions"><button class="glow" onclick="toggleProjectAddBookPanel()">+ Add Book</button><button onclick="setView('plotBoard')">Open Plot Board</button></div></section><section class="dashboard-widgets"><div class="dashboard-panel continue-panel"><h3>📖 Continue Writing</h3><div id="projectContinueWriting"></div></div><div class="dashboard-panel stats-panel project-writing-stats-panel"><div class="card-header"><h3>📈 Project Writing Stats</h3><span class="tag">All Books</span></div><div class="mini-stats"><div><strong id="projectDashWords">0</strong><span>Words</span></div><div><strong id="projectDashChapters">0</strong><span>Chapters</span></div><div><strong id="projectDashScenes">0</strong><span>Scenes</span></div><div><strong id="projectDashCharacters">0</strong><span>Characters</span></div></div><div class="fake-chart daily-word-chart" id="projectWritingChart"></div></div><div class="dashboard-panel quick-panel"><h3>⚡ Quick Add</h3><button onclick="toggleProjectAddBookPanel()">+ Book</button><button onclick="setView('characters')">+ Character</button><button onclick="setView('plotBoard')">+ Plot Point</button><button onclick="setView('world')">+ Worldbuilding</button></div></section><section class="dashboard-widgets lower"><div class="dashboard-panel project-books-panel"><div class="card-header"><h3>📚 Books in This Project</h3><button onclick="toggleProjectAddBookPanel()">+ Add Book</button></div><div class="project-add-book-panel hidden" id="projectAddBookPanel"><div class="card-header compact-header"><h4>Add Book</h4><button class="ghost-btn tiny-btn" onclick="toggleProjectAddBookPanel(false)" type="button">Close</button></div><div class="project-add-book-grid"><label>Book Title <input id="projectNewBookTitle" placeholder="Book title" type="text"/></label><label class="checkbox-row project-pov-row"><input checked="" id="projectNewBookIsPov" type="checkbox"/><span>This is a POV book</span></label><label>Add a Cover <input accept="image/*" id="projectNewBookCover" onchange="previewProjectNewBookCover(this)" type="file"/></label><div class="project-new-book-cover-preview hidden" id="projectNewBookCoverPreview"></div></div><div class="form-actions"><button class="glow" onclick="createBookFromProjectDashboard()" type="button">Create Book</button></div></div><div class="project-add-book-panel hidden" id="projectEditBookPanel"><div class="card-header compact-header"><h4>Edit Book</h4><button class="ghost-btn tiny-btn" onclick="toggleProjectEditBookPanel(null,false)" type="button">Close</button></div><div class="project-add-book-grid"><label>Select Book <select id="projectEditBookSelect" onchange="loadProjectEditBookFields(this.value)"></select></label><label>Book Title <input id="projectEditBookTitle" placeholder="Book title" type="text"/></label><label class="checkbox-row project-pov-row"><input checked="" id="projectEditBookIsPov" type="checkbox"/><span>This is a POV book</span></label><label>Add / Change Cover <input accept="image/*" id="projectEditBookCover" onchange="previewProjectEditBookCover(this)" type="file"/></label><div class="project-new-book-cover-preview hidden" id="projectEditBookCoverPreview"></div></div><div class="form-actions"><button class="glow" onclick="saveProjectBookEdits()" type="button">Save Book Changes</button></div></div><div class="card-grid" id="projectDashboardBooks"></div></div><div class="dashboard-panel"><h3>🧭 Story Health</h3><div id="projectStoryHealth"></div></div></section><section class="dashboard-widgets lower"><div class="dashboard-panel"><div class="card-header"><h3>🗂️ Plot Arc Progress</h3><select id="plotProgressBookFilter" onchange="renderProjectDashboard()"></select></div><div id="projectPlotArcProgress"></div></div><div class="dashboard-panel"><h3>👀 Appearance Summary</h3><div id="projectAppearanceSummary"></div></div><div class="dashboard-panel"><h3>⚠️ Continuity Warnings</h3><div id="projectContinuityWarnings"></div></div></section></section><section class="view" id="overview"><div class="overview-actions"><button class="ghost-btn" onclick="backToProjects()">← Back to Main Page</button><button class="glow" onclick="setView('write')">Resume Writing</button></div><div class="two-col"><div class="panel"><h3>Project Bible</h3><input id="seriesTitleEdit" placeholder="Project / Series title"/><select id="seriesTypeEdit"><option value="series">Series</option><option value="standalone">Standalone Book</option></select><input id="seriesGenreEdit" placeholder="Genre / tone"/><textarea id="seriesSynopsisEdit" placeholder="Series / project synopsis"></textarea><textarea id="seriesThemeEdit" placeholder="Overall theme"></textarea><textarea id="seriesMysteriesEdit" placeholder="Major mysteries"></textarea><textarea id="seriesForeshadowingEdit" placeholder="Foreshadowing tracker"></textarea></div><div class="panel"><h3>Book Details</h3><input id="bookTitleEdit" placeholder="Book title"/><select id="bookStatusEdit"><option>Planning</option><option>Drafting</option><option>Revising</option><option>Finished</option></select><input id="bookStoryStartYearEdit" placeholder="Story start year, ex. 1970"/><textarea id="bookSummaryEdit" placeholder="Book summary"></textarea><textarea id="bookThemeEdit" placeholder="Book theme"></textarea><textarea id="bookNotesEdit" placeholder="General book notes"></textarea></div></div><div class="grid stats-grid"><div class="stat-card"><span id="statWords">0</span><p>Words Written</p></div><div class="stat-card"><span id="statChapters">0</span><p>Chapters</p></div><div class="stat-card"><span id="statScenes">0</span><p>Scenes</p></div><div class="stat-card"><span id="statCharacters">0</span><p>Characters</p></div></div></section><section class="view" id="write"><div class="editor-layout"><aside class="chapter-sidebar panel"><div class="chapter-sidebar-header"><h3>Chapters &amp; Scenes</h3><button class="collapse-editor-sidebar-btn" onclick="toggleManuscriptSidebar()" title="Collapse chapter/scene list" type="button">⇤</button></div><div class="chapter-sidebar-actions"><button onclick="addManuscriptChapter()">+ Chapter</button><button onclick="addSceneToActiveChapter()">+ Scene</button><button onclick="moveScene(-1)">Move Scene Up</button><button onclick="moveScene(1)">Move Scene Down</button></div><div id="manuscriptChapterList"></div></aside><div class="panel manuscript-panel" id="manuscriptPanel"><div class="editor-top"><input id="currentChapterTitle" placeholder="Chapter title"/><input id="currentSceneTitle" placeholder="Scene title"/><div class="word-pill"><span id="sceneWordCount">0</span> words</div></div><div class="scene-meta"><select id="scenePOV"><option value="">POV Character</option></select><select id="sceneLocation"><option value="">Location</option></select><select id="scenePlotPoint"><option value="">Plot Board Point</option></select><input id="sceneDate" placeholder="Timeline date / placement"/><input id="sceneMood" placeholder="Mood"/><input id="scenePurpose" placeholder="Scene purpose"/></div><div class="format-bar"><button onclick="formatDoc('bold')"><b>B</b></button><button onclick="formatDoc('italic')"><i>I</i></button><button onclick="formatDoc('underline')"><u>U</u></button><button onclick="formatDoc('strikeThrough')"><s>S</s></button><button onclick="formatBlock('h2')">Heading</button><button onclick="formatBlock('p')">Paragraph</button><button onclick="formatDoc('insertUnorderedList')">Bullets</button><button onclick="formatDoc('insertOrderedList')">Numbers</button><button onclick="formatDoc('justifyLeft')">Left</button><button onclick="formatDoc('justifyCenter')">Center</button><button onclick="formatDoc('justifyRight')">Right</button><button onclick="insertSceneBreak()">Scene Break</button><button onclick="toggleFullscreen()">Full Screen</button></div><div class="editor-stats"><span>Book words: <strong id="bookWordCountInline">0</strong></span><span>Scene chars: <strong id="sceneCharCount">0</strong></span><span>Paragraphs: <strong id="sceneParagraphCount">0</strong></span><span>Auto-save: <strong id="autosaveStatus">Ready</strong></span></div><div class="rich-editor" contenteditable="true" id="richEditor" spellcheck="true"></div><div class="scene-tracking-block scene-tracking-bottom" id="sceneTrackingBottom"></div></div><aside class="manuscript-lookup-sidebar panel collapsed" id="manuscriptLookupSidebar"><button class="lookup-sidebar-tab" onclick="toggleLookupSidebar()" title="Open project lookup" type="button">Lookup</button><div class="lookup-sidebar-inner"><div class="lookup-sidebar-header"><div><h3>Project Lookup</h3><p>Reference project entries without leaving your scene.</p></div><button class="lookup-sidebar-close" onclick="toggleLookupSidebar(true)" title="Collapse project lookup" type="button">⇥</button></div><input id="manuscriptLookupSearch" oninput="runManuscriptLookup()" placeholder="Search characters, locations, plot points..."/><div class="manuscript-lookup-results hidden" id="manuscriptLookupResults"></div><div class="sprint-panel"><div class="sprint-header"><h3>Writing Sprint</h3><span class="tag" id="sprintStatusBadge">Ready</span></div><div class="form-grid sprint-controls-grid"><label>Goal Words <input id="sprintGoalWords" min="1" onchange="updateSprintSettings()" type="number" value="500"/></label><label>Minutes <input id="sprintMinutes" min="1" onchange="updateSprintSettings()" type="number" value="25"/></label></div><div class="sprint-stat-row"><span>Words written</span><strong id="sprintWordsWritten">0</strong></div><div class="sprint-stat-row"><span>Time left</span><strong id="sprintTimeLeft">25:00</strong></div><div class="sprint-progress"><div id="sprintProgressBar"></div></div><div class="sprint-buttons"><button onclick="startWritingSprint()" type="button">Start</button><button onclick="pauseWritingSprint()" type="button">Pause</button><button onclick="resetWritingSprint()" type="button">Reset</button></div></div></div></aside></div></section><section class="view" id="storyBoard"><div class="form-panel"><h3>Story Structure Board</h3><div class="form-grid"><select id="structureTemplate"><option>Three Act Structure</option><option>Save The Cat</option><option>Hero's Journey</option><option>Romance Beat Sheet</option><option>Custom</option></select><input id="structureBeatName" placeholder="Beat / section name"/><textarea id="structureBeatNotes" placeholder="Beat notes"></textarea></div><button onclick="applyStructureTemplate()">Apply Template</button><button onclick="addStructureBeat()">Add Custom Beat</button></div><div class="board-grid" id="storyBoardList"></div></section><section class="view" id="chapters"><div class="form-panel"><h3>Chapter Planner</h3><div class="form-grid"><input id="chapterNumber" placeholder="Chapter number / title"/><input id="chapterPOV" placeholder="POV character"/><input id="chapterWordTarget" placeholder="Target word count"/><select id="chapterStructureBeat"></select><textarea id="chapterGoal" placeholder="Scene/chapter goal"></textarea><textarea id="chapterConflict" placeholder="Conflict"></textarea><textarea id="chapterOutcome" placeholder="Outcome"></textarea><textarea id="chapterEmotion" placeholder="Emotional beat"></textarea><textarea id="chapterForeshadowing" placeholder="Foreshadowing / callbacks"></textarea></div><button onclick="addChapterPlan()">Add Chapter Plan</button></div><div class="card-grid" id="chapterPlanList"></div></section><section class="view" id="threads"><div class="form-panel"><h3>Add Plot Thread</h3><div class="form-grid"><input id="threadTitle" placeholder="Thread title / question"/><select id="threadScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select><select id="threadType"><option>Main Plot</option><option>Subplot</option><option>Character Arc</option><option>Mystery</option><option>Romance</option><option>Other</option></select><select id="threadStatus"><option>Open</option><option>In Progress</option><option>Closed</option></select><textarea id="threadSetup" placeholder="Setup"></textarea><textarea id="threadPayoff" placeholder="Payoff / resolution"></textarea></div><button onclick="addThread()">Add Thread</button></div><div class="card-grid" id="threadList"></div></section><section class="view" id="mysteries"><div class="form-panel"><h3>Mystery Tracker</h3><div class="form-grid"><input id="mysteryQuestion" placeholder="Mystery question"/><input id="mysteryIntroduced" placeholder="Introduced in..."/><input id="mysteryPayoff" placeholder="Payoff chapter / book"/><select id="mysteryStatus"><option>Open</option><option>Hinted</option><option>Revealed</option><option>Resolved</option></select><textarea id="mysteryHints" placeholder="Hints / false leads"></textarea><textarea id="mysteryAnswer" placeholder="Answer / reveal"></textarea></div><button onclick="addMystery()">Add Mystery</button></div><div class="card-grid" id="mysteryList"></div></section><section class="view" id="foreshadowing"><div class="form-panel"><h3>Foreshadowing Tracker</h3><div class="form-grid"><input id="foreshadowHint" placeholder="Hint / setup"/><input id="foreshadowAppears" placeholder="Appears in..."/><input id="foreshadowPayoff" placeholder="Payoff in..."/><select id="foreshadowStatus"><option>Planted</option><option>Developing</option><option>Paid Off</option></select><textarea id="foreshadowNotes" placeholder="Notes"></textarea></div><button onclick="addForeshadowing()">Add Foreshadowing</button></div><div class="card-grid" id="foreshadowingList"></div></section><section class="view" id="plotBoard"><div class="form-panel"><h3>Plot Board</h3><div class="form-grid"><input id="plotArcTitle" placeholder="New arc title, ex. Act 1, Romance Arc, Betrayal Arc"/><button onclick="addPlotArc()" type="button">Add Plot Arc</button></div><hr/><div class="form-grid"><input id="plotCardTitle" placeholder="Plot point title"/><select id="plotCardArc"></select><textarea id="plotCardNotes" placeholder="Notes"></textarea></div><button onclick="addPlotCard()">Add Plot Point</button></div><div class="board-grid" id="plotBoardList"></div></section><section class="view" id="sceneBoard"><div class="category-page-header panel"><div><h2>🎬 Scene Cards / Board</h2><p class="muted">Review every scene as a card, grouped by chapter. Drag scenes between chapters to reorganize your book.</p></div><div class="category-tools"><button onclick="addManuscriptChapter(); setView('sceneBoard')" type="button">+ Chapter</button><button onclick="addSceneToActiveChapter(); setView('sceneBoard')" type="button">+ Scene</button></div></div><div class="scene-board-grid" id="sceneBoardList"></div></section><section class="view" id="characters"><button class="wide" onclick="toggleAddForm('characterAddForm')" type="button">+ Add Character</button><div class="form-panel hidden" id="characterAddForm"><h3>Add Character</h3><div class="form-grid"><input id="charName" placeholder="Character name"/><select id="charScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select><select id="charRole"><option>Protagonist</option><option>Major Supporting Character</option><option>Love Interest</option><option>Mentor</option><option>Antagonist</option><option>Historical Character</option><option>Minor Character</option></select><div class="inline-link-field"><select id="charSpecies" title="Race / Species from World Building"></select><button class="ghost-btn" onclick="openCharacterWorldCategoryModal('races-species','charSpecies')" type="button">+ Race/Species</button></div><div class="upload-control"><button class="file-label inline-file" onclick="triggerOverviewImageUpload('charPhoto', event)" type="button">Upload Character Image</button><input accept="image/*" class="hidden" id="charPhoto" onchange="previewOverviewImage('charPhoto','charPhotoPreview')" type="file"/><div class="upload-preview muted" id="charPhotoPreview">No image selected.</div></div><input id="charAge" oninput="syncCharacterAgeBirthFields('age')" placeholder="Actual age (used for timeline), e.g. 345"/><input id="charAppearanceAge" placeholder="Appearance age (does NOT affect timeline), e.g. looks 30"/><input id="charBirthDate" oninput="syncCharacterAgeBirthFields('birth')" placeholder="Birth year / date, e.g. 1625"/><label class="checkbox-line"><input id="charDeceased" onchange="toggleCharacterDeceasedFields()" type="checkbox"/> Deceased</label><input class="hidden" id="charDeathDate" placeholder="Death year / date"/><div class="inline-link-field"><select id="charBirthplace" title="Birthplace from Locations"><option value="">Birthplace</option></select><button class="ghost-btn" onclick="openCharacterLocationModal('charBirthplace')" type="button">+ Location</button></div><div class="inline-link-field"><select id="charLanguages" multiple="" size="3" title="Languages from World Building"></select><button class="ghost-btn" onclick="openCharacterWorldCategoryModal('languages','charLanguages')" type="button">+ Language</button></div><textarea id="charStoryPurpose" placeholder="Story Purpose: Why does this character matter to the plot?"></textarea><textarea id="charContinuityFacts" placeholder="Continuity Facts: appearance, age, rules, important fixed details"></textarea><textarea id="charBasicInfo" placeholder="Basic Information"></textarea><textarea id="charDescription" placeholder="Physical Appearance"></textarea><textarea id="charPersonality" placeholder="Personality"></textarea><textarea id="charBackstory" placeholder="Backstory"></textarea><div class="custom-section-builder" id="characterWorldTiesTracker"></div><textarea id="charWound" placeholder="Psychology: Core Wound, Core Fear, Core Desire, Fatal Flaw"></textarea><div class="custom-section-builder character-arc-builder"><h4>Book Specific Character Arcs</h4><select id="charArcBook"></select><textarea id="charArcText" placeholder="Character arc for the selected book"></textarea><label class="checkbox-line"><input id="charArcImpact" type="checkbox"/> This is an effect/impact arc, not this character’s own arc</label><button onclick="addCharacterArcDraft()" type="button">Add Character Arc</button><div class="custom-section-list" id="charArcDraftList"></div></div><textarea id="charVoice" placeholder="Voice summary / speech patterns"></textarea><div class="custom-section-builder character-voice-profile-form"><h4>Voice Profile</h4><input id="charVoiceSpeechStyle" placeholder="Speech style, e.g. cryptic, sarcastic"/><input id="charVoicePhrases" placeholder="Common phrases, comma separated"/><input id="charVoiceVocabulary" placeholder="Vocabulary level"/><input id="charVoiceSentenceLength" placeholder="Sentence length"/><input id="charVoiceFormality" placeholder="Formality"/><input id="charVoiceHumor" placeholder="Humor"/><input id="charVoiceDialect" placeholder="Accent / dialect"/><textarea id="charVoiceMannerisms" placeholder="Dialogue mannerisms"></textarea><small class="muted">This feeds the Encyclopedia voice profile. The Encyclopedia will display this data but no longer edits it there.</small></div><textarea id="charSecrets" placeholder="Secrets"></textarea><textarea id="charQuotes" placeholder="Quotes"></textarea><div class="custom-section-builder"><input id="charCustomTitle" placeholder="Additional section title"/><textarea id="charCustomText" placeholder="Additional section notes"></textarea><button onclick="addCharacterCustomSectionDraft()" type="button">Add Section to Character</button><div class="custom-section-list" id="charCustomDraftList"></div></div></div><button onclick="addCharacter()">Add Character</button></div><div id="characterRoleGroups"></div></section><section class="view" id="relationships"><button class="wide" onclick="toggleAddForm('relationshipAddForm')" type="button">+ Add Relationship</button><div class="form-panel hidden" id="relationshipAddForm"><h3>Add Relationship</h3><div class="form-grid"><select id="relA" onchange="updateRelationshipViewLabels()"></select><select id="relB" onchange="updateRelationshipViewLabels()"></select><select id="relScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select><input id="relType" placeholder="Relationship type"/><input id="relStatus" placeholder="Current status"/><textarea id="relHistory" placeholder="History"></textarea><textarea id="relMoments" placeholder="Important moments"></textarea><textarea id="relArc" placeholder="Relationship arc / future changes"></textarea><label class="field-label" for="relAView" id="relAViewLabel">Character 1's View</label><textarea id="relAView" placeholder="How Character 1 sees this relationship"></textarea><label class="field-label" for="relBView" id="relBViewLabel">Character 2's View</label><textarea id="relBView" placeholder="How Character 2 sees this relationship"></textarea></div><button onclick="addRelationship()">Add Relationship</button></div><div class="relationship-map" id="relationshipMap"></div><div class="card-grid" id="relationshipList"></div></section><section class="view" id="relationshipGraphView"><div class="category-page-header panel"><div><h2>🕸️ Relationship Graph</h2><p class="muted">A visual map of character relationships across the project. Click a character name to open their profile.</p></div></div><div class="panel relationship-graph-panel" id="relationshipGraphContent"></div></section><section class="view" id="locations"><div class="category-page-header panel"><div><h2>📍 Locations <span class="muted" id="locationCategoryCount"></span></h2><p class="muted">Create places, regions, landmarks, kingdoms, cities, and important story settings.</p></div><div class="category-tools"><input id="locationSearch" oninput="renderEntityList('location')" placeholder="Search Locations..."/><select id="locationSort" onchange="renderEntityList('location')"><option value="az">A–Z</option><option value="za">Z–A</option><option value="newest">Newest</option><option value="oldest">Oldest</option></select></div></div><button class="wide" onclick="toggleAddForm('locationAddForm')" type="button">+ Add Location</button><div class="form-panel hidden" id="locationAddForm"><h3>Add Location</h3><div class="form-grid"><input id="locationName" placeholder="Location name"/><select id="locationScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select><input id="locationPopulation" placeholder="Population"/><input id="locationCulture" placeholder="Culture"/><div class="upload-control"><button class="file-label inline-file" onclick="triggerOverviewImageUpload('locationImage', event)" type="button">Upload Location Image</button><input accept="image/*" class="hidden" id="locationImage" onchange="previewOverviewImage('locationImage','locationImagePreview')" type="file"/><div class="upload-preview muted" id="locationImagePreview">No image selected.</div></div><textarea id="locationDescription" placeholder="Description"></textarea><textarea id="locationHistory" placeholder="History"></textarea><textarea id="locationNotes" placeholder="Notes"></textarea></div><button onclick="addLocation()">Add Location</button></div><div class="card-grid" id="locationList"></div></section><section class="view" id="magic"><div class="category-page-header panel"><div><h2>✨ Magic Systems <span class="muted" id="magicCategoryCount"></span></h2><p class="muted">Create power systems, supernatural rules, magical sources, limitations, costs, and known users.</p></div><div class="category-tools"><input id="magicSearch" oninput="renderEntityList('magic')" placeholder="Search Magic Systems..."/><select id="magicSort" onchange="renderEntityList('magic')"><option value="az">A–Z</option><option value="za">Z–A</option><option value="newest">Newest</option><option value="oldest">Oldest</option></select></div></div><button class="wide" onclick="toggleAddForm('magicAddForm')" type="button">+ Add Magic System</button><div class="form-panel hidden" id="magicAddForm"><h3>Add Magic / Power System</h3><div class="form-grid"><input id="magicName" placeholder="Magic system name"/><input id="magicSource" placeholder="Source"/><div class="upload-control"><button class="file-label inline-file" onclick="triggerOverviewImageUpload('magicImage', event)" type="button">Upload Magic/System Image</button><input accept="image/*" class="hidden" id="magicImage" onchange="previewOverviewImage('magicImage','magicImagePreview')" type="file"/><div class="upload-preview muted" id="magicImagePreview">No image selected.</div></div><textarea id="magicRules" placeholder="Rules"></textarea><textarea id="magicLimits" placeholder="Limitations"></textarea><textarea id="magicCosts" placeholder="Costs"></textarea><textarea id="magicExamples" placeholder="Examples / users"></textarea></div><button onclick="addMagic()">Add Magic System</button></div><div class="card-grid" id="magicList"></div></section><section class="view" id="organizations"><div class="category-page-header panel"><div><h2>⚜️ Organizations <span class="muted" id="organizationCategoryCount"></span></h2><p class="muted">Create guilds, factions, councils, kingdoms, companies, orders, clubs, and power groups.</p></div><div class="category-tools"><input id="organizationSearch" oninput="renderEntityList('organization')" placeholder="Search Organizations..."/><select id="organizationSort" onchange="renderEntityList('organization')"><option value="az">A–Z</option><option value="za">Z–A</option><option value="newest">Newest</option><option value="oldest">Oldest</option></select></div></div><button class="wide" onclick="toggleAddForm('organizationAddForm')" type="button">+ Add Organization</button><div class="form-panel hidden" id="organizationAddForm"><h3>Add Organization</h3><div class="form-grid"><input id="orgName" placeholder="Organization name"/><input id="orgType" placeholder="Type: guild, religion, kingdom..."/><div class="upload-control"><button class="file-label inline-file" onclick="triggerOverviewImageUpload('orgImage', event)" type="button">Upload Organization Image</button><input accept="image/*" class="hidden" id="orgImage" onchange="previewOverviewImage('orgImage','orgImagePreview')" type="file"/><div class="upload-preview muted" id="orgImagePreview">No image selected.</div></div><textarea id="orgDescription" placeholder="Description"></textarea><textarea id="orgMembers" placeholder="Members"></textarea><textarea id="orgHistory" placeholder="History / influence"></textarea></div><button onclick="addOrganization()">Add Organization</button></div><div class="card-grid" id="organizationList"></div></section><section class="view" id="scenes"><div class="card-grid" id="sceneList"></div></section><section class="view" id="timeline"><div class="form-panel"><h3>Add Timeline Event</h3><div class="form-grid"><input id="timeWhen" placeholder="When? e.g. 300 years ago, Book 1 Ch. 3"/><select id="timeDateType" onchange="toggleSmartDateFields()"><option value="exact">Exact / typed date</option><option value="relative">Relative date</option><option value="approximate">Approximate</option><option value="unknown">Unknown</option></select><select id="timeRelativeTo"><option value="storyStart">Story Start</option><option value="customYear">Custom Year</option></select><input id="timeBaseYear" placeholder="Base year, optional"/><input id="timeOffset" placeholder="Offset, ex. 30 years ago / 5 years before / 2 months after"/><select id="timeScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select><textarea id="timeEvent" placeholder="What happens?"></textarea><textarea id="timeImpact" placeholder="Why it matters / consequences"></textarea></div><button onclick="addTimeline()">Add Event</button></div><div class="timeline-list" id="timelineList"></div></section><section class="view" id="world"><button class="wide" onclick="toggleAddForm('worldAddForm')" type="button">+ Add Worldbuilding Entry</button><div class="form-panel hidden" id="worldAddForm"><h3>Add Worldbuilding Entry</h3><p class="muted">Each entry creates its own detail page, similar to Characters.</p><div class="form-grid"><input id="worldName" placeholder="Entry name"/><select id="worldScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select><select id="worldCategory"></select><input id="worldCustomCategory" placeholder="New custom category, optional"/><div class="upload-control"><button class="file-label inline-file" onclick="triggerOverviewImageUpload('worldImage', event)" type="button">Upload Entry Image</button><input accept="image/*" class="hidden" id="worldImage" onchange="previewOverviewImage('worldImage','worldImagePreview')" type="file"/><div class="upload-preview muted" id="worldImagePreview">No image selected.</div></div><textarea id="worldBasicInfo" placeholder="Basic Information"></textarea><textarea id="worldDescription" placeholder="Description"></textarea><textarea id="worldHistory" placeholder="History"></textarea><textarea id="worldCulture" placeholder="Culture / Society"></textarea><textarea id="worldRules" placeholder="Rules, limits, powers, or important notes"></textarea><textarea id="worldPlotRelevance" placeholder="Plot Relevance"></textarea><div class="custom-section-builder"><input id="worldCustomTitle" placeholder="Additional section title"/><textarea id="worldCustomText" placeholder="Additional section notes"></textarea><button onclick="addWorldCustomSectionDraft()" type="button">Add Section to Entry</button><div class="custom-section-list" id="worldCustomDraftList"></div></div></div><button onclick="addWorld()">Add Worldbuilding Entry</button></div><div id="worldCategoryGroups"></div></section><section class="view" id="worldCategoryView"><div id="worldCategoryContent"></div></section><section class="view" id="seriesTools"><div class="series-only-warning" id="seriesOnlyWarning"></div><div id="seriesToolsContent"><div class="category-page-header panel"><div><h2>🏛️ Series Dashboard</h2><p class="muted">Big-picture health for the entire project across all books.</p></div><div class="category-tools"><button onclick="setView('storyBible')" type="button">Open Story Bible</button><button onclick="exportSeriesBiblePDF()" type="button">Generate Series Bible PDF</button></div></div><div class="grid stats-grid"><div class="stat-card"><span id="seriesBookCount">0</span><p>Books</p></div><div class="stat-card"><span id="seriesTotalWords">0</span><p>Total Words</p></div><div class="stat-card"><span id="seriesArcCount">0</span><p>Character Arcs</p></div><div class="stat-card"><span id="seriesWarningCount">0</span><p>Warnings</p></div></div><div class="series-command-grid"><button class="series-command-card" onclick="setView('storyBible')" type="button"><strong>📖 Story Bible</strong><span>Review synced character, world, and plot reference material.</span></button><button class="series-command-card" onclick="setView('seriesArcs')" type="button"><strong>🧭 Series Arc Tracker</strong><span>Check how character arcs move across books.</span></button><button class="series-command-card" onclick="setView('themeTracker')" type="button"><strong>🎭 Theme Tracker</strong><span>Track recurring themes and where they show up.</span></button><button class="series-command-card" onclick="setView('continuityCenter')" type="button"><strong>⚠️ Continuity Center</strong><span>Find missing plot points, unused entries, and unresolved questions.</span></button><button class="series-command-card" onclick="setView('bookHandoffs')" type="button"><strong>🔁 Book Handoffs</strong><span>Manage what carries from one book into the next.</span></button><button class="series-command-card" onclick="setView('seriesMilestones')" type="button"><strong>🏁 Series Milestones</strong><span>Track drafts, revisions, and publishing goals.</span></button></div><div class="two-col"><div class="panel"><h3>Books in Series</h3><div id="seriesDashboardBooks"></div></div><div class="panel"><h3>Series Health Snapshot</h3><div id="seriesBigPicture"></div></div></div><div class="two-col"><div class="panel"><h3>Arc Progress Preview</h3><div id="seriesArcPreview"></div></div><div class="panel"><h3>Needs Attention</h3><div id="seriesNeedsAttention"></div></div></div></div></section><section class="view" id="seriesArcs"><button class="wide" onclick="toggleAddForm('seriesArcAddForm')" type="button">+ Add Series Arc</button><div class="form-panel hidden" id="seriesArcAddForm"><h3>Add Series Arc</h3><div class="form-grid"><input id="seriesArcTitle" placeholder="Arc title, ex. Cinna learns to live again"/><select id="seriesArcCharacter"></select><p class="muted full-span">Manual series arcs are optional. Character-specific book arcs entered on character pages also appear here automatically.</p><textarea id="seriesArcBook1" placeholder="Book 1 stage"></textarea><textarea id="seriesArcBook2" placeholder="Book 2 stage"></textarea><textarea id="seriesArcBook3" placeholder="Book 3 stage"></textarea><textarea id="seriesArcNotes" placeholder="Series-wide arc notes"></textarea></div><button onclick="addSeriesArc()">Add Series Arc</button></div><div class="card-grid" id="seriesArcList"></div></section><section class="view" id="themeTracker"><button class="wide" onclick="toggleAddForm('themeTrackAddForm')" type="button">+ Add Theme</button><div class="form-panel hidden" id="themeTrackAddForm"><h3>Add Theme</h3><div class="form-grid"><input id="themeTrackName" placeholder="Theme, ex. You cannot recreate the past"/><textarea id="themeTrackBooks" placeholder="How this theme appears across books"></textarea><textarea id="themeTrackScenes" placeholder="Key scenes / chapters where this theme appears"></textarea><textarea id="themeTrackNotes" placeholder="Notes"></textarea></div><button onclick="addThemeTrack()">Add Theme</button></div><div class="card-grid" id="themeTrackList"></div></section><section class="view" id="continuityCenter"><div class="category-page-header panel"><div><h2>⚠️ Continuity Center</h2><p class="muted">Automatic series-level warnings gathered from characters, plot points, manuscript scenes, and questions.</p></div></div><div class="card-grid" id="continuityCenterList"></div></section><section class="view" id="bookHandoffs"><button class="wide" onclick="toggleAddForm('bookHandoffAddForm')" type="button">+ Add Book Handoff</button><div class="form-panel hidden" id="bookHandoffAddForm"><h3>Add Book-to-Book Handoff</h3><div class="form-grid"><select id="handoffFromBook"></select><select id="handoffToBook"></select><textarea id="handoffStatus" placeholder="Ending/starting status, ex. Cinna: heartbroken; Marcus: concerned"></textarea><textarea id="handoffNotes" placeholder="Continuity notes"></textarea></div><button onclick="addBookHandoff()">Add Handoff</button></div><div class="card-grid" id="bookHandoffList"></div></section><section class="view" id="seriesMilestones"><button class="wide" onclick="toggleAddForm('seriesMilestoneAddForm')" type="button">+ Add Milestone</button><div class="form-panel hidden" id="seriesMilestoneAddForm"><h3>Add Series Milestone</h3><div class="form-grid"><input id="milestoneTitle" placeholder="Milestone, ex. Book 2 first draft complete"/><select id="milestoneStatus"><option>Not Started</option><option>In Progress</option><option>Complete</option></select><input id="milestoneDate" placeholder="Target date / completed date"/><textarea id="milestoneNotes" placeholder="Notes"></textarea></div><button onclick="addSeriesMilestone()">Add Milestone</button></div><div class="card-grid" id="seriesMilestoneList"></div></section><section class="view" id="storyBible"><div class="category-page-header panel"><div><h2>📚 Story Bible</h2><p class="muted">A project-wide reference guide synced across all books in this series/project.</p></div><div class="category-tools"><button onclick="exportSeriesBibleDocx()" type="button">Export Word HTML</button><button onclick="exportSeriesBiblePDF()" type="button">Export PDF</button></div></div><div class="story-bible-content" id="storyBibleContent"></div></section><section class="view" id="encyclopedia"><div class="category-page-header panel"><div><h2>📖 Encyclopedia</h2><p class="muted">A live wiki built from characters, worldbuilding, timeline events, relationships, and manuscript mentions.</p></div><div class="category-tools"><input id="encyclopediaSearch" oninput="renderEncyclopedia()" placeholder="Search Encyclopedia..."/><select id="encyclopediaFilter" onchange="renderEncyclopedia()"><option value="all">All</option><option value="characters">Characters</option><option value="world">Worldbuilding</option><option value="timeline">Timeline Events</option><option value="relationships">Relationships</option><option value="manuscript">Manuscript Mentions</option></select><button onclick="document.getElementById('encyclopediaUtilityDrawer')?.setAttribute('open','open'); scanManuscriptForLore()" type="button">Scan Manuscript For Lore</button></div></div><details class="panel encyclopedia-utility-drawer" id="encyclopediaUtilityDrawer"><summary>📊 Encyclopedia Tools, Stats &amp; Health</summary><div class="encyclopedia-dashboard grid stats-grid compact-ency-stats"><div class="stat-card"><span id="encyCharCount">0</span><p>Characters</p></div><div class="stat-card"><span id="encyWorldCount">0</span><p>World Entries</p></div><div class="stat-card"><span id="encyEventCount">0</span><p>Events</p></div><div class="stat-card"><span id="encyMentionCount">0</span><p>Manuscript Mentions</p></div></div><div class="panel hidden" id="encyclopediaScannerResults"></div><div class="panel" id="encyKnowledgeControls"></div><div class="panel" id="encyclopediaIntelligence"></div><div class="panel" id="encyRelationshipGraphPanel"></div></details><div class="encyclopedia-with-sidebar"><aside class="encyclopedia-sidebar" id="encyclopediaSidebar"></aside><div class="story-bible-content encyclopedia-main-content" id="encyclopediaContent"></div></div></section><section class="view" id="music"><div class="music-library-shell"><div class="panel music-hero-panel"><div><h3>Project Music Library</h3><p>Upload tracks, build playlists, add playlist covers, and play music inside PlotPals across this project.</p></div></div><div class="panel music-toolbar-panel"><div class="music-toolbar"><label class="file-label music-upload-btn">Upload Music <input accept="audio/*" id="musicUpload" multiple="" onchange="uploadMusicTracks(event)" type="file"/></label><input id="newMusicPlaylistName" placeholder="New playlist name"/><button class="glow" onclick="createMusicPlaylist()">Create Playlist</button><input id="musicLibrarySearch" oninput="renderMusic()" placeholder="Search music..."/><select id="musicLibrarySort" onchange="renderMusic()"><option value="az">Alphabetical (A-Z)</option><option value="za">Alphabetical (Z-A)</option><option value="newest">Date Added (Newest)</option><option value="oldest">Date Added (Oldest)</option><option value="duration">Duration</option><option value="artist">Artist</option></select></div><details class="music-notes-drawer"><summary>Music Notes</summary><textarea id="musicNotes" placeholder="Playlist notes, mood, character themes, chapter songs..."></textarea><button onclick="saveMusicNotes()">Save Music Notes</button></details><p class="muted small-text" id="musicUploadStatus"></p></div><div class="music-dashboard" id="musicLinks"></div></div></section><section class="view" id="stats"><div class="grid stats-grid"><div class="stat-card"><span id="statsTotalWords">0</span><p>Total Book Words</p></div><div class="stat-card"><span id="statsAvgWords">0</span><p>Average Words / Chapter</p></div><div class="stat-card"><span id="statsLongestChapter">0</span><p>Longest Chapter Words</p></div><div class="stat-card"><span id="statsBibleItems">0</span><p>Bible Entries</p></div></div><div class="two-col"><div class="panel"><h3>Chapter Word Counts</h3><div id="chapterStatsList"></div></div><div class="panel"><h3>POV Distribution</h3><div id="povStatsList"></div></div></div></section><section class="view" id="exports"><div class="panel"><h3>Export</h3><p>Export your full manuscript or series bible.</p><div class="backup-row"><button onclick="exportFullManuscriptTxt()">Full Manuscript TXT</button><button onclick="exportFullManuscriptDocx()">Full Manuscript Word HTML</button><button onclick="exportFullManuscriptPDF()">Full Manuscript PDF</button><button onclick="exportSeriesBibleDocx()">Project Bible Word HTML</button><button onclick="exportSeriesBiblePDF()">Project Bible PDF</button></div><div class="print-area" id="printArea"></div></div></section><section class="view" id="backup"><div class="panel"><h3>Backup &amp; Restore</h3><div class="backup-row"><button onclick="exportData()">Export Backup JSON</button><label class="file-label">Import Backup <input accept="application/json" id="importFile" onchange="importData(event)" type="file"/></label><button onclick="importLegacyLocalDataToSupabase()">Import Legacy Local Data to Supabase</button><button class="danger" onclick="clearLegacyLocalProjectData()">Remove Legacy Browser Data</button><button class="danger" onclick="resetAll()">Clear Loaded View</button></div><p class="muted" id="storageHealth"></p><h4>Automatic Backup Snapshots</h4><div class="card-grid" id="backupSnapshots"></div><h4>Trash / Restore</h4><div class="card-grid" id="trashManager"></div><textarea id="rawData" readonly=""></textarea></div></section></main></div><div class="global-music-player" id="globalMusicPlayer"></div><template id="cardTemplate"><article class="item-card"><div class="card-header"><h3></h3><button class="delete-btn">Delete</button></div><div class="card-body"></div></article></template> <script>
+    window.WRITERS_VAULT_SUPABASE_URL = "https://eygiasbppwcijzvfoxwp.supabase.co";
+    window.WRITERS_VAULT_SUPABASE_KEY = "sb_publishable_-iKq8JUH2VBrG2u3WCpGxg_Uq5Fq845";
+    window.PLOTPALS_SUPABASE_MEDIA_BUCKET = "plotpals-media";
+  </script> <script src="app.bundle.min.js"></script><script src="pwa.js"></script> 
+<script>
+(function(){
+  function h(v){ return (typeof escapeHTML === 'function' ? escapeHTML(v) : String(v ?? '').replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))); }
+  function a(v){ return (typeof escapeAttr === 'function' ? escapeAttr(v) : h(v)); }
+  function arr(v){ return Array.isArray(v) ? v : []; }
+  function activeProjectList(){ return (typeof activeProjects === 'function' ? activeProjects() : arr(data?.series).filter(s=>!s.deletedAt)); }
+  function projectBooks(seriesId){ return arr(data?.books).filter(b=>b.seriesId===seriesId && !b.deletedAt); }
+  function bookWords(book){ return typeof projectWordCount === 'function' ? projectWordCount(book) : arr(book?.manuscript).flatMap(c=>arr(c.scenes)).reduce((sum,sc)=>sum+String(sc.content||'').replace(/<[^>]+>/g,' ').trim().split(/\s+/).filter(Boolean).length,0); }
+  function bookScenes(book){ return typeof projectSceneCount === 'function' ? projectSceneCount(book) : arr(book?.manuscript).reduce((sum,ch)=>sum+arr(ch.scenes).length,0); }
+  function formatDate(value){
+    if(!value) return 'Not tracked yet';
+    const d = new Date(value); if(Number.isNaN(d.getTime())) return 'Not tracked yet';
+    return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+  }
+  function latestProjectDate(project, books){
+    return [project?.updatedAt, project?.openedAt, project?.created, ...books.flatMap(b=>[b.updatedAt,b.openedAt,b.created])].filter(Boolean).sort().pop() || '';
+  }
+  function ensureDashboardPolishLayout(){
+    document.querySelectorAll('.pwa-install-btn').forEach(btn=>btn.remove());
+    const search = document.getElementById('projectSearch');
+    if(search) search.placeholder = 'Search everything...';
+    const sidebar = document.querySelector('#projectScreen .story-sidebar');
+    if(sidebar && !sidebar.dataset.polishedHomeSidebar){
+      sidebar.dataset.polishedHomeSidebar = 'true';
+      sidebar.innerHTML = `
+        <div class="brand"><div class="brand-mark">✦</div><div><h1>PlotPals</h1><p>Plan. Write. Build Worlds.</p></div></div>
+        <div class="story-nav-group"><h4>Projects</h4>
+          <button class="story-nav active" data-library="stories" onclick="setLibraryView('stories')">📚 My Stories</button>
           <button class="story-nav" data-library="favorites" onclick="setLibraryView('favorites')">⭐ Favorites</button>
           <button class="story-nav" data-library="recent" onclick="setLibraryView('recent')">🕘 Recently Opened</button>
           <button class="story-nav" data-library="trash" onclick="setLibraryView('trash')">🗑️ Trash</button>
         </div>
-
-        <div class="story-nav-group">
-          <h4>Quick Links</h4>
-          <button class="story-nav" onclick="showCreateProjectPanel()">➕ New Project</button>
+        <div class="story-nav-group"><h4>Tools</h4>
+          <button class="story-nav" onclick="quickOpenFirstProject()">📊 Project Dashboard</button>
+          <button class="story-nav" onclick="openFirstProjectView('overview')">📘 Book Overview</button>
+          <button class="story-nav" onclick="openFirstProjectView('storyBible')">📚 Story Bible</button>
+          <button class="story-nav" onclick="openFirstProjectView('encyclopedia')">📖 Encyclopedia</button>
+          <button class="story-nav" onclick="openFirstProjectView('write')">✍️ Manuscript</button>
+        </div>
+        <div class="story-nav-group"><h4>Account</h4>
           <button class="story-nav" onclick="loadFromCloud()">☁️ Load Cloud</button>
           <button class="story-nav" onclick="signOut()">🚪 Sign Out</button>
         </div>
-
-        <button class="collapse-btn">‹ Collapse Sidebar</button>
-      </aside>
-
-      <main class="story-main">
-        <header class="story-topbar">
-          <div class="dashboard-search">
-            🔍 <input id="projectSearch" placeholder="Search your stories..." oninput="renderProjectScreen()" />
-          </div>
-          <div class="dashboard-icons">
-            <button onclick="toggleTheme()">☾</button>
-            <button onclick="signOut()">Sign Out</button>
-          </div>
-        </header>
-
-        <section class="welcome-hero">
-          <div>
-            <h1>Welcome back, <span id="dashboardName">Writer</span> ✒</h1>
-            <p>What story will you tell today?</p>
-          </div>
-          <div class="hero-actions">
-            <button onclick="showCreateProjectPanel()" class="glow">+ New Book / Series</button>
-            <button onclick="importDataFromDashboard()">⇧ Import</button>
-            <button type="button" class="pwa-install-btn" data-pwa-install onclick="installPlotPalsPwa()">📲 Get the App</button>
-          </div>
-        </section>
-
-        <section id="createProjectPanel" class="dashboard-panel create-panel hidden">
-          <div class="card-header">
-            <h3>Create New Story</h3>
-            <button class="delete-btn" onclick="hideCreateProjectPanel()">Close</button>
-          </div>
-          <div class="project-grid compact">
-            <div>
-              <label>Project Type</label>
-              <select id="newProjectType" onchange="projectTypeChanged()">
-                <option value="series">Series</option>
-                <option value="standalone">Standalone Book</option>
-              </select>
-              <label id="seriesTitleLabel">Series / Project Title</label>
-              <input id="newSeriesTitle" placeholder="Series title" />
-              <button onclick="createSeriesFromProject()">Create Project</button>
-            </div>
-            <div>
-              <label>Book Title</label>
-              <input id="newBookTitle" placeholder="Book title" />
-              <label class="inline-check"><input id="newBookIsPov" type="checkbox" checked /> This is a POV book</label>
-              <label>Add to Project</label>
-              <select id="newBookSeriesSelect"></select>
-              <button onclick="createBookFromProject()">Create Book</button>
-              
-            </div>
-          </div>
-          <p id="projectMessage"></p>
-        </section>
-
-        <section class="dashboard-section">
-          <div class="section-title">
-            <h2 id="dashboardLibraryTitle">My Stories</h2>
-            <button onclick="showCreateProjectPanel()">View / Create →</button>
-          </div>
-          <div id="dashboardStoryCards" class="story-card-grid"></div>
-        </section>
-
-        <section class="dashboard-widgets">
-          <div class="dashboard-panel continue-panel">
-            <h3>📖 Continue Writing</h3>
-            <div id="continueWritingCard"></div>
-          </div>
-
-          <div class="dashboard-panel stats-panel">
-            <div class="card-header">
-              <h3>📈 Writing Stats</h3>
-              <span class="tag">This Project</span>
-            </div>
-            <div class="mini-stats">
-              <div><strong id="dashWords">0</strong><span>Words</span></div>
-              <div><strong id="dashChapters">0</strong><span>Chapters</span></div>
-              <div><strong id="dashScenes">0</strong><span>Scenes</span></div>
-              <div><strong id="dashCharacters">0</strong><span>Characters</span></div>
-            </div>
-            <div class="fake-chart daily-word-chart" id="dashboardDailyWordChart"></div>
-          </div>
-
-          <div class="dashboard-panel quick-panel">
-            <h3>⚡ Quick Create</h3>
-            <button onclick="showCreateProjectPanel()">Write New Book</button>
-            <button onclick="quickOpenFirstProject()">Resume Writing</button>
-            <button onclick="showCreateProjectPanel()">Create Series</button>
-            <button onclick="loadFromCloud()">Load Cloud Save</button>
-          </div>
-        </section>
-
-        <section class="dashboard-widgets lower">
-          <div class="dashboard-panel">
-            <h3>↺ Recent Activity</h3>
-            <div id="recentActivity"></div>
-          </div>
-
-          <div class="dashboard-panel pinned-panel">
-            <div class="card-header">
-              <h3>📌 Pinned Notes</h3>
-              <button onclick="savePinnedNote()">Save</button>
-            </div>
-            <textarea id="dashboardPinnedNote" placeholder="Pin a quote, theme, reminder, or story note..."></textarea>
-          </div>
-
-          <div class="dashboard-panel">
-            <h3>♫ Project Playlist</h3>
-            <div id="dashboardPlaylistPreview"></div>
-          </div>
-        </section>
-
-        <input type="file" id="dashboardImportFile" accept="application/json" class="hidden" onchange="importData(event)" />
-      </main>
-    </div>
-  </section>
-
-  <div id="appShell" class="app-shell hidden">
-    <aside id="sidebar" class="sidebar story-sidebar workspace-sidebar">
-      <div class="brand">
-        <div class="brand-mark">✦</div>
-        <div class="brand-text">
-          <h1>PlotPals</h1>
-          <p id="sidebarProjectName">Project</p>
+        <button class="collapse-btn">‹ Collapse Sidebar</button>`;
+    }
+    const firstWidgets = document.querySelector('#projectScreen .dashboard-widgets');
+    if(firstWidgets && !document.getElementById('dashboardCurrentProject')){
+      firstWidgets.insertAdjacentHTML('afterbegin', `<div class="dashboard-panel current-project-panel"><h3>🧭 Current Project</h3><div id="dashboardCurrentProject"></div></div>`);
+    }
+    const lower = document.querySelector('#projectScreen .dashboard-widgets.lower');
+    if(lower && !document.getElementById('dashboardProjectStats')){
+      const pinned = document.querySelector('#projectScreen .pinned-panel');
+      const html = `<div class="dashboard-panel project-stats-panel"><h3>📊 Project Statistics</h3><div id="dashboardProjectStats"></div></div>`;
+      if(pinned) pinned.insertAdjacentHTML('beforebegin', html); else lower.insertAdjacentHTML('afterbegin', html);
+    }
+    const heroActions = document.querySelector('#projectScreen .welcome-hero .hero-actions');
+    if(heroActions && !document.getElementById('heroNewBookSeriesBtn')){
+      heroActions.insertAdjacentHTML('afterbegin', `<button id="heroNewBookSeriesBtn" class="glow" onclick="newBookSeriesFromHero()">+ New Book / Series</button>`);
+    }
+  }
+  window.openFirstProjectView = function(view){
+    const item = typeof firstProjectBook === 'function' ? firstProjectBook() : null;
+    if(!item) return showStatus?.('Create or import a story first.');
+    data.activeSeriesId = item.series.id; data.activeBookId = item.book.id;
+    data.activeChapterId = item.book.manuscript?.[0]?.id || null;
+    data.activeSceneId = item.book.manuscript?.[0]?.scenes?.[0]?.id || null;
+    if(typeof saveData === 'function') saveData(false,false);
+    if(typeof updateAuthGate === 'function') updateAuthGate();
+    setTimeout(()=> setView?.(view), 0);
+  };
+  window.newBookSeriesFromHero = function(){
+    const title = prompt('New book or series title:');
+    if(!title || !title.trim()) return;
+    const typeRaw = prompt('Type "series" for a series project, or "book" for standalone:', 'series') || 'series';
+    const type = /^book|standalone$/i.test(typeRaw.trim()) ? 'standalone' : 'series';
+    const series = {id: uid(), title: title.trim(), type, genre:'', synopsis:'', theme:'', mysteries:'', foreshadowing:'', created:new Date().toISOString(), updatedAt:new Date().toISOString()};
+    data.series.push(series);
+    data.books.push(makeStarterBook(series.id, title.trim(), true));
+    data.libraryView = 'stories';
+    saveData(false);
+    renderProjectScreen();
+    showStatus?.('Created new project.');
+  };
+  window.renderProjectScreen = function(){
+    ensureCollections?.();
+    applyTheme?.();
+    ensureDashboardPolishLayout();
+    const emailName = data.user?.email ? data.user.email.split('@')[0] : 'Writer';
+    setText?.('dashboardName', emailName.charAt(0).toUpperCase()+emailName.slice(1));
+    const q = (document.getElementById('projectSearch')?.value || '').toLowerCase();
+    const view = data.libraryView || 'stories';
+    let projects = view === 'trash' ? (typeof trashedProjects === 'function' ? trashedProjects() : []) : activeProjectList();
+    if(view === 'favorites') projects = projects.filter(s=>s.favorite);
+    if(view === 'recent') projects = projects.slice().sort((x,y)=>String(latestProjectDate(y,projectBooks(y.id))).localeCompare(String(latestProjectDate(x,projectBooks(x.id)))));
+    projects = projects.filter(s=>!q || JSON.stringify(s).toLowerCase().includes(q) || projectBooks(s.id).some(b=>JSON.stringify(b).toLowerCase().includes(q)) || arr(data.characters).some(c=>String(c.name||'').toLowerCase().includes(q)) || arr(data.locations).some(l=>String(l.name||'').toLowerCase().includes(q)) || arr(data.scenes).some(sc=>String(sc.title||'').toLowerCase().includes(q)));
+    document.querySelectorAll('.story-nav[data-library]').forEach(btn=>btn.classList.toggle('active', btn.dataset.library===view));
+    const titleMap={stories:'My Stories',favorites:'Favorites',recent:'Recently Opened',trash:'Trash'};
+    setHTML?.('dashboardLibraryTitle', titleMap[view] || 'My Stories');
+    const cards = projects.map(s=>{
+      const books = projectBooks(s.id); const primaryBook = books[0];
+      const words = books.reduce((sum,b)=>sum+bookWords(b),0); const scenes = books.reduce((sum,b)=>sum+bookScenes(b),0);
+      const chapters = books.reduce((sum,b)=>sum+arr(b.manuscript).length,0);
+      const progress = Math.min(100, Math.round(words/50000*100));
+      const latest = latestProjectDate(s,books);
+      const status = primaryBook?.status || (s.type==='standalone'?'Planning':`${books.length} book${books.length===1?'':'s'}`);
+      const buttons = view === 'trash'
+        ? `<button class="ghost-btn" onclick="restoreProject('${a(s.id)}',event)">Restore</button><button class="delete-btn" onclick="permanentlyDeleteProject('${a(s.id)}',event)">Delete Forever</button>`
+        : `<button class="ghost-btn" onclick="toggleFavoriteProject('${a(s.id)}',event)">${s.favorite?'★ Favorited':'☆ Favorite'}</button><button class="delete-btn" onclick="softDeleteProject('${a(s.id)}',event)">Delete</button>`;
+      const coverBook = books.find(b=>b.cover) || primaryBook;
+      const cover = coverBook?.cover ? `<img class="story-card-cover-large" src="${a(coverBook.cover)}" alt="${a(coverBook.title||'Book cover')}">` : `<div class="story-card-cover-large placeholder-cover">No Cover</div>`;
+      return `<article class="story-card story-card-bookshelf polished-story-card" onclick="openProjectFromDashboard('${a(s.id)}','${a(primaryBook?.id||'')}')">
+        <div class="story-card-body polished-story-card-body">
+          <div class="story-card-title-row"><h3>${h(s.title)}</h3><span>${s.favorite?'★':''}</span></div>
+          <span class="tag">${h(s.type==='standalone'?'Standalone':'Series')}</span>${s.deletedAt?` <span class="tag danger-tag">In Trash</span>`:''}
+          <div class="story-card-main-row">${cover}<div class="story-card-meta"><strong>${h(primaryBook?.title||'No book yet')}</strong><p>${h(status)}</p><p>${books.length} book${books.length===1?'':'s'} · ${chapters} chapters · ${scenes} scenes</p><p>${words.toLocaleString()} words</p><p class="muted">Last edited: ${h(formatDate(latest))}</p></div></div>
+          <div class="progress-bar"><span style="width:${progress}%"></span></div>
+          <div class="story-card-actions"><button class="glow" onclick="event.stopPropagation(); openProjectFromDashboard('${a(s.id)}','${a(primaryBook?.id||'')}')">Resume</button>${buttons}</div>
         </div>
+      </article>`;
+    }).join('');
+    const emptyMessage = view === 'trash' ? 'Trash is empty.' : view === 'favorites' ? 'No favorites yet. Star a story from My Stories.' : 'No stories here yet. Use + New Book / Series to begin.';
+    setHTML?.('dashboardStoryCards', cards || `<p class="muted">${h(emptyMessage)}</p>`);
+    const item = typeof firstProjectBook === 'function' ? firstProjectBook() : null;
+    if(item){
+      const ch = item.book.manuscript?.[0]; const sc = ch?.scenes?.[0]; const words = bookWords(item.book); const scenes = bookScenes(item.book);
+      setHTML?.('dashboardCurrentProject', `<div class="current-project-details"><strong>${h(item.series.title)}</strong><p>Book: ${h(item.book.title)}</p><p>Status: ${h(item.book.status||'Planning')}</p><div class="progress-bar"><span style="width:${Math.min(100,Math.round(words/50000*100))}%"></span></div><small>${words.toLocaleString()} words · ${scenes} scenes</small></div>`);
+      setHTML?.('continueWritingCard', `<div class="continue-card polished-continue"><p class="muted">Last Scene</p><strong>${h(sc?.title || ch?.title || item.book.title)}</strong><span>${h(item.series.title)} — ${h(item.book.title)}</span><p class="muted">Last edited: ${h(formatDate(latestProjectDate(item.series,[item.book])) )}</p><button class="glow" onclick="quickOpenFirstProject()">Resume Writing</button></div>`);
+    } else {
+      setHTML?.('dashboardCurrentProject','<p>No current project yet.</p>');
+      setHTML?.('continueWritingCard','<p>No stories yet.</p>');
+    }
+    const allProjects = activeProjectList(); const allBooks = allProjects.flatMap(s=>projectBooks(s.id));
+    const allWords = allBooks.reduce((sum,b)=>sum+bookWords(b),0), allScenes=allBooks.reduce((sum,b)=>sum+bookScenes(b),0), allChapters=allBooks.reduce((sum,b)=>sum+arr(b.manuscript).length,0);
+    setText?.('dashWords', allWords.toLocaleString()); setText?.('dashChapters', allChapters); setText?.('dashScenes', allScenes); setText?.('dashCharacters', arr(data.characters).length);
+    if(typeof renderDashboardDailyWordChart === 'function') renderDashboardDailyWordChart();
+    setHTML?.('dashboardProjectStats', `<div class="mini-stats vertical-stats"><div><strong>${allProjects.length}</strong><span>Projects</span></div><div><strong>${allBooks.length}</strong><span>Books</span></div><div><strong>${arr(data.characters).length}</strong><span>Characters</span></div><div><strong>${arr(data.locations).length}</strong><span>Locations</span></div><div><strong>${allScenes}</strong><span>Scenes</span></div><div><strong>${allWords.toLocaleString()}</strong><span>Words</span></div></div>`);
+    const recentItems = [
+      ...arr(data.characters).slice(-2).map(c=>`Added character: ${h(c.name||'Unnamed')}`),
+      ...allBooks.slice(-3).map(b=>`Edited ${h(b.title||'Untitled Book')}`),
+      ...arr(data.threads).slice(-2).map(t=>`Created plot thread: ${h(t.title||'Untitled Thread')}`)
+    ].slice(-6).reverse();
+    setHTML?.('recentActivity', recentItems.length ? `<h4>Today</h4>${recentItems.map(r=>`<p>• ${r}</p>`).join('')}` : '<p>No recent activity yet.</p>');
+    setVal?.('dashboardPinnedNote', data.pinnedNote || '');
+    const playlistProjects = allProjects.filter(s=>{ const m=typeof normalizeMusicRecord==='function'?normalizeMusicRecord(data.music?.[s.id]||{}):(data.music?.[s.id]||{}); return arr(m.tracks).length||arr(m.playlists).length||m.notes; });
+    setHTML?.('dashboardPlaylistPreview', playlistProjects.length ? playlistProjects.map(s=>{ const m=typeof normalizeMusicRecord==='function'?normalizeMusicRecord(data.music[s.id]||{}):(data.music[s.id]||{}); return `<p><strong>${h(s.title)}</strong><br>${arr(m.tracks).length} uploaded track(s) • ${arr(m.playlists).length} playlist(s)</p>`; }).join('') : '<p>No project music yet. Add uploaded tracks inside a project.</p>');
+  };
+  setTimeout(()=>{ ensureDashboardPolishLayout(); if(!data?.activeSeriesId && data?.user?.id) renderProjectScreen(); }, 50);
+})();
+</script>
+
+<script>
+(function(){
+  if(window.__plotpalsMusicLibraryPolish) return;
+  window.__plotpalsMusicLibraryPolish = true;
+  const esc = (v)=> (typeof escapeHTML === 'function' ? escapeHTML(v) : String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])));
+  const attr = (v)=> (typeof escapeAttr === 'function' ? escapeAttr(v) : esc(v));
+  const arr = (v)=> Array.isArray(v) ? v : [];
+  function projectMusic(){ return typeof musicForProject === 'function' ? musicForProject() : (data.music ||= {}, data.music[data.activeSeriesId] ||= {tracks:[],playlists:[],notes:'',activePlaylistId:null,expandedPlaylists:{}}); }
+  function trackStorageLabel(track){ return track?.storage === 'indexeddb' ? 'Saved in browser music storage' : 'Saved in project data'; }
+  function defaultCover(name){ return `<div class="playlist-cover-placeholder"><span>♫</span><small>${esc(String(name||'Playlist').slice(0,2).toUpperCase())}</small></div>`; }
+  function playlistCoverMarkup(pl){ return pl.cover ? `<img class="playlist-cover-image" src="${attr(pl.cover)}" alt="${attr(pl.name||'Playlist cover')}">` : defaultCover(pl.name); }
+  window.uploadPlaylistCover = function(playlistId, input){
+    const file = input?.files?.[0];
+    if(!file) return;
+    if(!file.type || !file.type.startsWith('image/')){ alert('Please choose an image file.'); input.value=''; return; }
+    const reader = new FileReader();
+    reader.onload = function(){
+      const music = projectMusic();
+      const playlist = music.playlists.find(p=>p.id===playlistId);
+      if(!playlist) return;
+      playlist.cover = reader.result;
+      if(typeof saveData === 'function') saveData();
+      else if(typeof renderMusic === 'function') renderMusic();
+    };
+    reader.readAsDataURL(file);
+  };
+  window.removePlaylistCover = function(playlistId){
+    const music = projectMusic();
+    const playlist = music.playlists.find(p=>p.id===playlistId);
+    if(!playlist) return;
+    playlist.cover = '';
+    if(typeof saveData === 'function') saveData();
+    else if(typeof renderMusic === 'function') renderMusic();
+  };
+  window.renderMusicPlayerPanel = function(music){
+    const player = music.playerState || {};
+    const activeTrack = music.tracks.find(t=>t.id===player.trackId);
+    const activePlaylist = music.playlists.find(p=>p.id===player.playlistId) || music.playlists.find(p=>p.id===music.activePlaylistId);
+    const title = activeTrack?.title || player.title || 'No track playing';
+    const playlistLine = activePlaylist ? `<p class="muted small-text">Playlist: ${esc(activePlaylist.name)}</p>` : '<p class="muted small-text">Choose a track or playlist to start listening.</p>';
+    return `<section class="panel music-now-playing-card compact-now-playing-card">
+      <div class="compact-now-playing-layout">
+        <div class="compact-now-playing-info">
+          <span class="music-eyebrow">Now Playing</span>
+          <strong id="projectPlaylistNowPlaying">${esc(title)}</strong>
+          ${playlistLine}
+        </div>
+        <audio id="plotpalsAudioPlayer" controls preload="metadata"></audio>
+        ${activePlaylist ? `<button class="glow compact-playlist-btn" onclick="playPlaylist('${attr(activePlaylist.id)}')">Play Playlist</button>` : ''}
       </div>
-
-      <button class="wide glow" onclick="backToProjects()">← Main Page</button>
-
-      <div id="nestedNav" class="nested-nav"></div>
-
-      <div class="account-card">
-        <strong id="accountStatus">Signed in</strong>
-        <p id="syncStatus">Cloud auto-sync ready.</p>
+    </section>`;
+  };
+  function playlistCard(music, playlist){
+    const isOpen = !!music.expandedPlaylists?.[playlist.id];
+    const tracks = arr(playlist.trackIds).map(id=>music.tracks.find(t=>t.id===id)).filter(Boolean);
+    const songs = isOpen ? `<div class="playlist-song-list polished-song-list" ondragover="musicPlaylistDragOver(event)" ondrop="musicPlaylistDrop(event,'${attr(playlist.id)}',null)">
+      ${tracks.length ? tracks.map(t=>`<div class="playlist-song-row" draggable="true" ondragstart="musicPlaylistDragStart(event,'${attr(playlist.id)}','${attr(t.id)}')" ondragover="musicPlaylistDragOver(event)" ondrop="musicPlaylistDrop(event,'${attr(playlist.id)}','${attr(t.id)}')"><span class="drag-handle">☰</span><button class="music-track-btn" onclick="playTrack('${attr(t.id)}')">▶ ${esc(t.title)}</button><button class="delete-btn small-btn" onclick="toggleTrackInPlaylist('${attr(playlist.id)}','${attr(t.id)}')">Remove</button></div>`).join('') : '<p class="muted small-text">No songs in this playlist yet.</p>'}
+    </div>` : '';
+    return `<article class="playlist-media-card ${isOpen?'open':''}">
+      <div class="playlist-cover-wrap">${playlistCoverMarkup(playlist)}</div>
+      <div class="playlist-card-info">
+        <button class="playlist-title-toggle" onclick="toggleMusicPlaylistOpen('${attr(playlist.id)}')">${isOpen?'▾':'▸'} ${esc(playlist.name)}</button>
+        <p class="muted small-text">${tracks.length} track${tracks.length===1?'':'s'}</p>
+        <div class="playlist-card-actions">
+          <button onclick="playPlaylist('${attr(playlist.id)}')">Play</button>
+          <button onclick="renameMusicPlaylist('${attr(playlist.id)}')">Rename</button>
+          <label class="cover-upload-button">Change Cover<input type="file" accept="image/*" onchange="uploadPlaylistCover('${attr(playlist.id)}',this)"></label>
+          ${playlist.cover ? `<button onclick="removePlaylistCover('${attr(playlist.id)}')">Remove Cover</button>` : ''}
+          <button class="delete-btn" onclick="deleteMusicPlaylist('${attr(playlist.id)}')">Delete</button>
+        </div>
+        ${songs}
       </div>
-
-      <div class="sidebar-footer">
-        <input id="globalSearch" placeholder="Search project..." /><small class="muted">Filter appears with results.</small>
-      </div>
-    </aside>
-
-    <main>
-      <header class="topbar">
-        <div>
-          <h2 id="viewTitle">Overview</h2>
-          <p id="projectPath">No project selected.</p>
-        </div>
-        <div class="top-actions">
-          <button onclick="toggleTheme()" class="ghost-btn">Theme</button>
-          <button onclick="syncToCloud()" class="ghost-btn">Retry Cloud Save</button>
-          <button onclick="loadFromCloud()" class="ghost-btn">Load Cloud</button>
-          <button id="clearSearch" class="ghost-btn">Clear Search</button>
-        </div>
-      </header>
-
-      <section id="searchResults" class="search-results hidden"></section>
-
-
-      <section id="projectDashboard" class="view active">
-        <div class="overview-actions">
-          <button onclick="backToProjects()" class="ghost-btn">← Back to Main Page</button>
-          <button onclick="setView('write')" class="glow">Continue Writing</button>
-          <button onclick="setView('overview')">Edit Overview</button>
-        </div>
-        <section class="welcome-hero project-landing-hero">
-          <div>
-            <h1 id="projectDashboardTitle">Project Dashboard</h1>
-            <p id="projectDashboardSubtitle">All books in this project at a glance.</p>
-          </div>
-          <div class="hero-actions">
-            <button onclick="toggleProjectAddBookPanel()" class="glow">+ Add Book</button>
-            <button onclick="setView('plotBoard')">Open Plot Board</button>
-          </div>
-        </section>
-
-        <section class="dashboard-widgets">
-          <div class="dashboard-panel continue-panel">
-            <h3>📖 Continue Writing</h3>
-            <div id="projectContinueWriting"></div>
-          </div>
-          <div class="dashboard-panel stats-panel project-writing-stats-panel">
-            <div class="card-header">
-              <h3>📈 Project Writing Stats</h3>
-              <span class="tag">All Books</span>
-            </div>
-            <div class="mini-stats">
-              <div><strong id="projectDashWords">0</strong><span>Words</span></div>
-              <div><strong id="projectDashChapters">0</strong><span>Chapters</span></div>
-              <div><strong id="projectDashScenes">0</strong><span>Scenes</span></div>
-              <div><strong id="projectDashCharacters">0</strong><span>Characters</span></div>
-            </div>
-            <div class="fake-chart daily-word-chart" id="projectWritingChart"></div>
-          </div>
-          <div class="dashboard-panel quick-panel">
-            <h3>⚡ Quick Add</h3>
-            <button onclick="toggleProjectAddBookPanel()">+ Book</button>
-            <button onclick="setView('characters')">+ Character</button>
-            <button onclick="setView('plotBoard')">+ Plot Point</button>
-            <button onclick="setView('world')">+ Worldbuilding</button>
-          </div>
-        </section>
-
-        <section class="dashboard-widgets lower">
-          <div class="dashboard-panel project-books-panel">
-            <div class="card-header"><h3>📚 Books in This Project</h3><button onclick="toggleProjectAddBookPanel()">+ Add Book</button></div>
-            <div id="projectAddBookPanel" class="project-add-book-panel hidden">
-              <div class="card-header compact-header">
-                <h4>Add Book</h4>
-                <button type="button" class="ghost-btn tiny-btn" onclick="toggleProjectAddBookPanel(false)">Close</button>
-              </div>
-              <div class="project-add-book-grid">
-                <label>Book Title
-                  <input id="projectNewBookTitle" type="text" placeholder="Book title">
-                </label>
-                <label class="checkbox-row project-pov-row">
-                  <input id="projectNewBookIsPov" type="checkbox" checked>
-                  <span>This is a POV book</span>
-                </label>
-                <label>Add a Cover
-                  <input id="projectNewBookCover" type="file" accept="image/*" onchange="previewProjectNewBookCover(this)">
-                </label>
-                <div id="projectNewBookCoverPreview" class="project-new-book-cover-preview hidden"></div>
-              </div>
-              <div class="form-actions">
-                <button type="button" class="glow" onclick="createBookFromProjectDashboard()">Create Book</button>
-              </div>
-            </div>
-
-            <div id="projectEditBookPanel" class="project-add-book-panel hidden">
-              <div class="card-header compact-header">
-                <h4>Edit Book</h4>
-                <button type="button" class="ghost-btn tiny-btn" onclick="toggleProjectEditBookPanel(null,false)">Close</button>
-              </div>
-              <div class="project-add-book-grid">
-                <label>Select Book
-                  <select id="projectEditBookSelect" onchange="loadProjectEditBookFields(this.value)"></select>
-                </label>
-                <label>Book Title
-                  <input id="projectEditBookTitle" type="text" placeholder="Book title">
-                </label>
-                <label class="checkbox-row project-pov-row">
-                  <input id="projectEditBookIsPov" type="checkbox" checked>
-                  <span>This is a POV book</span>
-                </label>
-                <label>Add / Change Cover
-                  <input id="projectEditBookCover" type="file" accept="image/*" onchange="previewProjectEditBookCover(this)">
-                </label>
-                <div id="projectEditBookCoverPreview" class="project-new-book-cover-preview hidden"></div>
-              </div>
-              <div class="form-actions">
-                <button type="button" class="glow" onclick="saveProjectBookEdits()">Save Book Changes</button>
-              </div>
-            </div>
-            <div id="projectDashboardBooks" class="card-grid"></div>
-          </div>
-          <div class="dashboard-panel">
-            <h3>🧭 Story Health</h3>
-            <div id="projectStoryHealth"></div>
-          </div>
-        </section>
-
-        <section class="dashboard-widgets lower">
-          <div class="dashboard-panel">
-            <div class="card-header">
-              <h3>🗂️ Plot Arc Progress</h3>
-              <select id="plotProgressBookFilter" onchange="renderProjectDashboard()"></select>
-            </div>
-            <div id="projectPlotArcProgress"></div>
-          </div>
-          <div class="dashboard-panel">
-            <h3>👀 Appearance Summary</h3>
-            <div id="projectAppearanceSummary"></div>
-          </div>
-          <div class="dashboard-panel">
-            <h3>⚠️ Continuity Warnings</h3>
-            <div id="projectContinuityWarnings"></div>
-          </div>
-        </section>
-      </section>
-
-      <section id="overview" class="view">
-        <div class="overview-actions">
-          <button onclick="backToProjects()" class="ghost-btn">← Back to Main Page</button>
-          <button onclick="setView('write')" class="glow">Resume Writing</button>
-        </div>
-        <div class="two-col">
-          <div class="panel">
-            <h3>Project Bible</h3>
-            <input id="seriesTitleEdit" placeholder="Project / Series title" />
-            <select id="seriesTypeEdit">
-              <option value="series">Series</option>
-              <option value="standalone">Standalone Book</option>
-            </select>
-            <input id="seriesGenreEdit" placeholder="Genre / tone" />
-            <textarea id="seriesSynopsisEdit" placeholder="Series / project synopsis"></textarea>
-            <textarea id="seriesThemeEdit" placeholder="Overall theme"></textarea>
-            <textarea id="seriesMysteriesEdit" placeholder="Major mysteries"></textarea>
-            <textarea id="seriesForeshadowingEdit" placeholder="Foreshadowing tracker"></textarea>
-          </div>
-
-          <div class="panel">
-            <h3>Book Details</h3>
-            <input id="bookTitleEdit" placeholder="Book title" />
-            <select id="bookStatusEdit">
-              <option>Planning</option><option>Drafting</option><option>Revising</option><option>Finished</option>
-            </select>
-            <textarea id="bookSummaryEdit" placeholder="Book summary"></textarea>
-            <textarea id="bookThemeEdit" placeholder="Book theme"></textarea>
-            <textarea id="bookNotesEdit" placeholder="General book notes"></textarea>
-          </div>
-        </div>
-
-        <div class="grid stats-grid">
-          <div class="stat-card"><span id="statWords">0</span><p>Words Written</p></div>
-          <div class="stat-card"><span id="statChapters">0</span><p>Chapters</p></div>
-          <div class="stat-card"><span id="statScenes">0</span><p>Scenes</p></div>
-          <div class="stat-card"><span id="statCharacters">0</span><p>Characters</p></div>
-        </div>
-      </section>
-
-      <section id="write" class="view">
-        <div class="editor-layout">
-          <aside class="chapter-sidebar panel">
-            <div class="chapter-sidebar-header">
-              <h3>Chapters & Scenes</h3>
-              <button type="button" class="collapse-editor-sidebar-btn" onclick="toggleManuscriptSidebar()" title="Collapse chapter/scene list">⇤</button>
-            </div>
-            <div class="chapter-sidebar-actions">
-              <button onclick="addManuscriptChapter()">+ Chapter</button>
-              <button onclick="addSceneToActiveChapter()">+ Scene</button>
-              <button onclick="moveScene(-1)">Move Scene Up</button>
-              <button onclick="moveScene(1)">Move Scene Down</button>
-            </div>
-            <div id="manuscriptChapterList"></div>
-          </aside>
-
-          <div id="manuscriptPanel" class="panel manuscript-panel">
-            <div class="editor-top">
-              <input id="currentChapterTitle" placeholder="Chapter title" />
-              <input id="currentSceneTitle" placeholder="Scene title" />
-              <div class="word-pill"><span id="sceneWordCount">0</span> words</div>
-            </div>
-
-            <div class="scene-meta">
-              <select id="scenePOV"><option value="">POV Character</option></select>
-              <select id="sceneLocation"><option value="">Location</option></select>
-              <select id="scenePlotPoint"><option value="">Plot Board Point</option></select>
-              <input id="sceneDate" placeholder="Timeline date / placement" />
-              <input id="sceneMood" placeholder="Mood" />
-              <input id="scenePurpose" placeholder="Scene purpose" />
-            </div>
-
-            <div class="format-bar">
-              <button onclick="formatDoc('bold')"><b>B</b></button>
-              <button onclick="formatDoc('italic')"><i>I</i></button>
-              <button onclick="formatDoc('underline')"><u>U</u></button>
-              <button onclick="formatDoc('strikeThrough')"><s>S</s></button>
-              <button onclick="formatBlock('h2')">Heading</button>
-              <button onclick="formatBlock('p')">Paragraph</button>
-              <button onclick="formatDoc('insertUnorderedList')">Bullets</button>
-              <button onclick="formatDoc('insertOrderedList')">Numbers</button>
-              <button onclick="formatDoc('justifyLeft')">Left</button>
-              <button onclick="formatDoc('justifyCenter')">Center</button>
-              <button onclick="formatDoc('justifyRight')">Right</button>
-              <button onclick="insertSceneBreak()">Scene Break</button>
-              <button onclick="toggleFullscreen()">Full Screen</button>
-            </div>
-
-            <div class="editor-stats">
-              <span>Book words: <strong id="bookWordCountInline">0</strong></span>
-              <span>Scene chars: <strong id="sceneCharCount">0</strong></span>
-              <span>Paragraphs: <strong id="sceneParagraphCount">0</strong></span>
-              <span>Auto-save: <strong id="autosaveStatus">Ready</strong></span>
-            </div>
-
-            <div id="richEditor" class="rich-editor" contenteditable="true" spellcheck="true"></div>
-
-            <div id="sceneTrackingBottom" class="scene-tracking-block scene-tracking-bottom"></div>
-          </div>
-          <aside id="manuscriptLookupSidebar" class="manuscript-lookup-sidebar panel collapsed">
-            <button type="button" class="lookup-sidebar-tab" onclick="toggleLookupSidebar()" title="Open project lookup">Lookup</button>
-            <div class="lookup-sidebar-inner">
-              <div class="lookup-sidebar-header">
-                <div>
-                  <h3>Project Lookup</h3>
-                  <p>Reference project entries without leaving your scene.</p>
-                </div>
-                <button type="button" class="lookup-sidebar-close" onclick="toggleLookupSidebar(true)" title="Collapse project lookup">⇥</button>
-              </div>
-              <input id="manuscriptLookupSearch" placeholder="Search characters, locations, plot points..." oninput="runManuscriptLookup()" />
-              <div id="manuscriptLookupResults" class="manuscript-lookup-results hidden"></div>
-              <div class="sprint-panel">
-                <div class="sprint-header">
-                  <h3>Writing Sprint</h3>
-                  <span id="sprintStatusBadge" class="tag">Ready</span>
-                </div>
-                <div class="form-grid sprint-controls-grid">
-                  <label>Goal Words <input id="sprintGoalWords" type="number" min="1" value="500" onchange="updateSprintSettings()" /></label>
-                  <label>Minutes <input id="sprintMinutes" type="number" min="1" value="25" onchange="updateSprintSettings()" /></label>
-                </div>
-                <div class="sprint-stat-row"><span>Words written</span><strong id="sprintWordsWritten">0</strong></div>
-                <div class="sprint-stat-row"><span>Time left</span><strong id="sprintTimeLeft">25:00</strong></div>
-                <div class="sprint-progress"><div id="sprintProgressBar"></div></div>
-                <div class="sprint-buttons">
-                  <button type="button" onclick="startWritingSprint()">Start</button>
-                  <button type="button" onclick="pauseWritingSprint()">Pause</button>
-                  <button type="button" onclick="resetWritingSprint()">Reset</button>
-                </div>
-              </div>
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <section id="storyBoard" class="view">
-        <div class="form-panel">
-          <h3>Story Structure Board</h3>
-          <div class="form-grid">
-            <select id="structureTemplate">
-              <option>Three Act Structure</option>
-              <option>Save The Cat</option>
-              <option>Hero's Journey</option>
-              <option>Romance Beat Sheet</option>
-              <option>Custom</option>
-            </select>
-            <input id="structureBeatName" placeholder="Beat / section name" />
-            <textarea id="structureBeatNotes" placeholder="Beat notes"></textarea>
-          </div>
-          <button onclick="applyStructureTemplate()">Apply Template</button>
-          <button onclick="addStructureBeat()">Add Custom Beat</button>
-        </div>
-        <div id="storyBoardList" class="board-grid"></div>
-      </section>
-
-      <section id="chapters" class="view">
-        <div class="form-panel">
-          <h3>Chapter Planner</h3>
-          <div class="form-grid">
-            <input id="chapterNumber" placeholder="Chapter number / title" />
-            <input id="chapterPOV" placeholder="POV character" />
-            <input id="chapterWordTarget" placeholder="Target word count" />
-            <select id="chapterStructureBeat"></select>
-            <textarea id="chapterGoal" placeholder="Scene/chapter goal"></textarea>
-            <textarea id="chapterConflict" placeholder="Conflict"></textarea>
-            <textarea id="chapterOutcome" placeholder="Outcome"></textarea>
-            <textarea id="chapterEmotion" placeholder="Emotional beat"></textarea>
-            <textarea id="chapterForeshadowing" placeholder="Foreshadowing / callbacks"></textarea>
-          </div>
-          <button onclick="addChapterPlan()">Add Chapter Plan</button>
-        </div>
-        <div id="chapterPlanList" class="card-grid"></div>
-      </section>
-
-      <section id="threads" class="view">
-        <div class="form-panel">
-          <h3>Add Plot Thread</h3>
-          <div class="form-grid">
-            <input id="threadTitle" placeholder="Thread title / question" />
-            <select id="threadScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
-            <select id="threadType"><option>Main Plot</option><option>Subplot</option><option>Character Arc</option><option>Mystery</option><option>Romance</option><option>Other</option></select>
-            <select id="threadStatus"><option>Open</option><option>In Progress</option><option>Closed</option></select>
-            <textarea id="threadSetup" placeholder="Setup"></textarea>
-            <textarea id="threadPayoff" placeholder="Payoff / resolution"></textarea>
-          </div>
-          <button onclick="addThread()">Add Thread</button>
-        </div>
-        <div id="threadList" class="card-grid"></div>
-      </section>
-
-      <section id="mysteries" class="view">
-        <div class="form-panel">
-          <h3>Mystery Tracker</h3>
-          <div class="form-grid">
-            <input id="mysteryQuestion" placeholder="Mystery question" />
-            <input id="mysteryIntroduced" placeholder="Introduced in..." />
-            <input id="mysteryPayoff" placeholder="Payoff chapter / book" />
-            <select id="mysteryStatus"><option>Open</option><option>Hinted</option><option>Revealed</option><option>Resolved</option></select>
-            <textarea id="mysteryHints" placeholder="Hints / false leads"></textarea>
-            <textarea id="mysteryAnswer" placeholder="Answer / reveal"></textarea>
-          </div>
-          <button onclick="addMystery()">Add Mystery</button>
-        </div>
-        <div id="mysteryList" class="card-grid"></div>
-      </section>
-
-      <section id="foreshadowing" class="view">
-        <div class="form-panel">
-          <h3>Foreshadowing Tracker</h3>
-          <div class="form-grid">
-            <input id="foreshadowHint" placeholder="Hint / setup" />
-            <input id="foreshadowAppears" placeholder="Appears in..." />
-            <input id="foreshadowPayoff" placeholder="Payoff in..." />
-            <select id="foreshadowStatus"><option>Planted</option><option>Developing</option><option>Paid Off</option></select>
-            <textarea id="foreshadowNotes" placeholder="Notes"></textarea>
-          </div>
-          <button onclick="addForeshadowing()">Add Foreshadowing</button>
-        </div>
-        <div id="foreshadowingList" class="card-grid"></div>
-      </section>
-
-      <section id="plotBoard" class="view">
-        <div class="form-panel">
-          <h3>Plot Board</h3>
-          <div class="form-grid">
-            <input id="plotArcTitle" placeholder="New arc title, ex. Act 1, Romance Arc, Betrayal Arc" />
-            <button type="button" onclick="addPlotArc()">Add Plot Arc</button>
-          </div>
-          <hr />
-          <div class="form-grid">
-            <input id="plotCardTitle" placeholder="Plot point title" />
-            <select id="plotCardArc"></select>
-            <textarea id="plotCardNotes" placeholder="Notes"></textarea>
-          </div>
-          <button onclick="addPlotCard()">Add Plot Point</button>
-        </div>
-        <div id="plotBoardList" class="board-grid"></div>
-      </section>
-
-      <section id="sceneBoard" class="view">
-        <div class="category-page-header panel">
-          <div>
-            <h2>🎬 Scene Cards / Board</h2>
-            <p class="muted">Review every scene as a card, grouped by chapter. Drag scenes between chapters to reorganize your book.</p>
-          </div>
-          <div class="category-tools">
-            <button type="button" onclick="addManuscriptChapter(); setView('sceneBoard')">+ Chapter</button>
-            <button type="button" onclick="addSceneToActiveChapter(); setView('sceneBoard')">+ Scene</button>
-          </div>
-        </div>
-        <div id="sceneBoardList" class="scene-board-grid"></div>
-      </section>
-
-      <section id="characters" class="view">
-        <button type="button" class="wide" onclick="toggleAddForm('characterAddForm')">+ Add Character</button>
-        <div id="characterAddForm" class="form-panel hidden">
-          <h3>Add Character</h3>
-          <div class="form-grid">
-            <input id="charName" placeholder="Character name" />
-            <select id="charScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
-            <select id="charRole"><option>Protagonist</option><option>Major Supporting Character</option><option>Love Interest</option><option>Mentor</option><option>Antagonist</option><option>Historical Character</option><option>Minor Character</option></select>
-            <input id="charSpecies" placeholder="Species / identity" />
-            <div class="upload-control"><button type="button" class="file-label inline-file" onclick="triggerOverviewImageUpload('charPhoto', event)">Upload Character Image</button><input id="charPhoto" type="file" accept="image/*" class="hidden" onchange="previewOverviewImage('charPhoto','charPhotoPreview')" /><div id="charPhotoPreview" class="upload-preview muted">No image selected.</div></div>
-            <textarea id="charBasicInfo" placeholder="Basic Information"></textarea>
-            <textarea id="charDescription" placeholder="Physical Appearance"></textarea>
-            <textarea id="charPersonality" placeholder="Personality"></textarea>
-            <textarea id="charBackstory" placeholder="Backstory"></textarea>
-            <textarea id="charWound" placeholder="Psychology: Core Wound, Core Fear, Core Desire, Fatal Flaw"></textarea>
-            <div class="custom-section-builder character-arc-builder">
-              <h4>Book Specific Character Arcs</h4>
-              <select id="charArcBook"></select>
-              <textarea id="charArcText" placeholder="Character arc for the selected book"></textarea>
-              <label class="checkbox-line"><input id="charArcImpact" type="checkbox" /> This is an effect/impact arc, not this character’s own arc</label>
-              <button type="button" onclick="addCharacterArcDraft()">Add Character Arc</button>
-              <div id="charArcDraftList" class="custom-section-list"></div>
-            </div>
-            <textarea id="charVoice" placeholder="Voice / speech patterns"></textarea>
-            <textarea id="charSecrets" placeholder="Secrets"></textarea>
-            <textarea id="charQuotes" placeholder="Quotes"></textarea>
-            <div class="custom-section-builder">
-              <input id="charCustomTitle" placeholder="Additional section title" />
-              <textarea id="charCustomText" placeholder="Additional section notes"></textarea>
-              <button type="button" onclick="addCharacterCustomSectionDraft()">Add Section to Character</button>
-              <div id="charCustomDraftList" class="custom-section-list"></div>
-            </div>
-          </div>
-          <button onclick="addCharacter()">Add Character</button>
-        </div>
-        <div id="characterRoleGroups"></div>
-      </section>
-
-      <section id="characterDetail" class="view">
-        <div id="characterDetailContent"></div>
-      </section>
-
-      <section id="relationships" class="view">
-        <button type="button" class="wide" onclick="toggleAddForm('relationshipAddForm')">+ Add Relationship</button>
-        <div id="relationshipAddForm" class="form-panel hidden">
-          <h3>Add Relationship</h3>
-          <div class="form-grid">
-            <select id="relA" onchange="updateRelationshipViewLabels()"></select>
-            <select id="relB" onchange="updateRelationshipViewLabels()"></select>
-            <select id="relScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
-            <input id="relType" placeholder="Relationship type" />
-            <input id="relStatus" placeholder="Current status" />
-            <textarea id="relHistory" placeholder="History"></textarea>
-            <textarea id="relMoments" placeholder="Important moments"></textarea>
-            <textarea id="relArc" placeholder="Relationship arc / future changes"></textarea>
-            <label class="field-label" id="relAViewLabel" for="relAView">Character 1's View</label>
-            <textarea id="relAView" placeholder="How Character 1 sees this relationship"></textarea>
-            <label class="field-label" id="relBViewLabel" for="relBView">Character 2's View</label>
-            <textarea id="relBView" placeholder="How Character 2 sees this relationship"></textarea>
-          </div>
-          <button onclick="addRelationship()">Add Relationship</button>
-        </div>
-        <div id="relationshipMap" class="relationship-map"></div>
-        <div id="relationshipList" class="card-grid"></div>
-      </section>
-
-      <section id="relationshipGraphView" class="view">
-        <div class="category-page-header panel">
-          <div>
-            <h2>🕸️ Relationship Graph</h2>
-            <p class="muted">A visual map of character relationships across the project. Click a character name to open their profile.</p>
-          </div>
-        </div>
-        <div id="relationshipGraphContent" class="panel relationship-graph-panel"></div>
-      </section>
-
-      <section id="locations" class="view">
-        <div class="category-page-header panel">
-          <div>
-            <h2>📍 Locations <span id="locationCategoryCount" class="muted"></span></h2>
-            <p class="muted">Create places, regions, landmarks, kingdoms, cities, and important story settings.</p>
-          </div>
-          <div class="category-tools">
-            <input id="locationSearch" placeholder="Search Locations..." oninput="renderEntityList('location')" />
-            <select id="locationSort" onchange="renderEntityList('location')">
-              <option value="az">A–Z</option>
-              <option value="za">Z–A</option>
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-            </select>
-          </div>
-        </div>
-        <button type="button" class="wide" onclick="toggleAddForm('locationAddForm')">+ Add Location</button>
-        <div id="locationAddForm" class="form-panel hidden">
-          <h3>Add Location</h3>
-          <div class="form-grid">
-            <input id="locationName" placeholder="Location name" />
-            <select id="locationScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
-            <input id="locationPopulation" placeholder="Population" />
-            <input id="locationCulture" placeholder="Culture" />
-            <div class="upload-control">
-              <button type="button" class="file-label inline-file" onclick="triggerOverviewImageUpload('locationImage', event)">Upload Location Image</button>
-              <input id="locationImage" type="file" accept="image/*" class="hidden" onchange="previewOverviewImage('locationImage','locationImagePreview')" />
-              <div id="locationImagePreview" class="upload-preview muted">No image selected.</div>
-            </div>
-            <textarea id="locationDescription" placeholder="Description"></textarea>
-            <textarea id="locationHistory" placeholder="History"></textarea>
-            <textarea id="locationNotes" placeholder="Notes"></textarea>
-          </div>
-          <button onclick="addLocation()">Add Location</button>
-        </div>
-        <div id="locationList" class="card-grid"></div>
-      </section>
-
-      <section id="magic" class="view">
-        <div class="category-page-header panel">
-          <div>
-            <h2>✨ Magic Systems <span id="magicCategoryCount" class="muted"></span></h2>
-            <p class="muted">Create power systems, supernatural rules, magical sources, limitations, costs, and known users.</p>
-          </div>
-          <div class="category-tools">
-            <input id="magicSearch" placeholder="Search Magic Systems..." oninput="renderEntityList('magic')" />
-            <select id="magicSort" onchange="renderEntityList('magic')">
-              <option value="az">A–Z</option>
-              <option value="za">Z–A</option>
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-            </select>
-          </div>
-        </div>
-        <button type="button" class="wide" onclick="toggleAddForm('magicAddForm')">+ Add Magic System</button>
-        <div id="magicAddForm" class="form-panel hidden">
-          <h3>Add Magic / Power System</h3>
-          <div class="form-grid">
-            <input id="magicName" placeholder="Magic system name" />
-            <input id="magicSource" placeholder="Source" />
-            <div class="upload-control">
-              <button type="button" class="file-label inline-file" onclick="triggerOverviewImageUpload('magicImage', event)">Upload Magic/System Image</button>
-              <input id="magicImage" type="file" accept="image/*" class="hidden" onchange="previewOverviewImage('magicImage','magicImagePreview')" />
-              <div id="magicImagePreview" class="upload-preview muted">No image selected.</div>
-            </div>
-            <textarea id="magicRules" placeholder="Rules"></textarea>
-            <textarea id="magicLimits" placeholder="Limitations"></textarea>
-            <textarea id="magicCosts" placeholder="Costs"></textarea>
-            <textarea id="magicExamples" placeholder="Examples / users"></textarea>
-          </div>
-          <button onclick="addMagic()">Add Magic System</button>
-        </div>
-        <div id="magicList" class="card-grid"></div>
-      </section>
-
-      <section id="organizations" class="view">
-        <div class="category-page-header panel">
-          <div>
-            <h2>⚜️ Organizations <span id="organizationCategoryCount" class="muted"></span></h2>
-            <p class="muted">Create guilds, factions, councils, kingdoms, companies, orders, clubs, and power groups.</p>
-          </div>
-          <div class="category-tools">
-            <input id="organizationSearch" placeholder="Search Organizations..." oninput="renderEntityList('organization')" />
-            <select id="organizationSort" onchange="renderEntityList('organization')">
-              <option value="az">A–Z</option>
-              <option value="za">Z–A</option>
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-            </select>
-          </div>
-        </div>
-        <button type="button" class="wide" onclick="toggleAddForm('organizationAddForm')">+ Add Organization</button>
-        <div id="organizationAddForm" class="form-panel hidden">
-          <h3>Add Organization</h3>
-          <div class="form-grid">
-            <input id="orgName" placeholder="Organization name" />
-            <input id="orgType" placeholder="Type: guild, religion, kingdom..." />
-            <div class="upload-control">
-              <button type="button" class="file-label inline-file" onclick="triggerOverviewImageUpload('orgImage', event)">Upload Organization Image</button>
-              <input id="orgImage" type="file" accept="image/*" class="hidden" onchange="previewOverviewImage('orgImage','orgImagePreview')" />
-              <div id="orgImagePreview" class="upload-preview muted">No image selected.</div>
-            </div>
-            <textarea id="orgDescription" placeholder="Description"></textarea>
-            <textarea id="orgMembers" placeholder="Members"></textarea>
-            <textarea id="orgHistory" placeholder="History / influence"></textarea>
-          </div>
-          <button onclick="addOrganization()">Add Organization</button>
-        </div>
-        <div id="organizationList" class="card-grid"></div>
-      </section>
-
-      <section id="locationDetail" class="view">
-        <button type="button" class="ghost-btn detail-back-btn" onclick="showWorldCategory('Locations')">← Back to Locations</button>
-        <div id="locationDetailContent"></div>
-      </section>
-
-      <section id="magicDetail" class="view">
-        <button type="button" class="ghost-btn detail-back-btn" onclick="showWorldCategory('Magic Systems')">← Back to Magic Systems</button>
-        <div id="magicDetailContent"></div>
-      </section>
-
-      <section id="organizationDetail" class="view">
-        <button type="button" class="ghost-btn detail-back-btn" onclick="showWorldCategory('Organizations')">← Back to Organizations</button>
-        <div id="organizationDetailContent"></div>
-      </section>
-
-
-      <section id="scenes" class="view">
-        <div id="sceneList" class="card-grid"></div>
-      </section>
-
-      <section id="timeline" class="view">
-        <div class="form-panel">
-          <h3>Add Timeline Event</h3>
-          <div class="form-grid">
-            <input id="timeWhen" placeholder="When? e.g. 300 years ago, Book 1 Ch. 3" />
-            <select id="timeScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
-            <textarea id="timeEvent" placeholder="What happens?"></textarea>
-            <textarea id="timeImpact" placeholder="Why it matters / consequences"></textarea>
-          </div>
-          <button onclick="addTimeline()">Add Event</button>
-        </div>
-        <div id="timelineList" class="timeline-list"></div>
-      </section>
-
-      <section id="world" class="view">
-        <button type="button" class="wide" onclick="toggleAddForm('worldAddForm')">+ Add Worldbuilding Entry</button>
-        <div id="worldAddForm" class="form-panel hidden">
-          <h3>Add Worldbuilding Entry</h3>
-          <p class="muted">Each entry creates its own detail page, similar to Characters.</p>
-          <div class="form-grid">
-            <input id="worldName" placeholder="Entry name" />
-            <select id="worldScope"><option value="book">Attach to this book</option><option value="series">Attach to whole project</option></select>
-            <select id="worldCategory"></select>
-            <input id="worldCustomCategory" placeholder="New custom category, optional" />
-            <div class="upload-control">
-              <button type="button" class="file-label inline-file" onclick="triggerOverviewImageUpload('worldImage', event)">Upload Entry Image</button>
-              <input id="worldImage" type="file" accept="image/*" class="hidden" onchange="previewOverviewImage('worldImage','worldImagePreview')" />
-              <div id="worldImagePreview" class="upload-preview muted">No image selected.</div>
-            </div>
-            <textarea id="worldBasicInfo" placeholder="Basic Information"></textarea>
-            <textarea id="worldDescription" placeholder="Description"></textarea>
-            <textarea id="worldHistory" placeholder="History"></textarea>
-            <textarea id="worldCulture" placeholder="Culture / Society"></textarea>
-            <textarea id="worldRules" placeholder="Rules, limits, powers, or important notes"></textarea>
-            <textarea id="worldPlotRelevance" placeholder="Plot Relevance"></textarea>
-            <div class="custom-section-builder">
-              <input id="worldCustomTitle" placeholder="Additional section title" />
-              <textarea id="worldCustomText" placeholder="Additional section notes"></textarea>
-              <button type="button" onclick="addWorldCustomSectionDraft()">Add Section to Entry</button>
-              <div id="worldCustomDraftList" class="custom-section-list"></div>
-            </div>
-          </div>
-          <button onclick="addWorld()">Add Worldbuilding Entry</button>
-        </div>
-        <div id="worldCategoryGroups"></div>
-      </section>
-
-      <section id="worldDetail" class="view">
-        <button type="button" class="ghost-btn detail-back-btn" onclick="backToWorldCategory()">← Back to World Building</button>
-        <div id="worldDetailContent"></div>
-      </section>
-
-      <section id="worldCategoryView" class="view">
-        <div id="worldCategoryContent"></div>
-      </section>
-
-      <section id="seriesTools" class="view">
-        <div class="series-only-warning" id="seriesOnlyWarning"></div>
-        <div id="seriesToolsContent">
-          <div class="category-page-header panel">
-            <div>
-              <h2>🏛️ Series Dashboard</h2>
-              <p class="muted">Big-picture health for the entire project across all books.</p>
-            </div>
-            <div class="category-tools">
-              <button type="button" onclick="setView('storyBible')">Open Story Bible</button>
-              <button type="button" onclick="exportSeriesBiblePDF()">Generate Series Bible PDF</button>
-            </div>
-          </div>
-          <div class="grid stats-grid">
-            <div class="stat-card"><span id="seriesBookCount">0</span><p>Books</p></div>
-            <div class="stat-card"><span id="seriesTotalWords">0</span><p>Total Words</p></div>
-            <div class="stat-card"><span id="seriesArcCount">0</span><p>Character Arcs</p></div>
-            <div class="stat-card"><span id="seriesWarningCount">0</span><p>Warnings</p></div>
-          </div>
-          <div class="series-command-grid">
-            <button class="series-command-card" type="button" onclick="setView('storyBible')"><strong>📖 Story Bible</strong><span>Review synced character, world, and plot reference material.</span></button>
-            <button class="series-command-card" type="button" onclick="setView('seriesArcs')"><strong>🧭 Series Arc Tracker</strong><span>Check how character arcs move across books.</span></button>
-            <button class="series-command-card" type="button" onclick="setView('themeTracker')"><strong>🎭 Theme Tracker</strong><span>Track recurring themes and where they show up.</span></button>
-            <button class="series-command-card" type="button" onclick="setView('continuityCenter')"><strong>⚠️ Continuity Center</strong><span>Find missing plot points, unused entries, and unresolved questions.</span></button>
-            <button class="series-command-card" type="button" onclick="setView('bookHandoffs')"><strong>🔁 Book Handoffs</strong><span>Manage what carries from one book into the next.</span></button>
-            <button class="series-command-card" type="button" onclick="setView('seriesMilestones')"><strong>🏁 Series Milestones</strong><span>Track drafts, revisions, and publishing goals.</span></button>
-          </div>
-          <div class="two-col">
-            <div class="panel"><h3>Books in Series</h3><div id="seriesDashboardBooks"></div></div>
-            <div class="panel"><h3>Series Health Snapshot</h3><div id="seriesBigPicture"></div></div>
-          </div>
-          <div class="two-col">
-            <div class="panel"><h3>Arc Progress Preview</h3><div id="seriesArcPreview"></div></div>
-            <div class="panel"><h3>Needs Attention</h3><div id="seriesNeedsAttention"></div></div>
-          </div>
-        </div>
-      </section>
-
-      <section id="seriesArcs" class="view">
-        <button type="button" class="wide" onclick="toggleAddForm('seriesArcAddForm')">+ Add Series Arc</button>
-        <div id="seriesArcAddForm" class="form-panel hidden">
-          <h3>Add Series Arc</h3>
-          <div class="form-grid">
-            <input id="seriesArcTitle" placeholder="Arc title, ex. Cinna learns to live again" />
-            <select id="seriesArcCharacter"></select>
-            <p class="muted full-span">Manual series arcs are optional. Character-specific book arcs entered on character pages also appear here automatically.</p>
-            <textarea id="seriesArcBook1" placeholder="Book 1 stage"></textarea>
-            <textarea id="seriesArcBook2" placeholder="Book 2 stage"></textarea>
-            <textarea id="seriesArcBook3" placeholder="Book 3 stage"></textarea>
-            <textarea id="seriesArcNotes" placeholder="Series-wide arc notes"></textarea>
-          </div>
-          <button onclick="addSeriesArc()">Add Series Arc</button>
-        </div>
-        <div id="seriesArcList" class="card-grid"></div>
-      </section>
-
-      <section id="themeTracker" class="view">
-        <button type="button" class="wide" onclick="toggleAddForm('themeTrackAddForm')">+ Add Theme</button>
-        <div id="themeTrackAddForm" class="form-panel hidden">
-          <h3>Add Theme</h3>
-          <div class="form-grid">
-            <input id="themeTrackName" placeholder="Theme, ex. You cannot recreate the past" />
-            <textarea id="themeTrackBooks" placeholder="How this theme appears across books"></textarea>
-            <textarea id="themeTrackScenes" placeholder="Key scenes / chapters where this theme appears"></textarea>
-            <textarea id="themeTrackNotes" placeholder="Notes"></textarea>
-          </div>
-          <button onclick="addThemeTrack()">Add Theme</button>
-        </div>
-        <div id="themeTrackList" class="card-grid"></div>
-      </section>
-
-      <section id="continuityCenter" class="view">
-        <div class="category-page-header panel">
-          <div>
-            <h2>⚠️ Continuity Center</h2>
-            <p class="muted">Automatic series-level warnings gathered from characters, plot points, manuscript scenes, and questions.</p>
-          </div>
-        </div>
-        <div id="continuityCenterList" class="card-grid"></div>
-      </section>
-
-      <section id="bookHandoffs" class="view">
-        <button type="button" class="wide" onclick="toggleAddForm('bookHandoffAddForm')">+ Add Book Handoff</button>
-        <div id="bookHandoffAddForm" class="form-panel hidden">
-          <h3>Add Book-to-Book Handoff</h3>
-          <div class="form-grid">
-            <select id="handoffFromBook"></select>
-            <select id="handoffToBook"></select>
-            <textarea id="handoffStatus" placeholder="Ending/starting status, ex. Cinna: heartbroken; Marcus: concerned"></textarea>
-            <textarea id="handoffNotes" placeholder="Continuity notes"></textarea>
-          </div>
-          <button onclick="addBookHandoff()">Add Handoff</button>
-        </div>
-        <div id="bookHandoffList" class="card-grid"></div>
-      </section>
-
-      <section id="seriesMilestones" class="view">
-        <button type="button" class="wide" onclick="toggleAddForm('seriesMilestoneAddForm')">+ Add Milestone</button>
-        <div id="seriesMilestoneAddForm" class="form-panel hidden">
-          <h3>Add Series Milestone</h3>
-          <div class="form-grid">
-            <input id="milestoneTitle" placeholder="Milestone, ex. Book 2 first draft complete" />
-            <select id="milestoneStatus"><option>Not Started</option><option>In Progress</option><option>Complete</option></select>
-            <input id="milestoneDate" placeholder="Target date / completed date" />
-            <textarea id="milestoneNotes" placeholder="Notes"></textarea>
-          </div>
-          <button onclick="addSeriesMilestone()">Add Milestone</button>
-        </div>
-        <div id="seriesMilestoneList" class="card-grid"></div>
-      </section>
-
-
-      <section id="storyBible" class="view">
-        <div class="category-page-header panel">
-          <div>
-            <h2>📚 Story Bible</h2>
-            <p class="muted">A project-wide reference guide synced across all books in this series/project.</p>
-          </div>
-          <div class="category-tools">
-            <button type="button" onclick="exportSeriesBibleDocx()">Export DOCX</button>
-            <button type="button" onclick="exportSeriesBiblePDF()">Export PDF</button>
-          </div>
-        </div>
-        <div id="storyBibleContent" class="story-bible-content"></div>
-      </section>
-
-      <section id="music" class="view">
-        <div class="panel">
-          <h3>Project Music Library</h3>
-          <p>Upload audio files, build your own playlists, and play music inside PlotPals across this project. Uploaded tracks are saved with the project data in this browser.</p>
-          <div class="form-grid">
-            <label class="file-label">Upload Music <input type="file" id="musicUpload" accept="audio/*" multiple onchange="uploadMusicTracks(event)" /></label>
-            <input id="newMusicPlaylistName" placeholder="New playlist name" />
-            <button onclick="createMusicPlaylist()">Create Playlist</button>
-            <textarea id="musicNotes" placeholder="Playlist notes, mood, character themes, chapter songs..."></textarea>
-          </div>
-          <div class="music-library-controls">
-            <input id="musicLibrarySearch" placeholder="Search music..." oninput="renderMusic()" />
-            <select id="musicLibrarySort" onchange="renderMusic()">
-              <option value="az">Alphabetical (A-Z)</option>
-              <option value="za">Alphabetical (Z-A)</option>
-              <option value="newest">Date Added (Newest)</option>
-              <option value="oldest">Date Added (Oldest)</option>
-              <option value="duration">Duration</option>
-              <option value="artist">Artist</option>
-            </select>
-          </div>
-          <button onclick="saveMusicNotes()">Save Music Notes</button>
-          <p id="musicUploadStatus" class="muted small-text"></p>
-        </div>
-        <div id="musicLinks" class="music-dashboard"></div>
-      </section>
-
-      <section id="stats" class="view">
-        <div class="grid stats-grid">
-          <div class="stat-card"><span id="statsTotalWords">0</span><p>Total Book Words</p></div>
-          <div class="stat-card"><span id="statsAvgWords">0</span><p>Average Words / Chapter</p></div>
-          <div class="stat-card"><span id="statsLongestChapter">0</span><p>Longest Chapter Words</p></div>
-          <div class="stat-card"><span id="statsBibleItems">0</span><p>Bible Entries</p></div>
-        </div>
-        <div class="two-col">
-          <div class="panel"><h3>Chapter Word Counts</h3><div id="chapterStatsList"></div></div>
-          <div class="panel"><h3>POV Distribution</h3><div id="povStatsList"></div></div>
-        </div>
-      </section>
-
-      <section id="exports" class="view">
-        <div class="panel">
-          <h3>Export</h3>
-          <p>Export your full manuscript or series bible.</p>
-          <div class="backup-row">
-            <button onclick="exportFullManuscriptTxt()">Full Manuscript TXT</button>
-            <button onclick="exportFullManuscriptDocx()">Full Manuscript DOCX</button>
-            <button onclick="exportFullManuscriptPDF()">Full Manuscript PDF</button>
-            <button onclick="exportSeriesBibleDocx()">Project Bible DOCX</button>
-            <button onclick="exportSeriesBiblePDF()">Project Bible PDF</button>
-          </div>
-          <div id="printArea" class="print-area"></div>
-        </div>
-      </section>
-
-      <section id="backup" class="view">
-        <div class="panel">
-          <h3>Backup & Restore</h3>
-          <div class="backup-row">
-            <button onclick="exportData()">Export Backup JSON</button>
-            <label class="file-label">Import Backup <input type="file" id="importFile" accept="application/json" onchange="importData(event)" /></label>
-            <button onclick="importLegacyLocalDataToSupabase()">Import Legacy Local Data to Supabase</button>
-            <button class="danger" onclick="clearLegacyLocalProjectData()">Remove Legacy Browser Data</button>
-            <button class="danger" onclick="resetAll()">Clear Loaded View</button>
-          </div>
-          <p id="storageHealth" class="muted"></p><h4>Automatic Backup Snapshots</h4><div id="backupSnapshots" class="card-grid"></div><h4>Trash / Restore</h4><div id="trashManager" class="card-grid"></div><textarea id="rawData" readonly></textarea>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <div id="globalMusicPlayer" class="global-music-player"></div>
-
-  <template id="cardTemplate">
-    <article class="item-card">
-      <div class="card-header"><h3></h3><button class="delete-btn">Delete</button></div>
-      <div class="card-body"></div>
-    </article>
-  </template>
-
-  <script>
-    window.WRITERS_VAULT_SUPABASE_URL = "https://eygiasbppwcijzvfoxwp.supabase.co";
-    window.WRITERS_VAULT_SUPABASE_KEY = "sb_publishable_-iKq8JUH2VBrG2u3WCpGxg_Uq5Fq845";
-    window.PLOTPALS_SUPABASE_MEDIA_BUCKET = "plotpals-media";
-  </script>
-  <script src="script.js?v=4"></script>
-  <script src="pwa.js?v=4"></script>
-</body>
-</html>
+    </article>`;
+  }
+  function trackCard(music, track){
+    const assigned = music.playlists.filter(p=>arr(p.trackIds).includes(track.id)).map(p=>p.name);
+    return `<article class="music-track-card">
+      <div class="track-card-header"><div><h3>${esc(track.title)}</h3><p class="muted small-text">${esc(track.fileName || '')} • ${trackStorageLabel(track)}</p></div><button class="delete-btn" onclick="deleteMusicTrack('${attr(track.id)}')">Delete</button></div>
+      <div class="track-card-actions"><button onclick="playTrack('${attr(track.id)}')">Play Track</button></div>
+      <div class="track-playlist-assignment"><strong>Playlists</strong>${music.playlists.length ? `<div class="playlist-check-grid">${music.playlists.map(p=>`<label><input type="checkbox" ${arr(p.trackIds).includes(track.id)?'checked':''} onchange="toggleTrackInPlaylist('${attr(p.id)}','${attr(track.id)}')"> <span>${esc(p.name)}</span></label>`).join('')}</div>` : '<p class="muted small-text">Create a playlist to organize this track.</p>'}</div>
+      ${assigned.length ? `<p class="muted small-text">Assigned to: ${esc(assigned.join(', '))}</p>` : ''}
+    </article>`;
+  }
+  window.renderMusic = function(){
+    const music = projectMusic();
+    if(typeof setVal === 'function') setVal('musicNotes', music.notes || '');
+    const search = (document.getElementById('musicLibrarySearch')?.value || '').trim().toLowerCase();
+    const sort = document.getElementById('musicLibrarySort')?.value || 'az';
+    let tracks = [...arr(music.tracks)];
+    if(search) tracks = tracks.filter(t=>[t.title,t.artist,t.album,t.fileName].some(v=>String(v||'').toLowerCase().includes(search)));
+    tracks.sort((a,b)=>{
+      const titleA=String(a.title||a.fileName||'').toLowerCase(), titleB=String(b.title||b.fileName||'').toLowerCase();
+      if(sort==='za') return titleB.localeCompare(titleA);
+      if(sort==='newest') return String(b.uploadedAt||b.created||'').localeCompare(String(a.uploadedAt||a.created||''));
+      if(sort==='oldest') return String(a.uploadedAt||a.created||'').localeCompare(String(b.uploadedAt||b.created||''));
+      if(sort==='artist') return String(a.artist||titleA).localeCompare(String(b.artist||titleB));
+      if(sort==='duration') return Number(a.duration||0)-Number(b.duration||0);
+      return titleA.localeCompare(titleB);
+    });
+    const playlistsHTML = music.playlists.length ? music.playlists.map(p=>playlistCard(music,p)).join('') : `<div class="empty-music-state"><h3>No playlists yet</h3><p>Create a playlist to organize your project soundtrack.</p></div>`;
+    const tracksHTML = tracks.length ? tracks.map(t=>trackCard(music,t)).join('') : `<div class="empty-music-state"><h3>${music.tracks.length?'No tracks match your search':'No uploaded music yet'}</h3><p>Upload music to start building your soundtrack.</p></div>`;
+    const legacy = music.legacyLink ? `<section class="panel"><h3>Old Saved Link</h3><p>Your old playlist link was kept for reference:</p><a class="playlist-link" target="_blank" href="${attr(music.legacyLink)}">${esc(music.legacyLink)}</a></section>` : '';
+    const html = `${renderMusicPlayerPanel(music)}<section class="panel playlists-polished-panel"><div class="music-section-heading"><div><h3>Playlists</h3><p class="muted small-text">Add covers, play full playlists, and drag songs to reorder them.</p></div></div><div class="playlist-media-list">${playlistsHTML}</div></section><section class="panel uploaded-tracks-panel"><div class="music-section-heading"><div><h3>Uploaded Tracks</h3><p class="muted small-text">${music.tracks.length} uploaded track${music.tracks.length===1?'':'s'} in this project.</p></div></div><div class="uploaded-tracks-grid">${tracksHTML}</div></section>${legacy}`;
+    if(typeof setHTML === 'function') setHTML('musicLinks', html); else document.getElementById('musicLinks').innerHTML = html;
+    if(typeof renderGlobalMusicPlayer === 'function') renderGlobalMusicPlayer();
+  };
+})();
+</script>
+<div id="quickWorldModalRoot"></div></body></html>
