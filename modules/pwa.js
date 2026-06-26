@@ -4,6 +4,8 @@
 
   const STATUS_ONLINE = 'online';
   const STATUS_OFFLINE = 'offline';
+  const PWA_PROTOCOLS = new Set(['http:', 'https:']);
+  const canUsePwaOrigin = PWA_PROTOCOLS.has(window.location.protocol) && window.location.origin !== 'null';
   let deferredPrompt = null;
 
   function show(msg, ms){
@@ -17,7 +19,21 @@
     window.PLOTPALS_NETWORK_STATUS = status;
   }
 
+  function ensureManifestLink(){
+    if (!canUsePwaOrigin) return;
+    if (document.querySelector('link[rel="manifest"]')) return;
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = './manifest.webmanifest';
+    document.head.appendChild(link);
+  }
+
   async function registerServiceWorker(){
+    if (!canUsePwaOrigin) {
+      window.PLOTPALS_SERVICE_WORKER_READY = false;
+      console.info('PlotPals PWA service worker skipped: open the app from localhost, HTTPS, or your deployed site. file:// cannot register service workers.');
+      return;
+    }
     if (!('serviceWorker' in navigator)) return;
     try {
       const registration = await navigator.serviceWorker.register('./service-worker.js', { scope: './' });
@@ -29,6 +45,7 @@
   }
 
   function ensureInstallButton(){
+    if (!canUsePwaOrigin) return;
     if (document.getElementById('plotpalsInstallAppButton')) return;
     const btn = document.createElement('button');
     btn.id = 'plotpalsInstallAppButton';
@@ -49,6 +66,7 @@
   }
 
   window.addEventListener('beforeinstallprompt', event => {
+    if (!canUsePwaOrigin) return;
     event.preventDefault();
     deferredPrompt = event;
     ensureInstallButton();
@@ -75,6 +93,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     updateNetworkStatus();
+    ensureManifestLink();
     ensureInstallButton();
     registerServiceWorker();
   });

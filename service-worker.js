@@ -1,16 +1,17 @@
 /* PlotPals PWA service worker
    Supabase-friendly strategy:
-   - Cache only the local app shell/assets needed to launch the app.
-   - Do not cache Supabase API/storage requests as app data source of truth.
-   - Let Supabase network requests pass through online.
-   - If offline, the app shell still opens and local browser-saved writing remains accessible.
+   - Cache only local app shell/assets needed to launch the app.
+   - Do not cache Supabase API/storage requests.
+   - Supabase remains online-first for cloud sync.
 */
-const CACHE_VERSION = 'plotpals-pwa-shell-v1.0.0';
+const CACHE_VERSION = 'plotpals-pwa-shell-v1.0.2';
 const APP_SHELL = [
   './',
   './index.html',
   './styles.min.css',
   './app.bundle.min.js',
+  './modules/pwa.js',
+  './modules/current-systems.js',
   './favicon.svg',
   './icon-192.png',
   './icon-512.png',
@@ -19,9 +20,17 @@ const APP_SHELL = [
 
 self.addEventListener('install', event => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_VERSION).then(cache => cache.addAll(APP_SHELL))
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_VERSION);
+    await Promise.all(APP_SHELL.map(async asset => {
+      try {
+        const response = await fetch(asset, { cache: 'reload' });
+        if (response && response.ok) await cache.put(asset, response);
+      } catch (error) {
+        console.warn('PlotPals skipped app-shell cache item:', asset, error);
+      }
+    }));
+  })());
 });
 
 self.addEventListener('activate', event => {
@@ -45,11 +54,8 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-
-  // Supabase must stay online-first and should not be cached by the app shell cache.
   if (isSupabaseRequest(url)) return;
 
-  // Navigation: network first, fallback to cached app shell.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -63,7 +69,6 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Local static assets: cache first, refresh in background when online.
   if (isLocalAppAsset(url)) {
     event.respondWith((async () => {
       const cached = await caches.match(request);
